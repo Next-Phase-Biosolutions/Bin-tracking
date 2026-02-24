@@ -1,0 +1,211 @@
+// ─── Prisma Schema ─── Bin Tracking System ────────────────────────
+// All review issues resolved (v2 plan)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────
+
+enum FacilityType {
+  PROCESSING
+  RENDERING
+}
+
+enum BinStatus {
+  IDLE
+  ACTIVE
+  IN_TRANSIT
+}
+
+enum CycleStatus {
+  ACTIVE
+  IN_TRANSIT
+  COMPLETED
+}
+
+enum ComplianceResult {
+  ON_TIME
+  LATE
+}
+
+enum Urgency {
+  CRITICAL
+  MEDIUM
+  STANDARD
+  LOW
+}
+
+enum EventType {
+  BIN_STARTED
+  PICKED_UP
+  DELIVERED
+}
+
+enum UserRole {
+  ADMIN
+  OPS_MANAGER
+  DRIVER
+  WORKER
+}
+
+// ─── Models ───────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  facilities   UserFacility[]
+  driverCycles BinCycle[]
+  driverEvents EventLog[]     @relation("EventDriver")
+
+  @@map("users")
+}
+
+model UserFacility {
+  id         String   @id @default(cuid())
+  userId     String
+  facilityId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, facilityId])
+  @@index([userId])
+  @@index([facilityId])
+  @@map("user_facilities")
+}
+
+model Facility {
+  id        String       @id @default(cuid())
+  name      String
+  type      FacilityType @default(PROCESSING)
+  address   String
+  lat       Float
+  lng       Float
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  users      UserFacility[]
+  stations   Station[]
+  bins       Bin[]          @relation("CurrentFacility")
+  cycles     BinCycle[]     @relation("CycleFacility")
+  deliveries BinCycle[]     @relation("CycleDestination")
+
+  @@map("facilities")
+}
+
+model Station {
+  id         String   @id @default(cuid())
+  facilityId String
+  token      String   @unique
+  label      String   @default("Tablet")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  facility Facility   @relation(fields: [facilityId], references: [id])
+  events   EventLog[]
+
+  @@index([facilityId])
+  @@map("stations")
+}
+
+model BinType {
+  id        String   @id @default(cuid())
+  organType String   @unique
+  dkHours   Int
+  urgency   Urgency
+  prefix    String
+  createdAt DateTime @default(now())
+
+  bins Bin[]
+
+  @@map("bin_types")
+}
+
+model Bin {
+  id                String    @id @default(cuid())
+  qrCode            String    @unique
+  binTypeId         String
+  currentFacilityId String
+  status            BinStatus @default(IDLE)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  binType         BinType    @relation(fields: [binTypeId], references: [id])
+  currentFacility Facility   @relation("CurrentFacility", fields: [currentFacilityId], references: [id])
+  cycles          BinCycle[]
+
+  @@index([status])
+  @@index([currentFacilityId])
+  @@index([binTypeId])
+  @@map("bins")
+}
+
+model BinCycle {
+  id               String            @id @default(cuid())
+  binId            String
+  facilityId       String
+  destinationId    String?
+  status           CycleStatus       @default(ACTIVE)
+  startedAt        DateTime          @default(now())
+  deadline         DateTime
+  pickedUpAt       DateTime?
+  deliveredAt      DateTime?
+  driverId         String?
+  vehicleId        String?
+  complianceResult ComplianceResult?
+  anchored         Boolean           @default(false)
+  anchorTxHash     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  bin         Bin        @relation(fields: [binId], references: [id])
+  facility    Facility   @relation("CycleFacility", fields: [facilityId], references: [id])
+  destination Facility?  @relation("CycleDestination", fields: [destinationId], references: [id])
+  driver      User?      @relation(fields: [driverId], references: [id])
+  events      EventLog[]
+
+  // Note: We use application-level validation (serializable transactions) to prevent
+  // duplicate ACTIVE/IN_TRANSIT cycles. A DB constraint would incorrectly prevent
+  // multiple COMPLETED cycles for the same bin (which are historical records).
+  // For additional DB-level safety, create a partial unique index in a migration.
+  @@index([binId, status])
+  @@index([status])
+  @@index([deadline])
+  @@index([facilityId])
+  @@map("bin_cycles")
+}
+
+model EventLog {
+  id          String    @id @default(cuid())
+  cycleId     String
+  eventType   EventType
+  timestamp   DateTime  @default(now())
+  stationId   String?
+  driverId    String?
+  locationLat Float?
+  locationLng Float?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  cycle   BinCycle @relation(fields: [cycleId], references: [id])
+  station Station? @relation(fields: [stationId], references: [id])
+  driver  User?    @relation("EventDriver", fields: [driverId], references: [id])
+
+  @@index([cycleId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@map("event_logs")
+}

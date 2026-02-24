@@ -1,0 +1,30 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "forceConsistentCasingInFileNames": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "moduleResolution": "bundler",
+        "module": "ESNext",
+        "target": "ES2022",
+        "lib": [
+            "ES2022"
+        ],
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true
+    },
+    "exclude": [
+        "node_modules",
+        "dist",
+        "build",
+        ".turbo"
+    ]
+}

@@ -1,0 +1,29 @@
+{
+    "name": "bin-tracker",
+    "private": true,
+    "version": "0.1.0",
+    "description": "Bin Spoilage Tracking System with Cardano integration",
+    "packageManager": "pnpm@9.15.4",
+    "engines": {
+        "node": ">=20.0.0",
+        "pnpm": ">=9.0.0"
+    },
+    "scripts": {
+        "dev": "turbo run dev",
+        "build": "turbo run build",
+        "typecheck": "turbo run typecheck",
+        "lint": "turbo run lint",
+        "lint:fix": "turbo run lint:fix",
+        "test": "turbo run test",
+        "test:watch": "turbo run test:watch",
+        "clean": "turbo run clean && rm -rf node_modules",
+        "db:generate": "pnpm --filter @bin-tracker/db generate",
+        "db:migrate": "pnpm --filter @bin-tracker/db migrate:dev",
+        "db:seed": "pnpm --filter @bin-tracker/db seed",
+        "db:studio": "pnpm --filter @bin-tracker/db studio",
+        "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+    },
+    "devDependencies": {
+        "turbo": "^2.8.9"
+    }
+}
