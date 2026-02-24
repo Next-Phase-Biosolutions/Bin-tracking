@@ -1,62 +1,31 @@
 const results = [
-    { stat: "72", desc: "tonnes diverted from landfill in the last 6 months" },
-    { stat: "35%", desc: "average reduction in disposal cost at pilot sites" },
-    { stat: "48 hrs", desc: "typical onboarding to schedule first pickup" },
+    { stat: "22,000", desc: "Litres of fuel saved annually by reducing transport needs." },
+    { stat: "8,000", desc: "Tonnes of waste diverted from landfill each year." },
+    { stat: "$20k+", desc: "Average annual savings for medium sized abattoir clients." },
 ];
 
 export function ProvenResults() {
     return (
-        <section
-            style={{
-                backgroundColor: "#2a6f2b",
-                padding: "112px 64px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                overflow: "hidden",
-            }}
-        >
+        <section className="bg-[#043f2e] py-16 px-4 md:py-24 md:px-16 flex flex-col items-center">
             <h2
-                style={{
-                    fontFamily: "'Montserrat', sans-serif",
-                    fontWeight: 700,
-                    fontSize: 48,
-                    lineHeight: 1.2,
-                    letterSpacing: "-0.48px",
-                    color: "white",
-                    marginBottom: 40,
-                    textAlign: "center",
-                    width: 768,
-                }}
+                className="font-bold text-3xl md:text-5xl leading-tight tracking-tight text-white mb-10 md:mb-16 text-center"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
             >
                 Proven Results
             </h2>
-            <div style={{ display: "flex", gap: 80, alignItems: "flex-start" }}>
+
+            <div className="flex flex-col md:flex-row flex-wrap gap-10 md:gap-20 items-center justify-center max-w-7xl mx-auto w-full">
                 {results.map((r) => (
-                    <div key={r.stat} style={{ width: 326, display: "flex", flexDirection: "column", gap: 18 }}>
-                        <p
-                            style={{
-                                fontFamily: "'Montserrat', sans-serif",
-                                fontWeight: 700,
-                                fontSize: 72,
-                                lineHeight: 1.2,
-                                letterSpacing: "-0.72px",
-                                color: "white",
-                                margin: 0,
-                            }}
+                    <div key={r.stat} className="w-full max-w-[326px] flex flex-col gap-3 md:gap-4 text-center md:text-left">
+                        <h3
+                            className="font-bold text-4xl md:text-6xl text-[#12cd80] m-0 tracking-tight"
+                            style={{ fontFamily: "'Montserrat', sans-serif" }}
                         >
                             {r.stat}
-                        </p>
+                        </h3>
                         <p
-                            style={{
-                                fontFamily: "'Inter', sans-serif",
-                                fontWeight: 400,
-                                fontSize: 22,
-                                lineHeight: 1.5,
-                                letterSpacing: "-0.22px",
-                                color: "white",
-                                margin: 0,
-                            }}
+                            className="font-normal text-base md:text-[20px] leading-relaxed text-white m-0"
+                            style={{ fontFamily: "'Open Sans', sans-serif" }}
                         >
                             {r.desc}
                         </p>

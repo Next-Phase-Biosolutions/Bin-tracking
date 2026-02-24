@@ -4,49 +4,26 @@ const imgProblem = "/assets/imgProblem.jpg";
 
 export function TheProblem() {
     return (
-        <section
-            style={{
-                backgroundColor: "white",
-                padding: "112px 64px",
-                display: "flex",
-                justifyContent: "center",
-                overflow: "hidden",
-            }}
-        >
-            <div style={{ display: "flex", gap: 80, alignItems: "center" }}>
+        <section className="bg-white py-16 px-4 md:py-28 md:px-16 flex justify-center overflow-hidden">
+            <div className="flex flex-col lg:flex-row gap-10 lg:gap-20 items-center max-w-7xl mx-auto w-full">
                 {/* Image */}
-                <div
-                    style={{
-                        width: 600,
-                        height: 400,
-                        borderRadius: 10,
-                        overflow: "hidden",
-                        flexShrink: 0,
-                    }}
-                >
+                <div className="w-full lg:w-1/2 rounded-xl overflow-hidden flex-shrink-0 aspect-[3/2] lg:h-[400px]">
                     <img
                         src={imgProblem}
                         alt="Problem"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        className="w-full h-full object-cover"
                     />
                 </div>
 
                 {/* Content */}
-                <div style={{ width: 544, display: "flex", flexDirection: "column", gap: 24 }}>
+                <div className="w-full lg:w-1/2 flex flex-col gap-6 lg:gap-8">
                     <h2
-                        style={{
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 48,
-                            lineHeight: 1.2,
-                            letterSpacing: "-0.48px",
-                            color: "black",
-                            margin: 0,
-                        }}
+                        className="font-bold text-3xl md:text-[48px] leading-tight tracking-tight text-black m-0"
+                        style={{ fontFamily: "'Montserrat', sans-serif" }}
                     >
                         The Problem
                     </h2>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div className="flex flex-col gap-4">
                         <CheckItem text="Disposal is expensive and risky." />
                         <CheckItem text="Landfill creates odour, pests, and pollution." />
                         <CheckItem text="Regulations change often and add extra work for your team." />

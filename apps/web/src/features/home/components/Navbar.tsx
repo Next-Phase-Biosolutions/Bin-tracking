@@ -1,77 +1,108 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 
 const imgLogo = "/assets/imgLogo.png";
 
 export function Navbar() {
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const toggleMenu = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
+
     return (
-        <nav
-            style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "20px 64px",
-                backgroundColor: "#043F2E",
-            }}
-        >
-            {/* Logo */}
-            <div style={{ display: "flex", alignItems: "center" }}>
-                <Link to="/">
-                    <img
-                        src={imgLogo}
-                        alt="Sheps Farm"
-                        style={{ height: 62, objectFit: "contain" }}
-                    />
-                </Link>
-            </div>
-
-            {/* Links */}
-            <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
-                <div style={{ display: "flex", gap: 24 }}>
-                    {["Home", "Solutions", "Process"].map((link) => {
-                        let target = "#";
-                        if (link === "Home") target = "/";
-                        if (link === "Solutions") target = "/solutions";
-                        if (link === "Process") target = "/process";
-
-                        return (
-                            <Link
-                                key={link}
-                                to={target}
-                                style={{
-                                    textDecoration: "none",
-                                    color: "white",
-                                    fontFamily: "'Open Sans', sans-serif",
-                                    fontWeight: 400,
-                                    fontSize: 18,
-                                    lineHeight: 1.5,
-                                }}
-                            >
-                                {link}
-                            </Link>
-                        );
-                    })}
+        <nav className="bg-[#043F2E] px-4 py-4 md:px-16 md:py-5 relative">
+            <div className="flex justify-between items-center max-w-7xl mx-auto">
+                {/* Logo */}
+                <div className="flex items-center">
+                    <Link to="/">
+                        <img
+                            src={imgLogo}
+                            alt="Sheps Farm"
+                            className="h-10 md:h-[62px] object-contain"
+                        />
+                    </Link>
                 </div>
 
-                <div style={{ display: "flex", gap: 16 }}>
-                    <a
-                        href="#"
-                        style={{
-                            backgroundColor: "#3d5aa8",
-                            color: "white",
-                            padding: "8px 20px",
-                            borderRadius: 100,
-                            textDecoration: "none",
-                            fontFamily: "'Open Sans', sans-serif",
-                            fontSize: 18,
-                            fontWeight: 600,
-                            lineHeight: 1.5,
-                            border: "1px solid #3d5aa8",
-                        }}
-                    >
-                        Contact Us
-                    </a>
+                {/* Desktop Links */}
+                <div className="hidden md:flex gap-8 items-center">
+                    <div className="flex gap-6">
+                        {["Home", "Solutions", "Process"].map((link) => {
+                            let target = "#";
+                            if (link === "Home") target = "/";
+                            if (link === "Solutions") target = "/solutions";
+                            if (link === "Process") target = "/process";
+
+                            return (
+                                <Link
+                                    key={link}
+                                    to={target}
+                                    className="text-white hover:text-gray-200 transition-colors font-sans text-lg font-normal"
+                                >
+                                    {link}
+                                </Link>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex gap-4">
+                        <a
+                            href="#"
+                            className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-5 py-2 rounded-full font-sans text-lg font-semibold border border-[#3d5aa8] transition-colors"
+                        >
+                            Contact Us
+                        </a>
+                    </div>
                 </div>
+
+                {/* Mobile Menu Button */}
+                <button
+                    className="md:hidden text-white focus:outline-none"
+                    onClick={toggleMenu}
+                    aria-label="Toggle mobile menu"
+                >
+                    {isMobileMenuOpen ? (
+                        <X size={28} />
+                    ) : (
+                        <Menu size={28} />
+                    )}
+                </button>
             </div>
+
+            {/* Mobile Menu Dropdown */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden absolute top-full left-0 right-0 bg-[#043F2E] border-t border-white/10 p-4 flex flex-col gap-4 shadow-lg z-50">
+                    <div className="flex flex-col gap-4">
+                        {["Home", "Solutions", "Process"].map((link) => {
+                            let target = "#";
+                            if (link === "Home") target = "/";
+                            if (link === "Solutions") target = "/solutions";
+                            if (link === "Process") target = "/process";
+
+                            return (
+                                <Link
+                                    key={link}
+                                    to={target}
+                                    className="text-white hover:text-gray-200 transition-colors font-sans text-lg font-normal block"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    {link}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                    <div className="pt-2 border-t border-white/10">
+                        <a
+                            href="#"
+                            className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-5 py-2 rounded-full font-sans text-lg font-semibold inline-block text-center w-full transition-colors"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Contact Us
+                        </a>
+                    </div>
+                </div>
+            )}
         </nav>
     );
 }
