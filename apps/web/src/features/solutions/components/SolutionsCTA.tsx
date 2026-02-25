@@ -5,113 +5,38 @@ const imgCtaVector = "/assets/imgCtaVector.png";
 
 export function SolutionsCTA() {
     return (
-        <section
-            style={{
-                position: "relative",
-                height: 522,
-                overflow: "hidden",
-                backgroundColor: "#f1ede2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-            }}
-        >
+        <section className="relative min-h-[400px] lg:min-h-[522px] overflow-hidden bg-[#f1ede2] flex items-center justify-center py-16 px-4">
             <img
                 src={imgCtaBg}
                 alt=""
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    pointerEvents: "none",
-                }}
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
             />
             {/* Dark Filter Overlay covering the image */}
-            <div
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    backgroundColor: "rgba(0, 0, 0, 0.5)",
-                    pointerEvents: "none",
-                }}
-            />
+            <div className="absolute inset-0 bg-black/50 pointer-events-none z-0" />
             <img
                 src={imgCtaVector}
                 alt=""
-                style={{
-                    position: "absolute",
-                    left: "50%",
-                    top: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: "101.5%",
-                    pointerEvents: "none",
-                }}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[101.5%] pointer-events-none z-0"
             />
 
-            <div
-                style={{
-                    position: "relative",
-                    zIndex: 10,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 24,
-                    textAlign: "center",
-                    maxWidth: 768,
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 24,
-                        color: "white",
-                        textAlign: "center",
-                        width: "100%",
-                    }}
-                >
+            <div className="relative z-10 flex flex-col items-center gap-6 text-center max-w-[768px] w-full px-4">
+                <div className="flex flex-col items-center gap-6 text-white text-center w-full">
                     <h2
-                        style={{
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 68,
-                            lineHeight: 1.2,
-                            letterSpacing: "-0.68px",
-                            margin: 0,
-                        }}
+                        className="font-bold text-4xl md:text-5xl lg:text-[68px] leading-tight tracking-tight m-0"
+                        style={{ fontFamily: "'Montserrat', sans-serif" }}
                     >
                         Start Your Zero<br />Waste Program
                     </h2>
                     <p
-                        style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: 22,
-                            lineHeight: 1.5,
-                            margin: 0,
-                        }}
+                        className="font-normal text-lg md:text-[22px] leading-relaxed m-0"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                         Get a simple audit of your plant. We review your by product streams and show how much waste you can divert from landfill.
                     </p>
                 </div>
                 <button
-                    style={{
-                        backgroundColor: "#043f2e",
-                        color: "white",
-                        border: "none",
-                        borderRadius: 100,
-                        padding: "15px 30px",
-                        fontFamily: "'Inter', sans-serif",
-                        fontWeight: 600,
-                        fontSize: 20,
-                        cursor: "pointer",
-                        lineHeight: 1.5,
-                        transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#032a1f")}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#043f2e")}
+                    className="bg-[#043f2e] hover:bg-[#032a1f] text-white border-none rounded-full px-6 py-3 lg:px-[30px] lg:py-[15px] font-semibold text-lg md:text-[20px] cursor-pointer leading-relaxed transition-colors"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
                 >
                     Contact Our Team
                 </button>

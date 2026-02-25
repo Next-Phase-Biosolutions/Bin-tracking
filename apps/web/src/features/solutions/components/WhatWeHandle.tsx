@@ -12,34 +12,20 @@ interface IconBadgeProps {
 
 function IconBadge({ badgeIcon, innerIcon, text }: IconBadgeProps) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: 250 }}>
-            <div style={{ position: "relative", width: 94, height: 94 }}>
-                <img src={badgeIcon} alt="" style={{ width: "100%", height: "100%" }} />
+        <div className="flex flex-col items-center gap-3 w-full sm:w-[250px]">
+            <div className="relative w-[94px] h-[94px]">
+                <img src={badgeIcon} alt="" className="w-full h-full object-contain" />
                 {innerIcon && (
                     <img
                         src={innerIcon}
                         alt=""
-                        style={{
-                            position: "absolute",
-                            top: "50%",
-                            left: "50%",
-                            transform: "translate(-50%, -50%)",
-                            width: 44,
-                            height: "auto",
-                        }}
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-auto object-contain"
                     />
                 )}
             </div>
             <p
-                style={{
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontSize: 20,
-                    color: "black",
-                    textAlign: "center",
-                    lineHeight: 1.5,
-                    width: 192,
-                    margin: 0,
-                }}
+                className="font-normal text-lg md:text-[20px] text-black text-center leading-relaxed w-full sm:w-[192px] m-0"
+                style={{ fontFamily: "'Open Sans', sans-serif" }}
             >
                 {text}
             </p>
@@ -49,40 +35,15 @@ function IconBadge({ badgeIcon, innerIcon, text }: IconBadgeProps) {
 
 export function WhatWeHandle() {
     return (
-        <section
-            style={{
-                width: "100%",
-                backgroundColor: "#eef2e3",
-                padding: "112px 64px",
-                overflow: "hidden",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 40,
-                    maxWidth: 1440,
-                    margin: "0 auto",
-                }}
-            >
+        <section className="w-full bg-[#eef2e3] py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
+            <div className="flex flex-col items-center gap-10 max-w-[1440px] mx-auto">
                 <h2
-                    style={{
-                        fontFamily: "'Montserrat', sans-serif",
-                        fontWeight: 700,
-                        fontSize: 48,
-                        color: "black",
-                        textAlign: "center",
-                        letterSpacing: "-0.48px",
-                        lineHeight: 1.2,
-                        width: 768,
-                        margin: 0,
-                    }}
+                    className="font-bold text-3xl md:text-5xl lg:text-[48px] text-black text-center leading-tight tracking-tight max-w-[768px] w-full m-0"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
                 >
                     What We Handle
                 </h2>
-                <div style={{ display: "flex", gap: 40 }}>
+                <div className="flex flex-row flex-wrap justify-center gap-8 lg:gap-10 w-full">
                     <IconBadge
                         badgeIcon={imgTrustLocal}
                         innerIcon={imgGroup31}

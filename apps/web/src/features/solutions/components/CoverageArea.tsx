@@ -4,75 +4,28 @@ const imgNpDigitalKreativaStudio2 = "https://www.figma.com/api/mcp/asset/52f7a81
 
 export function CoverageArea() {
     return (
-        <section
-            style={{
-                width: "100%",
-                backgroundColor: "white",
-                padding: "112px 64px",
-                overflow: "hidden",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 80,
-                    maxWidth: 1280,
-                    margin: "0 auto",
-                    width: "100%",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 24,
-                        maxWidth: 768,
-                        width: "100%",
-                    }}
-                >
+        <section className="w-full bg-white py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
+            <div className="flex flex-col items-center gap-10 lg:gap-20 max-w-[1280px] mx-auto w-full">
+                <div className="flex flex-col items-center gap-6 max-w-[768px] w-full">
                     <h2
-                        style={{
-                            fontFamily: "'Outfit', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 60,
-                            color: "black",
-                            textAlign: "center",
-                            letterSpacing: "-0.6px",
-                            lineHeight: 1.2,
-                            margin: 0,
-                        }}
+                        className="font-bold text-4xl md:text-5xl lg:text-[60px] text-black text-center leading-tight tracking-tight m-0"
+                        style={{ fontFamily: "'Outfit', sans-serif" }}
                     >
                         Coverage Area
                     </h2>
                     <p
-                        style={{
-                            fontFamily: "'Open Sans', sans-serif",
-                            fontSize: 18,
-                            color: "black",
-                            textAlign: "center",
-                            lineHeight: 1.5,
-                            margin: 0,
-                        }}
+                        className="font-normal text-lg lg:text-[18px] text-black text-center leading-relaxed m-0"
+                        style={{ fontFamily: "'Open Sans', sans-serif" }}
                     >
                         We serve up to 200 km around Scugog, Ontario.<br />
                         Call us if your plant is outside the area.
                     </p>
                 </div>
-                <div
-                    style={{
-                        width: "100%",
-                        maxWidth: 1280,
-                        height: 450,
-                        overflow: "hidden",
-                    }}
-                >
+                <div className="w-full max-w-[1280px] h-[300px] md:h-[450px] overflow-hidden">
                     <img
                         src={imgNpDigitalKreativaStudio2}
                         alt="Coverage Map"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }}
+                        className="w-full h-full object-cover object-center"
                     />
                 </div>
             </div>

@@ -12,86 +12,49 @@ interface PricingCardProps {
 
 function PricingCard({ title, price, yearly, features }: PricingCardProps) {
     return (
-        <div
-            style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                backgroundColor: "#f2f2f2",
-                border: "1px solid rgba(0,0,0,0.15)",
-                padding: 32,
-                minHeight: 625,
-            }}
-        >
-            <div style={{ display: "flex", flexDirection: "column", gap: 32, width: "100%" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-end", width: "100%" }}>
-                    <div style={{ width: 24, height: 24, overflow: "hidden" }}>
-                        <img src={imgVector9} alt="" style={{ width: "100%", height: "100%" }} />
+        <div className="flex flex-col justify-between flex-1 bg-[#f2f2f2] border border-black/15 p-6 lg:p-8 min-h-[auto] lg:min-h-[625px] w-full">
+            <div className="flex flex-col gap-8 w-full">
+                <div className="flex flex-col gap-4 items-end w-full">
+                    <div className="w-6 h-6 overflow-hidden">
+                        <img src={imgVector9} alt="" className="w-full h-full object-contain" />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", width: "100%", color: "black" }}>
+                    <div className="flex flex-col gap-2 items-start w-full text-black">
                         <p
-                            style={{
-                                fontFamily: "'Outfit', sans-serif",
-                                fontWeight: 700,
-                                fontSize: 26,
-                                lineHeight: 1.4,
-                                letterSpacing: "-0.26px",
-                                margin: 0,
-                            }}
+                            className="font-bold text-2xl lg:text-[26px] leading-snug tracking-tight m-0"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}
                         >
                             {title}
                         </p>
                         <p
-                            style={{
-                                fontFamily: "'Outfit', sans-serif",
-                                fontWeight: 700,
-                                margin: 0,
-                                display: "flex",
-                                alignItems: "baseline",
-                            }}
+                            className="font-bold m-0 flex items-baseline"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}
                         >
-                            <span style={{ fontSize: 84, lineHeight: 1.1, letterSpacing: "-0.84px" }}>{price}</span>
-                            <span style={{ fontSize: 40, lineHeight: 1.3, letterSpacing: "-0.4px" }}>/mo</span>
+                            <span className="text-6xl lg:text-[84px] leading-tight tracking-tight">{price}</span>
+                            <span className="text-3xl lg:text-[40px] leading-snug tracking-tight">/mo</span>
                         </p>
                         <p
-                            style={{
-                                fontFamily: "'Open Sans', sans-serif",
-                                fontSize: 18,
-                                lineHeight: 1.5,
-                                margin: 0,
-                            }}
+                            className="font-normal text-base lg:text-[18px] leading-relaxed m-0"
+                            style={{ fontFamily: "'Open Sans', sans-serif" }}
                         >
                             {yearly}
                         </p>
                     </div>
                 </div>
-                <div style={{ height: 1, width: "100%", backgroundColor: "rgba(0,0,0,0.15)" }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+                <div className="h-px w-full bg-black/15" />
+                <div className="flex flex-col gap-4 w-full">
                     <p
-                        style={{
-                            fontFamily: "'Open Sans', sans-serif",
-                            fontSize: 18,
-                            color: "black",
-                            lineHeight: 1.5,
-                            margin: 0,
-                        }}
+                        className="font-normal text-base lg:text-[18px] text-black leading-relaxed m-0"
+                        style={{ fontFamily: "'Open Sans', sans-serif" }}
                     >
                         Includes:
                     </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0", width: "100%" }}>
+                    <div className="flex flex-col gap-4 py-2 w-full">
                         {features.map((feature, index) => (
-                            <div key={index} style={{ display: "flex", gap: 16, alignItems: "flex-start", width: "100%" }}>
-                                <img src={imgCheck} alt="" style={{ width: 24, height: 24, flexShrink: 0 }} />
+                            <div key={index} className="flex gap-4 items-start w-full">
+                                <img src={imgCheck} alt="" className="w-6 h-6 shrink-0 object-contain" />
                                 <p
-                                    style={{
-                                        flex: 1,
-                                        fontFamily: "'Open Sans', sans-serif",
-                                        fontSize: 18,
-                                        color: "black",
-                                        lineHeight: 1.5,
-                                        margin: 0,
-                                    }}
+                                    className="flex-1 font-normal text-base lg:text-[18px] text-black leading-relaxed m-0"
+                                    style={{ fontFamily: "'Open Sans', sans-serif" }}
                                 >
                                     {feature}
                                 </p>
@@ -101,21 +64,8 @@ function PricingCard({ title, price, yearly, features }: PricingCardProps) {
                 </div>
             </div>
             <button
-                style={{
-                    width: "100%",
-                    backgroundColor: "#3d5aa8",
-                    color: "white",
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontWeight: 600,
-                    fontSize: 18,
-                    padding: "10px 24px",
-                    borderRadius: 100,
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#324a8f")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#3d5aa8")}
+                className="w-full bg-[#3d5aa8] hover:bg-[#324a8f] text-white font-semibold text-base lg:text-[18px] py-[10px] px-6 rounded-full border-none cursor-pointer transition-colors mt-8 lg:mt-0"
+                style={{ fontFamily: "'Open Sans', sans-serif" }}
             >
                 Button
             </button>
@@ -125,40 +75,15 @@ function PricingCard({ title, price, yearly, features }: PricingCardProps) {
 
 export function ProgramOptions() {
     return (
-        <section
-            style={{
-                width: "100%",
-                backgroundColor: "#f8f8f8",
-                padding: "112px 64px",
-                overflow: "hidden",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 80,
-                    maxWidth: 1280,
-                    margin: "0 auto",
-                    width: "100%",
-                }}
-            >
+        <section className="w-full bg-[#f8f8f8] py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
+            <div className="flex flex-col items-center gap-10 lg:gap-20 max-w-[1280px] mx-auto w-full">
                 <h2
-                    style={{
-                        fontFamily: "'Outfit', sans-serif",
-                        fontWeight: 700,
-                        fontSize: 60,
-                        color: "black",
-                        textAlign: "center",
-                        letterSpacing: "-0.6px",
-                        lineHeight: 1.2,
-                        margin: 0,
-                    }}
+                    className="font-bold text-4xl md:text-5xl lg:text-[60px] text-black text-center leading-tight tracking-tight m-0"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
                 >
                     Program Options
                 </h2>
-                <div style={{ display: "flex", gap: 32, width: "100%" }}>
+                <div className="flex flex-col lg:flex-row gap-8 w-full">
                     <PricingCard
                         title="Basic"
                         price="$19"

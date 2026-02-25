@@ -11,23 +11,18 @@ function CheckIcon() {
         <img
             src={imgGroup23}
             alt=""
-            style={{ width: 30.5, height: 30.5, flexShrink: 0 }}
+            className="w-[30.5px] h-[30.5px] shrink-0 object-contain"
         />
     );
 }
 
 function FeatureItem({ text }: { text: string }) {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+        <div className="flex items-center gap-3 w-full">
             <CheckIcon />
             <p
-                style={{
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontSize: 20,
-                    color: "black",
-                    lineHeight: 1.5,
-                    margin: 0,
-                }}
+                className="font-normal text-lg md:text-[20px] text-black leading-relaxed m-0"
+                style={{ fontFamily: "'Open Sans', sans-serif" }}
             >
                 {text}
             </p>
@@ -37,74 +32,33 @@ function FeatureItem({ text }: { text: string }) {
 
 export function WhatYouGet() {
     return (
-        <section
-            style={{
-                width: "100%",
-                backgroundColor: "white",
-                padding: "112px 64px",
-                overflow: "hidden",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 80,
-                    maxWidth: 1440,
-                    margin: "0 auto",
-                }}
-            >
+        <section className="w-full bg-white py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
+            <div className="flex flex-col items-center gap-12 lg:gap-20 max-w-[1440px] mx-auto w-full">
                 <h2
-                    style={{
-                        fontFamily: "'Montserrat', sans-serif",
-                        fontWeight: 700,
-                        fontSize: 48,
-                        color: "black",
-                        textAlign: "center",
-                        letterSpacing: "-0.48px",
-                        lineHeight: 1.2,
-                        width: 768,
-                        margin: 0,
-                    }}
+                    className="font-bold text-3xl md:text-5xl lg:text-[48px] text-black text-center leading-tight tracking-tight max-w-[768px] w-full m-0"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
                 >
                     What You Get
                 </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 40, width: "100%" }}>
+                <div className="flex flex-col gap-16 lg:gap-10 w-full">
                     {/* Collection and Logistics */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-                        <div
-                            style={{
-                                width: 600,
-                                height: 400,
-                                backgroundColor: "white",
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                flexShrink: 0,
-                            }}
-                        >
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
                             <img
                                 src={img11}
                                 alt="Collection bins in facility"
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                className="w-full h-full object-cover"
                             />
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: 544 }}>
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2">
                             <h3
-                                style={{
-                                    fontFamily: "'Montserrat', sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: 48,
-                                    color: "black",
-                                    letterSpacing: "-0.48px",
-                                    lineHeight: 1.2,
-                                    margin: 0,
-                                }}
+                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
+                                style={{ fontFamily: "'Montserrat', sans-serif" }}
                             >
                                 Collection and Logistics
                             </h3>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div className="flex flex-col gap-3">
                                 <FeatureItem text="Clean bins and totes" />
                                 <FeatureItem text="Scheduled pickups" />
                                 <FeatureItem text="Clear instructions for sorting" />
@@ -114,78 +68,46 @@ export function WhatYouGet() {
                     </div>
 
                     {/* Processing and Upcycling */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: 544 }}>
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
                             <h3
-                                style={{
-                                    fontFamily: "'Montserrat', sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: 48,
-                                    color: "black",
-                                    letterSpacing: "-0.48px",
-                                    lineHeight: 1.2,
-                                    margin: 0,
-                                }}
+                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
+                                style={{ fontFamily: "'Montserrat', sans-serif" }}
                             >
                                 Processing and Upcycling
                             </h3>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div className="flex flex-col gap-3">
                                 <FeatureItem text="We convert materials into usable inputs" />
                                 <FeatureItem text="Output pathways include collagen, leather preparation, tallow, and bio oils" />
                                 <FeatureItem text="Safe and compliant processing" />
                             </div>
                         </div>
-                        <div
-                            style={{
-                                width: 600,
-                                height: 400,
-                                backgroundColor: "white",
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                flexShrink: 0,
-                            }}
-                        >
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
                             <img
                                 src={img21}
                                 alt="Laboratory processing"
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                className="w-full h-full object-cover"
                             />
                         </div>
                     </div>
 
                     {/* Traceability and Reporting */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-                        <div
-                            style={{
-                                width: 600,
-                                height: 400,
-                                backgroundColor: "white",
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                flexShrink: 0,
-                            }}
-                        >
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
                             <img
                                 src={img37}
                                 alt="Reporting dashboard"
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                className="w-full h-full object-cover"
                             />
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: 544 }}>
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2">
                             <h3
-                                style={{
-                                    fontFamily: "'Montserrat', sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: 48,
-                                    color: "black",
-                                    letterSpacing: "-0.48px",
-                                    lineHeight: 1.2,
-                                    margin: 0,
-                                }}
+                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
+                                style={{ fontFamily: "'Montserrat', sans-serif" }}
                             >
                                 Traceability and Reporting
                             </h3>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div className="flex flex-col gap-3">
                                 <FeatureItem text="Monthly landfill diversion report" />
                                 <FeatureItem text="Clear weight records and percentages" />
                                 <FeatureItem text="Helpful for ESG, audits, and compliance paperwork" />
@@ -194,41 +116,25 @@ export function WhatYouGet() {
                     </div>
 
                     {/* Compliance Support */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: 544 }}>
+                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
                             <h3
-                                style={{
-                                    fontFamily: "'Montserrat', sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: 48,
-                                    color: "black",
-                                    letterSpacing: "-0.48px",
-                                    lineHeight: 1.2,
-                                    margin: 0,
-                                }}
+                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
+                                style={{ fontFamily: "'Montserrat', sans-serif" }}
                             >
                                 Compliance Support
                             </h3>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div className="flex flex-col gap-3">
                                 <FeatureItem text="SOPs for sorting and handling" />
                                 <FeatureItem text="Documentation we follow on site" />
                                 <FeatureItem text="Licensed transport and safe handling practices" />
                             </div>
                         </div>
-                        <div
-                            style={{
-                                width: 600,
-                                height: 400,
-                                backgroundColor: "white",
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                flexShrink: 0,
-                            }}
-                        >
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
                             <img
                                 src={imgFarmerCowshedLookingAfterCows1}
                                 alt="Farm compliance"
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                className="w-full h-full object-cover"
                             />
                         </div>
                     </div>

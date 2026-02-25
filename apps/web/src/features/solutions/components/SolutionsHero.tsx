@@ -2,91 +2,31 @@ const imgCloseUpCobblerUsingSewingMachine = "https://www.figma.com/api/mcp/asset
 
 export function SolutionsHero() {
     return (
-        <section
-            style={{
-                position: "relative",
-                width: "100%",
-                height: 800,
-                backgroundColor: "transparent",
-                overflow: "hidden",
-            }}
-        >
+        <section className="relative w-full min-h-[500px] lg:min-h-[800px] bg-transparent overflow-hidden">
             {/* Background image */}
             <img
                 src={imgCloseUpCobblerUsingSewingMachine}
                 alt=""
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                }}
+                className="absolute inset-0 w-full h-full object-cover"
             />
             {/* Content */}
-            <div
-                style={{
-                    position: "relative",
-                    zIndex: 10,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    paddingTop: 92,
-                    textAlign: "center",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 24,
-                        maxWidth: 768,
-                        width: "100%",
-                        padding: "0 20px",
-                    }}
-                >
+            <div className="relative z-10 flex flex-col items-center pt-16 lg:pt-[92px] text-center px-4">
+                <div className="flex flex-col items-center gap-6 max-w-[768px] w-full">
                     <h1
-                        style={{
-                            fontFamily: "'Montserrat', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 68,
-                            color: "white",
-                            textAlign: "center",
-                            lineHeight: 1.2,
-                            letterSpacing: "-0.68px",
-                            margin: 0,
-                        }}
+                        className="font-bold text-4xl md:text-5xl lg:text-[68px] text-white text-center leading-tight tracking-tight m-0"
+                        style={{ fontFamily: "'Montserrat', sans-serif" }}
                     >
                         The Zero Waste Program for Abattoirs
                     </h1>
                     <p
-                        style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: 22,
-                            color: "white",
-                            textAlign: "center",
-                            lineHeight: 1.5,
-                            margin: 0,
-                        }}
+                        className="font-normal text-lg md:text-[22px] text-white text-center leading-relaxed m-0"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                         A simple, closed loop system that turns your by products into value while reducing risk and landfill waste.
                     </p>
                     <button
-                        style={{
-                            backgroundColor: "#043f2e",
-                            color: "white",
-                            fontFamily: "'Inter', sans-serif",
-                            fontWeight: 600,
-                            fontSize: 20,
-                            padding: "15px 30px",
-                            borderRadius: 100,
-                            border: "none",
-                            cursor: "pointer",
-                            transition: "background-color 0.2s",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#032a1f")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#043f2e")}
+                        className="bg-[#043f2e] hover:bg-[#032a1f] text-white font-semibold text-lg md:text-[20px] px-6 py-3 lg:px-[30px] lg:py-[15px] rounded-full border-none cursor-pointer transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                         Request a Zero Waste Audit
                     </button>
