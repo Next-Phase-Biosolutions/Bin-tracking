@@ -119,8 +119,14 @@ export const dashboardService = {
     async getPriorityQueue(input: PaginationInput, facilityIds: string[], userRole: UserRole) {
         const cycleFilter = userRole === 'ADMIN' ? {} : { facilityId: { in: facilityIds } };
 
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
         const where = {
-            status: { in: ['ACTIVE' as const, 'IN_TRANSIT' as const] },
+            OR: [
+                { status: { in: ['ACTIVE' as const, 'IN_TRANSIT' as const] } },
+                { status: 'COMPLETED' as const, deliveredAt: { gte: todayStart } },
+            ],
             ...cycleFilter,
         };
 
