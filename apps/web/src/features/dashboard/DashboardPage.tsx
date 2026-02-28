@@ -3,6 +3,7 @@ import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
 import { LayoutDashboard, AlertTriangle, ArrowRightCircle, PackageCheck, Box, RefreshCw } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
+import { Link } from 'react-router-dom';
 
 // Temporarily hardcode an admin token for MVP testing since there's no login yet
 const TEST_ADMIN_TOKEN = "eyJhbGciOiJFUzI1NiIsImtpZCI6ImJiNjJmODNiLTNjMTAtNDcxZC1iYTg5LWNjOGMzNWMxZDkxYSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3NhcWt5aWlsdWJsdXR3dXN3dWxrLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJkN2NhNGZiMy1hYmFlLTQ4ZWItYTk4My0xM2M1ZTVmNzUxZTgiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcyMDA4NDMyLCJpYXQiOjE3NzIwMDQ4MzIsImVtYWlsIjoiYWRtaW5AYmludHJhY2tlci5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiU3lzdGVtIEFkbWluIn0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3NzIwMDQ4MzJ9XSwic2Vzc2lvbl9pZCI6IjJhMmM2YzU5LWY2ZmQtNDFhNy1iNjc0LTU5MjM1YTkzYmQxYiIsImlzX2Fub255bW91cyI6ZmFsc2V9.X_X8hUrhcNGmF9zlQpTlWVbtj4GpSFBYCdzBrVbJ1R6aYbfQWtgzDTk6yFadTdyV2tBBZ_tIL2frazME0hZRKw";
@@ -48,9 +49,21 @@ export function DashboardPage() {
                         <h1 className="text-xl md:text-2xl font-bold tracking-tight">Ops Dashboard</h1>
                     </div>
                     <div className="flex items-center gap-4">
+                        <Link
+                            to="/app/driver"
+                            className="bg-white hover:bg-gray-100 text-[#043F2E] px-4 py-2 rounded-lg text-sm font-semibold transition-colors hidden md:block"
+                        >
+                            Driver
+                        </Link>
+                        <Link
+                            to="/app/bin"
+                            className="bg-white hover:bg-gray-100 text-[#043F2E] px-4 py-2 rounded-lg text-sm font-semibold transition-colors hidden md:block"
+                        >
+                            Bin
+                        </Link>
                         <button
                             onClick={handleManualRefresh}
-                            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2"
+                            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
                         >
                             <RefreshCw className="w-4 h-4" />
                             <span className="hidden md:inline">Refresh</span>

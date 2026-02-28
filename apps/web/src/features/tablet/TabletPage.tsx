@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { trpc } from '../../lib/trpc';
 import { QRScanner } from '../../components/QRScanner';
 import { AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { createStationTRPCClient } from '../../lib/trpc';
 
@@ -81,6 +82,21 @@ export function TabletPage() {
                 <div className="w-full text-center mb-6">
                     <h1 className="text-3xl md:text-4xl font-bold text-[#043F2E] tracking-tight">Facility Scanner</h1>
                     <p className="text-[#3d5aa8] font-medium mt-2">Station: {TABLET_STATION_ID}</p>
+
+                    <div className="flex items-center justify-center gap-4 mt-6">
+                        <Link
+                            to="/app/dashboard"
+                            className="bg-white hover:bg-gray-50 text-[#043F2E] px-4 py-2 rounded-lg font-semibold text-sm border border-gray-200 shadow-sm transition-colors"
+                        >
+                            Dashboard
+                        </Link>
+                        <Link
+                            to="/app/driver"
+                            className="bg-white hover:bg-gray-50 text-[#043F2E] px-4 py-2 rounded-lg font-semibold text-sm border border-gray-200 shadow-sm transition-colors"
+                        >
+                            Driver
+                        </Link>
+                    </div>
                 </div>
 
                 {!scannedBinId ? (

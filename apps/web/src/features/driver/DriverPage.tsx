@@ -4,6 +4,7 @@ import { QRScanner } from '../../components/QRScanner';
 import { Package, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import type { BinWithDetails } from '@bin-tracker/types';
+import { Link } from 'react-router-dom';
 
 // Temporarily hardcode a driver token for MVP testing since there's no login yet
 const TEST_DRIVER_TOKEN = "eyJhbGciOiJFUzI1NiIsImtpZCI6ImJiNjJmODNiLTNjMTAtNDcxZC1iYTg5LWNjOGMzNWMxZDkxYSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3NhcWt5aWlsdWJsdXR3dXN3dWxrLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI1ZWZhOGE1ZC02MTQ3LTQwYzMtOWIyOS1mYTkyYTc1ODQ0MmEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcyMDA4Mzg4LCJpYXQiOjE3NzIwMDQ3ODgsImVtYWlsIjoiZHJpdmVyMUBiaW50cmFja2VyLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJKb2huIERyaXZlciJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzcyMDA0Nzg4fV0sInNlc3Npb25faWQiOiJkNjU2NjRmNi0zZDBhLTRiODEtODBmNi1kM2Y3ZTU3MjVhZWIiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.CtKiIYmhueTpIyDO0g6863z2x_qXDiEkSYj_mrUvAzvU9gy-Skhl9-QiR7YLB9qcMoan1BdjcYTQXi2JYHuLFw";
@@ -111,6 +112,20 @@ export function DriverPage() {
                         <h1 className="text-xl font-bold text-gray-900">Driver Portal</h1>
                         <p className="text-sm text-gray-500">John Doe (Truck-01)</p>
                     </div>
+                </div>
+                <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    <Link
+                        to="/app/dashboard"
+                        className="bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 shadow-sm transition-colors"
+                    >
+                        Dashboard
+                    </Link>
+                    <Link
+                        to="/app/bin"
+                        className="bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 shadow-sm transition-colors"
+                    >
+                        Bin
+                    </Link>
                 </div>
             </header>
 

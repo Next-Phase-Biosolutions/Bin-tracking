@@ -53,6 +53,12 @@ export function Navbar() {
                         >
                             Contact Us
                         </a>
+                        <Link
+                            to="/app/dashboard"
+                            className="bg-white hover:bg-gray-100 text-[#043F2E] px-5 py-2 rounded-full font-sans text-lg font-semibold border border-white transition-colors"
+                        >
+                            Launch App
+                        </Link>
                     </div>
                 </div>
 
@@ -95,11 +101,18 @@ export function Navbar() {
                     <div className="pt-2 border-t border-white/10">
                         <a
                             href="#"
-                            className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-5 py-2 rounded-full font-sans text-lg font-semibold inline-block text-center w-full transition-colors"
+                            className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-5 py-2 rounded-full font-sans text-lg font-semibold inline-block text-center w-full transition-colors mb-2"
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
                             Contact Us
                         </a>
+                        <Link
+                            to="/app/dashboard"
+                            className="bg-white hover:bg-gray-100 text-[#043F2E] px-5 py-2 rounded-full font-sans text-lg font-semibold inline-block text-center w-full transition-colors"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Launch App
+                        </Link>
                     </div>
                 </div>
             )}
