@@ -289,6 +289,89 @@ export const binService = {
         };
     },
 
+    /** 
+     * Get all active bins associated with a scanned QR Code (or Master QR Code).
+     * Used by the driver portal to resolve dynamic ambiguity and guarantee access. 
+     */
+    async getActiveDynamicMatches(qrCode: string, userId: string, userRole: string) {
+        // 1. Resolve permitted facility IDs first (Drivers only see bins physically at their facilities)
+        let permittedFacilityIds: string[] | undefined = undefined;
+        if (userRole !== 'ADMIN') {
+            const userFacilities = await prisma.userFacility.findMany({
+                where: { userId },
+                select: { facilityId: true }
+            });
+            permittedFacilityIds = userFacilities.map(uf => uf.facilityId);
+        }
+
+        const facilityFilter = permittedFacilityIds ? { currentFacilityId: { in: permittedFacilityIds } } : {};
+
+        // 2. Check if the QR code is an exact physical Bin match
+        const exactBin = await prisma.bin.findUnique({
+            where: { qrCode },
+            include: {
+                binType: true,
+                currentFacility: { select: { id: true, name: true, type: true } },
+                cycles: {
+                    where: { status: { in: ['ACTIVE', 'IN_TRANSIT'] } },
+                    take: 1,
+                    orderBy: { startedAt: 'desc' }
+                }
+            }
+        });
+
+        // If it's an exact match, verify it's active and accessible
+        if (exactBin && !exactBin.deletedAt && ['ACTIVE', 'IN_TRANSIT'].includes(exactBin.status)) {
+            if (permittedFacilityIds && !permittedFacilityIds.includes(exactBin.currentFacilityId)) {
+                return []; // Cannot access this specific bin
+            }
+
+            const activeCycle = exactBin.cycles[0];
+            return [{
+                ...exactBin,
+                activeCycle: activeCycle ? { ...activeCycle, ...calculateCountdown(activeCycle.deadline) } : null
+            }];
+        }
+
+        // 3. Fallback: Check if it's a Master QR code to find dynamic bins
+        const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
+        const binType = await prisma.binType.findUnique({
+            where: { masterQrCode: normalizedQr }
+        });
+
+        if (!binType) {
+            return []; // Not a known master QR or exact QR
+        }
+
+        // 4. Find ALL active bins of this type that the user has access to
+        const activeBins = await prisma.bin.findMany({
+            where: {
+                binTypeId: binType.id,
+                status: { in: ['ACTIVE', 'IN_TRANSIT'] },
+                deletedAt: null,
+                ...facilityFilter
+            },
+            include: {
+                binType: true,
+                currentFacility: { select: { id: true, name: true, type: true } },
+                cycles: {
+                    where: { status: { in: ['ACTIVE', 'IN_TRANSIT'] } },
+                    take: 1,
+                    orderBy: { startedAt: 'desc' },
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        return activeBins.map(b => {
+            const activeCycle = b.cycles[0];
+            return {
+                ...b,
+                activeCycle: activeCycle ? { ...activeCycle, ...calculateCountdown(activeCycle.deadline) } : null
+            };
+        });
+    },
+
     /** List bins with filters and cursor pagination */
     async list(input: BinListInput, facilityIds: string[], userRole: string) {
         const facilityFilter = userRole === 'ADMIN' ? {} : { currentFacilityId: { in: facilityIds } };

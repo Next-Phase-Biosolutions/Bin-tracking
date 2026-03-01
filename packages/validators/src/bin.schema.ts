@@ -37,6 +37,15 @@ export const binGetByQrCodeSchema = z.object({
         .max(50, 'QR code too long'),
 });
 
+export const binGetActiveDynamicSchema = z.object({
+    qrCode: z
+        .string()
+        .min(1, 'QR code is required')
+        .max(50, 'QR code too long'),
+});
+
+export type BinGetActiveDynamicInput = z.infer<typeof binGetActiveDynamicSchema>;
+
 // ─── Bin List ─────────────────────────────────────────────────
 
 export const binListSchema = z.object({

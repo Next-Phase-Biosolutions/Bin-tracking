@@ -8,9 +8,11 @@ export {
     binStartDynamicSchema,
     binGetByIdSchema,
     binGetByQrCodeSchema,
+    binGetActiveDynamicSchema,
     binListSchema,
     type BinStartInput,
     type BinStartDynamicInput,
+    type BinGetActiveDynamicInput,
     type BinListInput,
 } from './bin.schema.js';
 

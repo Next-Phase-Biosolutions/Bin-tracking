@@ -11,7 +11,8 @@ const TEST_DRIVER_TOKEN = import.meta.env.VITE_TEST_DRIVER_TOKEN || "";
 
 export function DriverPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
-    const [binInfo, setBinInfo] = useState<any>(null); // Simplified typing for now
+    const [binOptions, setBinOptions] = useState<any[]>([]);
+    const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
     const [actionSuccess, setActionSuccess] = useState<string | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(false);
@@ -22,10 +23,6 @@ export function DriverPage() {
         setAuthToken(TEST_DRIVER_TOKEN);
     });
 
-    // tRPC procedures
-    // getById is a query, but we only want to fetch when a scan happens. 
-    // We can use trpc.useUtils() or just a query with enabled: !!scannedBinId
-    // For simplicity, we'll keep the manual fetch pattern using trpcContext
     const trpcContext = trpc.useUtils();
 
     const pickupMutation = trpc.cycle.pickup.useMutation();
@@ -36,24 +33,34 @@ export function DriverPage() {
             setScannedBinId(decodedText);
             setActionSuccess(null);
             setIsFetching(true);
+            setBinOptions([]);
+            setSelectedBinId(null);
+            setFetchError(null);
 
-            try {        // Fetch bin details to know if we are picking up or delivering
-                const details = await trpcContext.bin.getByQrCode.fetch({ qrCode: decodedText });
-                setBinInfo(details);
-                setFetchError(null);
+            try {
+                // Fetch dynamic bin matches
+                const options = await trpcContext.bin.getActiveDynamicMatches.fetch({ qrCode: decodedText });
+
+                if (options.length === 0) {
+                    setFetchError("No accessible active bins found for this code.");
+                } else if (options.length === 1) {
+                    // Auto-select if there's only one exactly
+                    setBinOptions(options);
+                    setSelectedBinId(options[0].id);
+                } else {
+                    // Show selection UI
+                    setBinOptions(options);
+                }
+
             } catch (error: any) {
                 console.error("Error fetching bin details:", error);
-                setBinInfo(null);
-
                 let errorMessage = error.message || "Failed to find bin";
                 try {
                     const parsed = JSON.parse(errorMessage);
                     if (Array.isArray(parsed) && parsed[0]?.message) {
                         errorMessage = parsed[0].message;
                     }
-                } catch (_) {
-                    // Not JSON, use as is
-                }
+                } catch (_) { }
 
                 setFetchError(errorMessage);
             } finally {
@@ -61,6 +68,8 @@ export function DriverPage() {
             }
         }
     };
+
+    const binInfo = binOptions.find(b => b.id === selectedBinId);
 
     const handlePickup = async () => {
         if (!binInfo?.activeCycle?.id) return;
@@ -92,7 +101,8 @@ export function DriverPage() {
 
     const resetScan = () => {
         setScannedBinId(null);
-        setBinInfo(null);
+        setBinOptions([]);
+        setSelectedBinId(null);
         setActionSuccess(null);
         setFetchError(null);
         pickupMutation.reset();
@@ -196,10 +206,54 @@ export function DriverPage() {
                             </div>
                         )}
 
+                        {!isFetching && !fetchError && binOptions.length > 1 && !selectedBinId && (
+                            <div className="space-y-4 animate-in fade-in duration-300">
+                                <h4 className="font-medium text-gray-800">Multiple active cycles found. Select the physical bin you are holding:</h4>
+                                <div className="space-y-3">
+                                    {binOptions.map((bin, index) => (
+                                        <button
+                                            key={bin.id}
+                                            onClick={() => setSelectedBinId(bin.id)}
+                                            className="w-full bg-white border-2 border-gray-200 hover:border-[#3d5aa8] p-4 rounded-xl text-left transition-all active:scale-[0.98] group"
+                                        >
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-bold text-gray-900 group-hover:text-[#3d5aa8]">
+                                                    Option {index + 1}
+                                                </span>
+                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${bin.status === 'ACTIVE' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                                    }`}>
+                                                    {bin.status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-gray-500 flex flex-col gap-1">
+                                                <span>Facility: {bin.currentFacility?.name || 'Unknown'}</span>
+                                                <span className="font-mono text-xs opacity-70">ID: {bin.qrCode}</span>
+                                                {bin.activeCycle?.startedAt && (
+                                                    <span>Started: {new Date(bin.activeCycle.startedAt).toLocaleTimeString()}</span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {binInfo && !actionSuccess && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                                {binOptions.length > 1 && (
+                                    <button
+                                        onClick={() => setSelectedBinId(null)}
+                                        className="text-sm text-[#3d5aa8] font-medium hover:underline mb-2"
+                                    >
+                                        &larr; Back to selection
+                                    </button>
+                                )}
                                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                                     <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs text-gray-500 mb-1">Assigned ID</p>
+                                            <span className="font-mono text-xs font-semibold">{binInfo.qrCode}</span>
+                                        </div>
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Status</p>
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize

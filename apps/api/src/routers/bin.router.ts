@@ -1,5 +1,5 @@
 import { router, stationProcedure, protectedProcedure } from '../trpc/trpc.js';
-import { binStartSchema, binStartDynamicSchema, binGetByIdSchema, binGetByQrCodeSchema, binListSchema } from '@bin-tracker/validators';
+import { binStartSchema, binStartDynamicSchema, binGetByIdSchema, binGetByQrCodeSchema, binGetActiveDynamicSchema, binListSchema } from '@bin-tracker/validators';
 import { binService } from '../services/bin.service.js';
 import { getUserFacilityIds } from '../trpc/middleware.js';
 
@@ -22,6 +22,11 @@ export const binRouter = router({
     /** Get bin details by QR code */
     getByQrCode: protectedProcedure.input(binGetByQrCodeSchema).query(async ({ input, ctx }) => {
         return binService.getByQrCode(input.qrCode, ctx.user.id, ctx.user.role);
+    }),
+
+    /** Get active dynamic bin cycles by QR or Master QR code */
+    getActiveDynamicMatches: protectedProcedure.input(binGetActiveDynamicSchema).query(async ({ input, ctx }) => {
+        return binService.getActiveDynamicMatches(input.qrCode, ctx.user.id, ctx.user.role);
     }),
 
     /** List bins with filters and pagination */
