@@ -18,7 +18,7 @@ export function createUserTRPCClient() {
     return trpc.createClient({
         links: [
             httpBatchLink({
-                url: '/trpc',
+                url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
                 transformer: superjson,
                 headers: () =>
                     _authToken ? { Authorization: `Bearer ${_authToken}` } : {},
@@ -34,7 +34,7 @@ export function createStationTRPCClient(stationToken: string) {
     return createTRPCClient<AppRouter>({
         links: [
             httpBatchLink({
-                url: '/trpc',
+                url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
                 transformer: superjson,
                 headers: () => ({ Authorization: `Station ${stationToken}` }),
             }),
