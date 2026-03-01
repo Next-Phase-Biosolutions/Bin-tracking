@@ -1,0 +1,15 @@
+[build]
+  # Tell Netlify to run the turbo build command from the root
+  command = "npm run build --filter=@bin-tracker/web..."
+  
+  # Tell Netlify where the compiled frontend files end up
+  publish = "apps/web/dist"
+  
+  # Tell Netlify where to run the build command from
+  base = "/"
+
+[[redirects]]
+  # This ensures React Router handles all page refreshing correctly
+  from = "/*"
+  to = "/index.html"
+  status = 200
