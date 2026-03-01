@@ -92,6 +92,96 @@ export const binService = {
         );
     },
 
+    /**
+     * Start a dynamic bin cycle (Scan 1 — Facility Tablet, Option B MVP)
+     * 
+     * Creates a new generic Bin on the fly from a Master QR Code and immediately starts a cycle for it.
+     */
+    async startDynamic(input: import('@bin-tracker/validators').BinStartDynamicInput, stationId: string) {
+        return prisma.$transaction(
+            async (tx: Prisma.TransactionClient) => {
+                // 1. Find the parent BinType by the scanned Master QR code
+                const binType = await tx.binType.findUnique({
+                    where: { masterQrCode: input.masterQrCode },
+                });
+
+                if (!binType) {
+                    throw new TRPCError({
+                        code: 'NOT_FOUND',
+                        message: `Master QR code "${input.masterQrCode}" not found in system`,
+                    });
+                }
+
+                // Get the physical facility location of the station scanning the QR
+                const station = await tx.station.findUnique({
+                    where: { id: stationId },
+                    select: { facilityId: true }
+                });
+
+                if (!station) {
+                    throw new TRPCError({
+                        code: 'NOT_FOUND',
+                        message: `Scanning station not found`,
+                    });
+                }
+
+                const now = new Date();
+                const deadline = new Date(now.getTime() + binType.dkHours * 60 * 60 * 1000);
+
+                // 2. Dynamically Generate a physical bin tracker identity.
+                // Format: HRT-cycle-<timestamp>
+                const dynamicQrCode = `${binType.prefix}-cycle-${Date.now().toString().slice(-6)}`;
+
+                // 3. Create the physical Bin representation
+                const bin = await tx.bin.create({
+                    data: {
+                        qrCode: dynamicQrCode,
+                        binTypeId: binType.id,
+                        currentFacilityId: station.facilityId,
+                        status: 'ACTIVE',
+                    }
+                });
+
+                // 4. Create cycle 
+                const cycle = await tx.binCycle.create({
+                    data: {
+                        binId: bin.id,
+                        facilityId: bin.currentFacilityId,
+                        startedAt: now,
+                        deadline,
+                    },
+                });
+
+                // 5. Append event (immutable audit log)
+                await tx.eventLog.create({
+                    data: {
+                        cycleId: cycle.id,
+                        eventType: 'BIN_STARTED',
+                        stationId,
+                        timestamp: now,
+                    },
+                });
+
+                // 6. Return cycle with countdown
+                const countdown = calculateCountdown(deadline, now);
+                return {
+                    ...cycle,
+                    ...countdown,
+                    bin: {
+                        id: bin.id,
+                        qrCode: bin.qrCode,
+                        binType: {
+                            organType: binType.organType,
+                            dkHours: binType.dkHours,
+                            urgency: binType.urgency,
+                        },
+                    },
+                };
+            },
+            { isolationLevel: 'Serializable' },
+        );
+    },
+
     /** Get bin by ID with active cycle and countdown */
     async getById(id: string, userId: string, userRole: string) {
         const bin = await prisma.bin.findUnique({

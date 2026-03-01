@@ -62,11 +62,11 @@ async function createAuthUser(email: string, password: string, name: string): Pr
 // ─── Seed data ─────────────────────────────────────────────────────────────
 
 const SEED_USERS = [
-    { email: 'admin@bintracker.com',   name: 'System Admin', role: UserRole.ADMIN,       password: 'Admin1234!'  },
-    { email: 'ops@bintracker.com',     name: 'Ops Manager',  role: UserRole.OPS_MANAGER, password: 'Ops1234!'    },
-    { email: 'driver1@bintracker.com', name: 'John Driver',  role: UserRole.DRIVER,      password: 'Driver1234!' },
-    { email: 'driver2@bintracker.com', name: 'Jane Driver',  role: UserRole.DRIVER,      password: 'Driver1234!' },
-    { email: 'worker1@bintracker.com', name: 'Bob Worker',   role: UserRole.WORKER,      password: 'Worker1234!' },
+    { email: 'admin@bintracker.com', name: 'System Admin', role: UserRole.ADMIN, password: 'Admin1234!' },
+    { email: 'ops@bintracker.com', name: 'Ops Manager', role: UserRole.OPS_MANAGER, password: 'Ops1234!' },
+    { email: 'driver1@bintracker.com', name: 'John Driver', role: UserRole.DRIVER, password: 'Driver1234!' },
+    { email: 'driver2@bintracker.com', name: 'Jane Driver', role: UserRole.DRIVER, password: 'Driver1234!' },
+    { email: 'worker1@bintracker.com', name: 'Bob Worker', role: UserRole.WORKER, password: 'Worker1234!' },
 ] as const;
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     // ─── 2. Clean Supabase Auth (remove old seed users) ────────
     console.log('🔐 Cleaning Supabase Auth users...');
     const existingAuth = await listAuthUsers();
-    const seedEmails = new Set(SEED_USERS.map(u => u.email));
+    const seedEmails = new Set(SEED_USERS.map(u => u.email as string));
     for (const authUser of existingAuth.filter(u => seedEmails.has(u.email))) {
         await deleteAuthUser(authUser.id);
         console.log(`  ✗ Deleted old auth user: ${authUser.email}`);
@@ -117,11 +117,11 @@ async function main(): Promise<void> {
     // ─── 5. Facilities ──────────────────────────────────────────
     console.log('🏭 Creating facilities...');
     const facilities = await Promise.all([
-        prisma.facility.create({ data: { name: 'Chicago Processing',   type: FacilityType.PROCESSING, address: '123 Industrial Blvd, Chicago, IL 60601',     lat: 41.8781, lng: -87.6298 } }),
-        prisma.facility.create({ data: { name: 'Detroit Processing',   type: FacilityType.PROCESSING, address: '456 Factory Ave, Detroit, MI 48201',          lat: 42.3314, lng: -83.0458 } }),
-        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd, Milwaukee, WI 53202',           lat: 43.0389, lng: -87.9065 } }),
-        prisma.facility.create({ data: { name: 'Midwest Rendering',    type: FacilityType.RENDERING,  address: '321 Render Lane, Indianapolis, IN 46201',    lat: 39.7684, lng: -86.1581 } }),
-        prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way, Columbus, OH 43215',        lat: 39.9612, lng: -82.9988 } }),
+        prisma.facility.create({ data: { name: 'Chicago Processing', type: FacilityType.PROCESSING, address: '123 Industrial Blvd, Chicago, IL 60601', lat: 41.8781, lng: -87.6298 } }),
+        prisma.facility.create({ data: { name: 'Detroit Processing', type: FacilityType.PROCESSING, address: '456 Factory Ave, Detroit, MI 48201', lat: 42.3314, lng: -83.0458 } }),
+        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd, Milwaukee, WI 53202', lat: 43.0389, lng: -87.9065 } }),
+        prisma.facility.create({ data: { name: 'Midwest Rendering', type: FacilityType.RENDERING, address: '321 Render Lane, Indianapolis, IN 46201', lat: 39.7684, lng: -86.1581 } }),
+        prisma.facility.create({ data: { name: 'Great Lakes Rendering', type: FacilityType.RENDERING, address: '654 Process Way, Columbus, OH 43215', lat: 39.9612, lng: -82.9988 } }),
     ]);
     const [chicago, detroit, milwaukee] = facilities;
 
@@ -132,31 +132,31 @@ async function main(): Promise<void> {
     //  Driver2     → Detroit + Milwaukee
     console.log('🔗 Assigning users to facilities...');
     await Promise.all([
-        prisma.userFacility.create({ data: { userId: ops!.id,     facilityId: chicago!.id  } }),
-        prisma.userFacility.create({ data: { userId: ops!.id,     facilityId: detroit!.id  } }),
-        prisma.userFacility.create({ data: { userId: driver1!.id, facilityId: chicago!.id  } }),
-        prisma.userFacility.create({ data: { userId: driver2!.id, facilityId: detroit!.id  } }),
-        prisma.userFacility.create({ data: { userId: driver2!.id, facilityId: milwaukee!.id} }),
+        prisma.userFacility.create({ data: { userId: ops!.id, facilityId: chicago!.id } }),
+        prisma.userFacility.create({ data: { userId: ops!.id, facilityId: detroit!.id } }),
+        prisma.userFacility.create({ data: { userId: driver1!.id, facilityId: chicago!.id } }),
+        prisma.userFacility.create({ data: { userId: driver2!.id, facilityId: detroit!.id } }),
+        prisma.userFacility.create({ data: { userId: driver2!.id, facilityId: milwaukee!.id } }),
     ]);
 
     // ─── 7. Stations (scanning tablets) ─────────────────────────
     console.log('📟 Creating stations...');
     await Promise.all([
-        prisma.station.create({ data: { facilityId: chicago!.id,   token: generateToken(), label: 'Chicago Tablet 1'   } }),
-        prisma.station.create({ data: { facilityId: chicago!.id,   token: generateToken(), label: 'Chicago Tablet 2'   } }),
-        prisma.station.create({ data: { facilityId: detroit!.id,   token: generateToken(), label: 'Detroit Tablet 1'   } }),
+        prisma.station.create({ data: { facilityId: chicago!.id, token: generateToken(), label: 'Chicago Tablet 1' } }),
+        prisma.station.create({ data: { facilityId: chicago!.id, token: generateToken(), label: 'Chicago Tablet 2' } }),
+        prisma.station.create({ data: { facilityId: detroit!.id, token: generateToken(), label: 'Detroit Tablet 1' } }),
         prisma.station.create({ data: { facilityId: milwaukee!.id, token: generateToken(), label: 'Milwaukee Tablet 1' } }),
     ]);
 
     // ─── 8. Bin Types ────────────────────────────────────────────
     console.log('📦 Creating bin types...');
     const binTypes = await Promise.all([
-        prisma.binType.create({ data: { organType: 'heart',  dkHours: 4,  urgency: Urgency.CRITICAL, prefix: 'BIN-HEART'  } }),
-        prisma.binType.create({ data: { organType: 'liver',  dkHours: 6,  urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER'  } }),
-        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM,   prefix: 'BIN-KIDNEY' } }),
-        prisma.binType.create({ data: { organType: 'skin',   dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN'   } }),
-        prisma.binType.create({ data: { organType: 'fat',    dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT'    } }),
-        prisma.binType.create({ data: { organType: 'bone',   dkHours: 48, urgency: Urgency.LOW,      prefix: 'BIN-BONE'   } }),
+        prisma.binType.create({ data: { organType: 'heart', dkHours: 4, urgency: Urgency.CRITICAL, prefix: 'BIN-HEART' } }),
+        prisma.binType.create({ data: { organType: 'liver', dkHours: 6, urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER' } }),
+        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM, prefix: 'BIN-KIDNEY' } }),
+        prisma.binType.create({ data: { organType: 'skin', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN' } }),
+        prisma.binType.create({ data: { organType: 'fat', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT' } }),
+        prisma.binType.create({ data: { organType: 'bone', dkHours: 48, urgency: Urgency.LOW, prefix: 'BIN-BONE' } }),
     ]);
 
     // ─── 9. Bins ─────────────────────────────────────────────────
@@ -164,11 +164,11 @@ async function main(): Promise<void> {
     const binData: Array<[number, number, number]> = [
         // [binTypeIdx, facilityIdx, serialNo]
         // Chicago — 8 bins
-        [0,0,1], [0,0,2], [1,0,1], [2,0,1], [3,0,1], [4,0,1], [5,0,1], [5,0,2],
+        [0, 0, 1], [0, 0, 2], [1, 0, 1], [2, 0, 1], [3, 0, 1], [4, 0, 1], [5, 0, 1], [5, 0, 2],
         // Detroit — 6 bins
-        [0,1,3], [1,1,2], [2,1,2], [3,1,2], [4,1,2], [5,1,3],
+        [0, 1, 3], [1, 1, 2], [2, 1, 2], [3, 1, 2], [4, 1, 2], [5, 1, 3],
         // Milwaukee — 6 bins
-        [0,2,4], [1,2,3], [2,2,3], [3,2,3], [4,2,3], [5,2,4],
+        [0, 2, 4], [1, 2, 3], [2, 2, 3], [3, 2, 3], [4, 2, 3], [5, 2, 4],
     ];
 
     await Promise.all(

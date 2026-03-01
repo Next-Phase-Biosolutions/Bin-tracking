@@ -5,10 +5,12 @@ export { paginationSchema, type PaginationInput } from './common.schema.js';
 
 export {
     binStartSchema,
+    binStartDynamicSchema,
     binGetByIdSchema,
     binGetByQrCodeSchema,
     binListSchema,
     type BinStartInput,
+    type BinStartDynamicInput,
     type BinListInput,
 } from './bin.schema.js';
 

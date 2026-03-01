@@ -14,6 +14,16 @@ export const binStartSchema = z.object({
 
 export type BinStartInput = z.infer<typeof binStartSchema>;
 
+export const binStartDynamicSchema = z.object({
+    /** The master generic QR code scanned at facility */
+    masterQrCode: z
+        .string()
+        .min(1, 'Master QR code is required')
+        .max(50, 'Master QR code too long'),
+});
+
+export type BinStartDynamicInput = z.infer<typeof binStartDynamicSchema>;
+
 // ─── Bin Get ──────────────────────────────────────────────────
 
 export const binGetByIdSchema = z.object({

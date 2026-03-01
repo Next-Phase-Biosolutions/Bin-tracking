@@ -121,12 +121,13 @@ model Station {
 }
 
 model BinType {
-  id        String   @id @default(cuid())
-  organType String   @unique
-  dkHours   Int
-  urgency   Urgency
-  prefix    String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  organType    String   @unique
+  dkHours      Int
+  urgency      Urgency
+  prefix       String
+  masterQrCode String?  @unique
+  createdAt    DateTime @default(now())
 
   bins Bin[]
 

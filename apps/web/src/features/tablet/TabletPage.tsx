@@ -42,8 +42,9 @@ export function TabletPage() {
         try {
             const stationClient = createStationTRPCClient(TABLET_STATION_TOKEN);
 
-            await stationClient.bin.start.mutate({
-                qrCode: scannedBinId,
+            // Call the new dynamic start endpoint for Option B
+            await stationClient.bin.startDynamic.mutate({
+                masterQrCode: scannedBinId,
             });
 
             setIsSuccess(true);
