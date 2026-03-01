@@ -151,12 +151,12 @@ async function main(): Promise<void> {
     // ─── 8. Bin Types ────────────────────────────────────────────
     console.log('📦 Creating bin types...');
     const binTypes = await Promise.all([
-        prisma.binType.create({ data: { organType: 'heart', dkHours: 4, urgency: Urgency.CRITICAL, prefix: 'BIN-HEART' } }),
-        prisma.binType.create({ data: { organType: 'liver', dkHours: 6, urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER' } }),
-        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM, prefix: 'BIN-KIDNEY' } }),
-        prisma.binType.create({ data: { organType: 'skin', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN' } }),
-        prisma.binType.create({ data: { organType: 'fat', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT' } }),
-        prisma.binType.create({ data: { organType: 'bone', dkHours: 48, urgency: Urgency.LOW, prefix: 'BIN-BONE' } }),
+        prisma.binType.create({ data: { organType: 'heart', dkHours: 4, urgency: Urgency.CRITICAL, prefix: 'BIN-HEART', masterQrCode: 'TYPE-HEART' } }),
+        prisma.binType.create({ data: { organType: 'liver', dkHours: 6, urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER', masterQrCode: 'TYPE-LIVER' } }),
+        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM, prefix: 'BIN-KIDNEY', masterQrCode: 'TYPE-KIDNEY' } }),
+        prisma.binType.create({ data: { organType: 'skin', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN', masterQrCode: 'TYPE-SKIN' } }),
+        prisma.binType.create({ data: { organType: 'fat', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT', masterQrCode: 'TYPE-FAT' } }),
+        prisma.binType.create({ data: { organType: 'bone', dkHours: 48, urgency: Urgency.LOW, prefix: 'BIN-BONE', masterQrCode: 'TYPE-BONE' } }),
     ]);
 
     // ─── 9. Bins ─────────────────────────────────────────────────
