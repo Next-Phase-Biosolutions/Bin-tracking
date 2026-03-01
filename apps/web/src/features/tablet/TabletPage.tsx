@@ -41,6 +41,7 @@ export function TabletPage() {
 
         try {
             const stationClient = createStationTRPCClient(TABLET_STATION_TOKEN);
+            console.log("Starting bin with station token:", TABLET_STATION_TOKEN);
 
             // Call the new dynamic start endpoint for Option B
             await stationClient.bin.startDynamic.mutate({

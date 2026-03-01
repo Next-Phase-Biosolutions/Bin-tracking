@@ -222,7 +222,7 @@ export const binService = {
 
     /** Get bin by QR code */
     async getByQrCode(qrCode: string, userId: string, userRole: string) {
-        const bin = await prisma.bin.findUnique({
+        let bin = await prisma.bin.findUnique({
             where: { qrCode },
             include: {
                 binType: true,
@@ -234,6 +234,38 @@ export const binService = {
                 },
             },
         });
+
+        // MVP Fallback: if scanning a Master QR code (e.g. TYPE-HEART), find the oldest active dynamic bin of that type
+        if (!bin) {
+            const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
+            const binType = await prisma.binType.findUnique({
+                where: { masterQrCode: normalizedQr },
+            });
+
+            if (binType) {
+                const activeBins = await prisma.bin.findMany({
+                    where: {
+                        binTypeId: binType.id,
+                        status: { in: ['ACTIVE', 'IN_TRANSIT'] },
+                        deletedAt: null,
+                    },
+                    include: {
+                        binType: true,
+                        currentFacility: { select: { id: true, name: true, type: true } },
+                        cycles: {
+                            where: { status: { in: ['ACTIVE', 'IN_TRANSIT'] } },
+                            take: 1,
+                            orderBy: { startedAt: 'desc' },
+                        },
+                    },
+                    orderBy: { createdAt: 'asc' },
+                    take: 1,
+                });
+                if (activeBins.length > 0) {
+                    bin = activeBins[0] || null;
+                }
+            }
+        }
 
         if (!bin || bin.deletedAt) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Bin not found' });
