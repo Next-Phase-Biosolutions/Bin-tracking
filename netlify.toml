@@ -1,6 +1,6 @@
 [build]
-  # Tell Netlify to run the turbo build command from the root
-  command = "npm run build --filter=@bin-tracker/web..."
+  # Tell Netlify to generate the database client first via pnpm, then build the frontend
+  command = "pnpm db:generate && pnpm --filter=@bin-tracker/web build"
   
   # Tell Netlify where the compiled frontend files end up
   publish = "apps/web/dist"
