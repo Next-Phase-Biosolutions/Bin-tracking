@@ -100,9 +100,10 @@ export const binService = {
     async startDynamic(input: import('@bin-tracker/validators').BinStartDynamicInput, stationId: string) {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
-                // 1. Find the parent BinType by the scanned Master QR code
+                // 1. Find the parent BinType by the scanned Master QR code (normailze case/spaces for fuzzy matching)
+                const normalizedQr = input.masterQrCode.trim().toUpperCase().replace(/\s+/g, '-');
                 const binType = await tx.binType.findUnique({
-                    where: { masterQrCode: input.masterQrCode },
+                    where: { masterQrCode: normalizedQr },
                 });
 
                 if (!binType) {
