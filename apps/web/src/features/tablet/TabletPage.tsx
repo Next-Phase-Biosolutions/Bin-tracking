@@ -9,7 +9,7 @@ import { createStationTRPCClient } from '../../lib/trpc';
 // For the MVP context where tablet is always on, we use a mock station ID 
 // or one provided via URL/Config. Here we default to a test station.
 const TABLET_STATION_ID = "Detroit Tablet 1";
-const TABLET_STATION_TOKEN = "e1207fa6bd707904e23dd181c46b2fdbd65326aef70b4dd036ebc2987a67e467";
+const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || "";
 
 export function TabletPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
