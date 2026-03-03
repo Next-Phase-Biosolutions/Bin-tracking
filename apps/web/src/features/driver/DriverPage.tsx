@@ -121,6 +121,14 @@ export function DriverPage() {
                 cycleId: binInfo.activeCycle.id,
                 destinationId: selectedDestinationId,
             });
+            // Immediately update binOptions to IDLE so the deliver UI can never re-flash
+            // even if actionSuccess is briefly cleared by a React re-render race
+            setBinOptions(prev => prev.map(b =>
+                b.id === selectedBinId
+                    ? { ...b, status: 'IDLE', activeCycle: null }
+                    : b
+            ));
+            await trpcContext.bin.getActiveDynamicMatches.invalidate();
             setActionSuccess("DELIVERED");
         } catch (error) {
             console.error(error);

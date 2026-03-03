@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { useRef, useEffect } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface QRScannerProps {
     onScan: (decodedText: string) => void;
@@ -7,68 +7,47 @@ interface QRScannerProps {
 }
 
 export function QRScanner({ onScan, onError }: QRScannerProps) {
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const containerId = 'qr-reader';
 
     useEffect(() => {
-        // Initialize scanner
-        scannerRef.current = new Html5QrcodeScanner(
-            "reader",
-            {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-                rememberLastUsedCamera: true,
-                aspectRatio: 1.0,
-            },
-            /* verbose= */ false
-        );
+        const scanner = new Html5Qrcode(containerId);
+        scannerRef.current = scanner;
 
-        scannerRef.current.render(
-            (decodedText) => {
-                onScan(decodedText);
-            },
-            (errorMessage) => {
-                if (onError) {
-                    onError(errorMessage);
+        scanner
+            .start(
+                // Always use the rear-facing camera — prevents all cameras on multi-camera phones
+                { facingMode: 'environment' },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                },
+                (decodedText) => {
+                    onScan(decodedText);
+                },
+                (_errorMessage) => {
+                    // Scan errors fire every frame when no QR is visible — intentionally silenced
                 }
-            }
-        );
+            )
+            .catch((err: unknown) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (onError) onError(msg);
+                console.error('QR Scanner failed to start:', msg);
+            });
 
         return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch(console.error);
+            const s = scannerRef.current;
+            if (s) {
+                s.stop().then(() => s.clear()).catch(() => { });
             }
         };
-    }, [onScan, onError]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="w-full max-w-sm mx-auto overflow-hidden rounded-xl border-2 border-[#BCD19B]/30 shadow-lg relative bg-black/5">
-            <div id="reader" className="w-full"></div>
-
-            <style>{`
-                #reader { border: none !important; }
-                #reader button {
-                    background-color: #3d5aa8;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 9999px;
-                    font-weight: 600;
-                    margin: 10px 0;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                #reader button:hover { background-color: #2d4280; }
-                #reader__dashboard_section_csr span { color: #043F2E !important; font-weight: 600; }
-                #reader select {
-                    padding: 8px;
-                    border-radius: 8px;
-                    border: 1px solid #ccc;
-                    margin: 10px 0;
-                    width: 90%;
-                    max-width: 300px;
-                }
-            `}</style>
+            <div id={containerId} className="w-full" />
         </div>
     );
 }
