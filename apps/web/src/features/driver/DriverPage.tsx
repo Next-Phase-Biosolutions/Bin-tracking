@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { QRScanner } from '../../components/QRScanner';
 import { Package, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -17,11 +17,27 @@ export function DriverPage() {
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(false);
     const [manualQr, setManualQr] = useState<string>('');
+    // Destination facility selection for deliver
+    const [selectedDestinationId, setSelectedDestinationId] = useState<string>('');
 
     // Temporary auth injection for testing without login
     useState(() => {
         setAuthToken(TEST_DRIVER_TOKEN);
     });
+
+    // Fetch all RENDERING facilities on mount so we have real IDs for deliver
+    const renderingFacilitiesQuery = trpc.facility.list.useQuery(
+        { type: 'RENDERING', limit: 50 },
+        { staleTime: 60_000 }
+    );
+    const renderingFacilities = renderingFacilitiesQuery.data?.items ?? [];
+
+    // Auto-select the first rendering facility when they load
+    useEffect(() => {
+        if (renderingFacilities.length > 0 && !selectedDestinationId) {
+            setSelectedDestinationId(renderingFacilities[0]!.id);
+        }
+    }, [renderingFacilities, selectedDestinationId]);
 
     const trpcContext = trpc.useUtils();
 
@@ -87,11 +103,14 @@ export function DriverPage() {
 
     const handleDeliver = async () => {
         if (!binInfo?.activeCycle?.id) return;
-
+        if (!selectedDestinationId) {
+            alert('Please select a destination rendering facility.');
+            return;
+        }
         try {
             await deliverMutation.mutateAsync({
                 cycleId: binInfo.activeCycle.id,
-                destinationId: "cmlrrc3f30004ebucz781y7uo" // Great Lakes Rendering (Mock for MVP)
+                destinationId: selectedDestinationId,
             });
             setActionSuccess("DELIVERED");
         } catch (error) {
@@ -279,14 +298,37 @@ export function DriverPage() {
                                 )}
 
                                 {binInfo.status === 'IN_TRANSIT' && (
-                                    <button
-                                        onClick={handleDeliver}
-                                        disabled={deliverMutation.isPending}
-                                        className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {deliverMutation.isPending ? "Processing..." : "Mark DELIVERED"}
-                                        {!deliverMutation.isPending && <CheckCircle2 className="w-5 h-5" />}
-                                    </button>
+                                    <div className="space-y-3">
+                                        {/* Destination facility picker */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Deliver To (Rendering Facility)</label>
+                                            {renderingFacilitiesQuery.isLoading ? (
+                                                <p className="text-sm text-gray-400">Loading facilities...</p>
+                                            ) : renderingFacilities.length === 0 ? (
+                                                <p className="text-sm text-red-500">No rendering facilities found. Contact admin.</p>
+                                            ) : renderingFacilities.length === 1 ? (
+                                                <p className="text-sm font-semibold text-gray-800 bg-gray-50 p-2 rounded-lg">{renderingFacilities[0]!.name}</p>
+                                            ) : (
+                                                <select
+                                                    value={selectedDestinationId}
+                                                    onChange={(e) => setSelectedDestinationId(e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
+                                                >
+                                                    {renderingFacilities.map(f => (
+                                                        <option key={f.id} value={f.id}>{f.name}</option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={handleDeliver}
+                                            disabled={deliverMutation.isPending || !selectedDestinationId}
+                                            className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {deliverMutation.isPending ? "Processing..." : "Mark DELIVERED"}
+                                            {!deliverMutation.isPending && <CheckCircle2 className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 )}
 
                                 {['IDLE', 'DELIVERED'].includes(binInfo.status) && (
