@@ -5,51 +5,53 @@ interface CountdownTimerProps {
     isOverdue?: boolean;
 }
 
-export function CountdownTimer({ deadline, isOverdue = false }: CountdownTimerProps) {
-    const [timeLeft, setTimeLeft] = useState<string>('');
-    const [isNegative, setIsNegative] = useState(isOverdue);
+export function CountdownTimer({ deadline }: CountdownTimerProps) {
+    const [display, setDisplay] = useState<string>('');
+    const [overdue, setOverdue] = useState(false);
 
     useEffect(() => {
-        const targetDate = new Date(deadline).getTime();
+        const targetMs = new Date(deadline).getTime();
 
-        const calculateTimeLeft = () => {
-            const now = new Date().getTime();
-            const difference = targetDate - now;
+        const tick = () => {
+            const diffMs = targetMs - Date.now();
 
-            if (difference < 0) {
-                setIsNegative(true);
+            if (diffMs <= 0) {
+                // Clamped at zero — show OVERDUE badge instead of negative count
+                setOverdue(true);
+                setDisplay('00:00:00');
             } else {
-                setIsNegative(false);
+                setOverdue(false);
+                const h = Math.floor(diffMs / 3_600_000);
+                const m = Math.floor((diffMs % 3_600_000) / 60_000);
+                const s = Math.floor((diffMs % 60_000) / 1000);
+                setDisplay(
+                    `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+                );
             }
-
-            const absDifference = Math.abs(difference);
-
-            const hours = Math.floor(absDifference / (1000 * 60 * 60));
-            const minutes = Math.floor((absDifference % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((absDifference % (1000 * 60)) / 1000);
-
-            const display = `${isNegative ? '-' : ''}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            setTimeLeft(display);
         };
 
-        // Initial calculation
-        calculateTimeLeft();
-
-        // Update every second
-        const timer = setInterval(calculateTimeLeft, 1000);
-
+        tick();
+        const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline, isNegative]);
+    }, [deadline]);
 
-    const colorClass = isNegative
-        ? 'text-red-600 font-bold'
-        : 'text-gray-900 font-medium';
+    if (overdue) {
+        return (
+            <span className="inline-flex items-center gap-1">
+                <span className="font-mono px-2 py-1 rounded inline-block text-center text-red-700 font-bold bg-red-50 ring-1 ring-inset ring-red-500/30 animate-pulse">
+                    OVERDUE
+                </span>
+            </span>
+        );
+    }
 
-    const bgClass = isNegative ? 'bg-red-50' : 'bg-gray-100';
-
+    const urgent = display.startsWith('00:');
     return (
-        <span className={`font-mono px-2 py-1 rounded inline-block min-w-[90px] text-center ${colorClass} ${bgClass}`}>
-            {timeLeft}
+        <span
+            className={`font-mono px-2 py-1 rounded inline-block min-w-[90px] text-center font-semibold
+                ${urgent ? 'text-orange-600 bg-orange-50 ring-1 ring-inset ring-orange-400/30' : 'text-gray-900 bg-gray-100'}`}
+        >
+            {display}
         </span>
     );
 }
