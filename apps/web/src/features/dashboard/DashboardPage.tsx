@@ -193,8 +193,8 @@ export function DashboardPage() {
                         <h1 className="text-xl md:text-2xl font-bold tracking-tight">Ops Dashboard</h1>
                     </div>
                     <div className="flex items-center gap-2 md:gap-4">
-                        <Link to="/app/driver" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors hidden sm:block">Driver</Link>
-                        <Link to="/app/bin" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors hidden sm:block">Bin</Link>
+                        <Link to="/app/driver" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Driver</Link>
+                        <Link to="/app/bin" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bin</Link>
                         <button onClick={() => refetch()} className="bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
                             <RefreshCw className="w-4 h-4" /><span className="hidden md:inline">Refresh</span>
                         </button>
