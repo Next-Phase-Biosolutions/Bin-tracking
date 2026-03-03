@@ -130,8 +130,9 @@ export const binService = {
                 const deadline = new Date(now.getTime() + binType.dkHours * 60 * 60 * 1000);
 
                 // 2. Dynamically Generate a physical bin tracker identity.
-                // Format: HRT-cycle-<timestamp>
-                const dynamicQrCode = `${binType.prefix}-cycle-${Date.now().toString().slice(-6)}`;
+                // Format: HRT-<full-timestamp>-<3-random-chars> — collision-safe
+                const randomSuffix = Math.random().toString(36).slice(2, 5).toUpperCase();
+                const dynamicQrCode = `${binType.prefix}-cycle-${Date.now()}-${randomSuffix}`;
 
                 // 3. Create the physical Bin representation
                 const bin = await tx.bin.create({

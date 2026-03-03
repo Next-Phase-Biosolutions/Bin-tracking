@@ -15,6 +15,8 @@ export function TabletPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
     const [manualQr, setManualQr] = useState<string>('');
+    // Gate the scanner so it doesn't auto-re-trigger after a success or cancel
+    const [isScannerActive, setIsScannerActive] = useState(true);
 
     // Mutation states
     const [isPending, setIsPending] = useState(false);
@@ -49,12 +51,8 @@ export function TabletPage() {
             });
 
             setIsSuccess(true);
-
-            // Clear after 3 seconds so tablet is ready for next bin
-            setTimeout(() => {
-                setScannedBinId(null);
-                setIsSuccess(false);
-            }, 3000);
+            // Turn scanner OFF after success — prevent auto re-trigger
+            setIsScannerActive(false);
 
         } catch (err: any) {
             console.error("Failed to start bin:", err);
@@ -108,9 +106,18 @@ export function TabletPage() {
                         </div>
                         <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">Scan Bin QR Code</h2>
 
-                        <div className="w-full">
-                            <QRScanner onScan={handleScan} />
-                        </div>
+                        {isScannerActive ? (
+                            <div className="w-full">
+                                <QRScanner onScan={handleScan} />
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsScannerActive(true)}
+                                className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors flex items-center justify-center gap-3"
+                            >
+                                Tap to Scan Next Bin
+                            </button>
+                        )}
 
                         {/* Manual Entry Fallback for Testing */}
                         <div className="w-full max-w-sm mt-6 flex gap-2">
@@ -122,7 +129,7 @@ export function TabletPage() {
                                 className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
                             />
                             <button
-                                onClick={() => { if (manualQr) handleScan(manualQr) }}
+                                onClick={() => { if (manualQr) { setIsScannerActive(true); handleScan(manualQr); } }}
                                 disabled={!manualQr}
                                 className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
                             >
@@ -139,12 +146,21 @@ export function TabletPage() {
 
                         {isSuccess ? (
                             <div className="flex flex-col items-center py-8">
-                                <CheckCircle2 className="w-24 h-24 text-green-500 mb-4 animate-bounce" />
+                                <CheckCircle2 className="w-24 h-24 text-green-500 mb-4" />
                                 <h2 className="text-3xl font-bold text-[#043F2E] mb-2">Cycle Started!</h2>
                                 <p className="text-gray-600 text-center text-lg">
                                     Bin <span className="font-bold text-[#3d5aa8]">{scannedBinId}</span> is now active.
                                 </p>
-                                <p className="text-sm text-gray-400 mt-6">Ready for next bin...</p>
+                                <button
+                                    onClick={() => {
+                                        setScannedBinId(null);
+                                        setIsSuccess(false);
+                                        setIsScannerActive(true);
+                                    }}
+                                    className="mt-8 bg-[#043F2E] hover:bg-[#032f22] text-white px-8 py-3 rounded-xl font-bold text-lg transition-colors"
+                                >
+                                    Scan Next Bin
+                                </button>
                             </div>
                         ) : (
                             <>
@@ -189,11 +205,12 @@ export function TabletPage() {
                                         setScannedBinId(null);
                                         setError(null);
                                         setIsSuccess(false);
+                                        setIsScannerActive(false);
                                     }}
                                     disabled={isPending}
                                     className="mt-6 text-gray-500 hover:text-gray-800 font-medium underline-offset-4 hover:underline"
                                 >
-                                    Cancel & Scan Another
+                                    Cancel
                                 </button>
                             </>
                         )}

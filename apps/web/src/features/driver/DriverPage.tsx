@@ -3,7 +3,6 @@ import { trpc } from '../../lib/trpc';
 import { QRScanner } from '../../components/QRScanner';
 import { Package, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
-import type { BinWithDetails } from '@bin-tracker/types';
 import { Link } from 'react-router-dom';
 
 // Temporarily pull the driver token from Environment Variables for MVP testing
@@ -93,10 +92,18 @@ export function DriverPage() {
         if (!binInfo?.activeCycle?.id) return;
 
         try {
-            await pickupMutation.mutateAsync({
+            const result = await pickupMutation.mutateAsync({
                 cycleId: binInfo.activeCycle.id,
-                vehicleId: "truck-01" // MOCK ID
+                vehicleId: undefined, // No fixed vehicle assignment in MVP
             });
+            // Update the local binInfo status to IN_TRANSIT immediately so the UI is correct
+            setBinOptions(prev => prev.map(b =>
+                b.id === selectedBinId
+                    ? { ...b, status: 'IN_TRANSIT', activeCycle: { ...b.activeCycle, ...result } }
+                    : b
+            ));
+            // Invalidate cache so any subsequent scan fetches fresh data
+            await trpcContext.bin.getActiveDynamicMatches.invalidate();
             setActionSuccess("PICKED_UP");
         } catch (error) {
             console.error(error);
