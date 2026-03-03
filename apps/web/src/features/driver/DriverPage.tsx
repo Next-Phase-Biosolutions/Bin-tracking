@@ -370,10 +370,10 @@ export function DriverPage() {
                                 </p>
 
                                 <button
-                                    onClick={() => { resetScan(); setIsScannerActive(true); }}
+                                    onClick={resetScan}
                                     className="px-6 py-3 bg-[#3d5aa8] hover:bg-[#2d4280] text-white font-semibold rounded-xl transition-colors"
                                 >
-                                    Scan Next Bin
+                                    Done — Back to Scan
                                 </button>
                             </div>
                         )}
