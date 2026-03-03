@@ -18,6 +18,20 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
     let user: User | null = null;
     let station: (Station & { facility: { id: string; name: string } }) | null = null;
 
+    // ─── AUTH BYPASS (DISABLE_AUTH=true) ─────────────────────────────────────
+    // Set DISABLE_AUTH=true in your environment to skip all token checks.
+    // This is useful for demos / development. Remove or set to false to re-enable.
+    if (process.env['DISABLE_AUTH'] === 'true') {
+        // Inject the first ADMIN user as the acting user
+        user = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+        // Inject the first available station for tablet endpoints
+        station = await prisma.station.findFirst({
+            include: { facility: { select: { id: true, name: true } } },
+        });
+        return { prisma, user, station, req };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const authHeader = req.headers.authorization;
 
     if (authHeader?.startsWith('Bearer ')) {

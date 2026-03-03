@@ -20,8 +20,11 @@ export function createUserTRPCClient() {
             httpBatchLink({
                 url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
                 transformer: superjson,
-                headers: () =>
-                    _authToken ? { Authorization: `Bearer ${_authToken}` } : {},
+                headers: () => {
+                    // When auth is disabled, send no header — backend injects admin user automatically
+                    if (import.meta.env.VITE_DISABLE_AUTH === 'true') return {};
+                    return _authToken ? { Authorization: `Bearer ${_authToken}` } : {};
+                },
             }),
         ],
     });
@@ -36,7 +39,11 @@ export function createStationTRPCClient(stationToken: string) {
             httpBatchLink({
                 url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
                 transformer: superjson,
-                headers: () => ({ Authorization: `Station ${stationToken}` }),
+                // When auth is disabled, send no header — backend injects the station automatically
+                headers: () =>
+                    import.meta.env.VITE_DISABLE_AUTH === 'true'
+                        ? {}
+                        : { Authorization: `Station ${stationToken}` },
             }),
         ],
     });
