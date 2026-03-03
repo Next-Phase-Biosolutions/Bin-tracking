@@ -25,6 +25,10 @@ export const middleware = t.middleware;
  * Protected procedure — requires authenticated user (JWT)
  */
 const isAuthenticated = middleware(async ({ ctx, next }) => {
+    // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
+    if (process.env['DISABLE_AUTH'] === 'true') {
+        return next({ ctx });
+    }
     if (!ctx.user) {
         throw new TRPCError({
             code: 'UNAUTHORIZED',
@@ -42,6 +46,10 @@ export const protectedProcedure = t.procedure.use(isAuthenticated);
  * Station procedure — requires station token auth (tablets)
  */
 const isStation = middleware(async ({ ctx, next }) => {
+    // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
+    if (process.env['DISABLE_AUTH'] === 'true') {
+        return next({ ctx });
+    }
     if (!ctx.station) {
         throw new TRPCError({
             code: 'UNAUTHORIZED',
