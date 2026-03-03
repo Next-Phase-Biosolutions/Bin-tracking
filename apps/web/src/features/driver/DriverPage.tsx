@@ -17,6 +17,8 @@ export function DriverPage() {
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(false);
     const [manualQr, setManualQr] = useState<string>('');
+    // Controls whether the QR scanner is live (prevents auto-re-trigger after success)
+    const [isScannerActive, setIsScannerActive] = useState(true);
     // Destination facility selection for deliver
     const [selectedDestinationId, setSelectedDestinationId] = useState<string>('');
 
@@ -126,6 +128,9 @@ export function DriverPage() {
         setFetchError(null);
         pickupMutation.reset();
         deliverMutation.reset();
+        // Keep scanner OFF after reset — user must press "Scan Next Bin" to re-activate
+        // This prevents the scanner from immediately re-firing the same QR code
+        setIsScannerActive(false);
     };
 
     return (
@@ -167,9 +172,18 @@ export function DriverPage() {
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">Scan a Bin</h2>
                         <p className="text-gray-500 mb-8">Ready to pickup or deliver? Scan the QR code on the bin to continue.</p>
 
-                        <div className="w-full">
-                            <QRScanner onScan={handleScan} />
-                        </div>
+                        {isScannerActive ? (
+                            <div className="w-full">
+                                <QRScanner onScan={handleScan} />
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsScannerActive(true)}
+                                className="w-full bg-[#3d5aa8] hover:bg-[#2d4280] text-white py-4 rounded-xl text-lg font-bold transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Package className="w-5 h-5" /> Tap to Start Scanning
+                            </button>
+                        )}
 
                         {/* Manual Entry Fallback for Testing */}
                         <div className="w-full max-w-sm mt-6 flex gap-2">
@@ -181,7 +195,7 @@ export function DriverPage() {
                                 className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
                             />
                             <button
-                                onClick={() => { if (manualQr) handleScan(manualQr) }}
+                                onClick={() => { if (manualQr) { setIsScannerActive(true); handleScan(manualQr); } }}
                                 disabled={!manualQr}
                                 className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
                             >
@@ -356,8 +370,8 @@ export function DriverPage() {
                                 </p>
 
                                 <button
-                                    onClick={resetScan}
-                                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-colors"
+                                    onClick={() => { resetScan(); setIsScannerActive(true); }}
+                                    className="px-6 py-3 bg-[#3d5aa8] hover:bg-[#2d4280] text-white font-semibold rounded-xl transition-colors"
                                 >
                                     Scan Next Bin
                                 </button>
