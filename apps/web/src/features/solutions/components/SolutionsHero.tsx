@@ -1,4 +1,4 @@
-const imgCloseUpCobblerUsingSewingMachine = "/assets/imgSolution.jpg";
+const imgCloseUpCobblerUsingSewingMachine = "/assets/solutions/solHero.png";
 
 export function SolutionsHero() {
     return (
