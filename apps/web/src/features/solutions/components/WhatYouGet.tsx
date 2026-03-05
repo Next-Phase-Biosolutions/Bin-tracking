@@ -1,18 +1,16 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 
-const img11 = "https://www.figma.com/api/mcp/asset/c24f0e38-339d-4bd7-bb77-786907f1aff0";
-const img21 = "https://www.figma.com/api/mcp/asset/600a67da-3602-4f35-8923-a2d1f7ac24d3";
-const img37 = "https://www.figma.com/api/mcp/asset/43b00609-8582-4a50-bc81-afd0c318169b";
-const imgFarmerCowshedLookingAfterCows1 = "https://www.figma.com/api/mcp/asset/9637e852-619a-4e73-8ce7-ad40873f5ace";
-const imgGroup23 = "https://www.figma.com/api/mcp/asset/4c07993e-b23e-4539-b17f-3f7aca39bd34";
+const img11 = "/assets/solutions/sol1.png";
+const img21 = "/assets/solutions/sol2.png";
+const img37 = "/assets/solutions/sol3.png";
+const imgFarmerCowshedLookingAfterCows1 = "/assets/solutions/sol4.png";
 
 function CheckIcon() {
     return (
-        <img
-            src={imgGroup23}
-            alt=""
-            className="w-[30.5px] h-[30.5px] shrink-0 object-contain"
-        />
+        <div className="flex items-center justify-center w-[30.5px] h-[30.5px] shrink-0">
+            <Check className="w-6 h-6 text-[#12cd80]" strokeWidth={3} />
+        </div>
     );
 }
 

@@ -1,8 +1,8 @@
 const imgTrustLocal = "/assets/imgTrustLocal.svg";
-const imgGroup31 = "https://www.figma.com/api/mcp/asset/6840897c-717a-4d41-96f7-b8187d2df8a4";
-const imgGroup1 = "https://www.figma.com/api/mcp/asset/170fbf22-6ece-4112-a337-23e860869341";
+const imgGroup31 = "/assets/solutions/jacket.png";
+const imgGroup1 = "/assets/solutions/meat.png";
 const imgCuts = "/assets/solutions/cuts.png";
-const imgJacket = "/assets/solutions/jacket.png";
+const imgDoc = "/assets/doc.png";
 
 interface IconBadgeProps {
     badgeIcon: string;
@@ -61,7 +61,7 @@ export function WhatWeHandle() {
                     />
                     <IconBadge
                         badgeIcon={imgTrustLocal}
-                        innerIcon={imgJacket}
+                        innerIcon={imgDoc}
                         text="Material types can be discussed with our team"
                     />
                 </div>

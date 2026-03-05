@@ -1,4 +1,4 @@
-const imgCloseUpCobblerUsingSewingMachine = "https://www.figma.com/api/mcp/asset/49eafe8f-73e0-4f8a-bc27-bf38de4474b4";
+const imgCloseUpCobblerUsingSewingMachine = "/assets/imgSolution.jpg";
 
 export function SolutionsHero() {
     return (

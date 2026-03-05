@@ -1,7 +1,7 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 
-const imgVector9 = "https://www.figma.com/api/mcp/asset/2e5f25a1-b553-46a2-b7da-c01f97c49675";
-const imgCheck = "https://www.figma.com/api/mcp/asset/77ba96ef-9694-4a9c-ac4b-94a99ed76b13";
+const imgVector9 = "/assets/bolt.png";
 
 interface PricingCardProps {
     title: string;
@@ -51,7 +51,7 @@ function PricingCard({ title, price, yearly, features }: PricingCardProps) {
                     <div className="flex flex-col gap-4 py-2 w-full">
                         {features.map((feature, index) => (
                             <div key={index} className="flex gap-4 items-start w-full">
-                                <img src={imgCheck} alt="" className="w-6 h-6 shrink-0 object-contain" />
+                                <Check className="w-6 h-6 shrink-0 text-[#12cd80]" strokeWidth={3} />
                                 <p
                                     className="flex-1 font-normal text-base lg:text-[18px] text-black leading-relaxed m-0"
                                     style={{ fontFamily: "'Open Sans', sans-serif" }}

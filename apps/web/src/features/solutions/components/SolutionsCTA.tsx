@@ -6,18 +6,23 @@ const imgCtaVector = "/assets/imgCtaVector.png";
 export function SolutionsCTA() {
     return (
         <section className="relative min-h-[400px] lg:min-h-[522px] overflow-hidden bg-[#f1ede2] flex items-center justify-center py-16 px-4">
-            <img
-                src={imgCtaBg}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
-            />
+            {/* Background images */}
+            <div className="absolute inset-0 z-0">
+                <img
+                    src={imgCtaBg}
+                    alt=""
+                    className="w-full h-full object-cover pointer-events-none"
+                />
+            </div>
             {/* Dark Filter Overlay covering the image */}
-            <div className="absolute inset-0 bg-black/50 pointer-events-none z-0" />
-            <img
-                src={imgCtaVector}
-                alt=""
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[101.5%] pointer-events-none z-0"
-            />
+            <div className="absolute inset-0 bg-black/60 pointer-events-none z-0" />
+            <div className="absolute inset-0 z-0 overflow-hidden">
+                <img
+                    src={imgCtaVector}
+                    alt=""
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] md:w-[101.5%] pointer-events-none"
+                />
+            </div>
 
             <div className="relative z-10 flex flex-col items-center gap-6 text-center max-w-[768px] w-full px-4">
                 <div className="flex flex-col items-center gap-6 text-white text-center w-full">

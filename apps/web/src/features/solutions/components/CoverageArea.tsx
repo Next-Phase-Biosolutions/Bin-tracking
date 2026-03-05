@@ -1,6 +1,6 @@
 import React from 'react';
 
-const imgNpDigitalKreativaStudio2 = "https://www.figma.com/api/mcp/asset/52f7a81e-08b0-490a-8584-6eadc5bb86a7";
+const imgNpDigitalKreativaStudio2 = "/assets/solutions/map.png";
 
 export function CoverageArea() {
     return (
