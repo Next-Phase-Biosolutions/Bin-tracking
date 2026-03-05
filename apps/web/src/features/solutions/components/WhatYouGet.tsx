@@ -39,9 +39,9 @@ export function WhatYouGet() {
                     What You Get
                 </h2>
 
-                <div className="flex flex-col gap-16 lg:gap-10 w-full">
+                <div className="flex lg:flex-col gap-6 lg:gap-10 w-full overflow-x-auto snap-x snap-mandatory px-4 lg:px-0 scrollbar-hide pb-4 lg:pb-0">
                     {/* Collection and Logistics */}
-                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
                         <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
                             <img
                                 src={img11}
@@ -66,7 +66,14 @@ export function WhatYouGet() {
                     </div>
 
                     {/* Processing and Upcycling */}
-                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
+                            <img
+                                src={img21}
+                                alt="Laboratory processing"
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
                         <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
                             <h3
                                 className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
@@ -80,17 +87,10 @@ export function WhatYouGet() {
                                 <FeatureItem text="Safe and compliant processing" />
                             </div>
                         </div>
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
-                            <img
-                                src={img21}
-                                alt="Laboratory processing"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
                     </div>
 
                     {/* Traceability and Reporting */}
-                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
                         <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
                             <img
                                 src={img37}
@@ -114,7 +114,14 @@ export function WhatYouGet() {
                     </div>
 
                     {/* Compliance Support */}
-                    <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-20 w-full">
+                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
+                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
+                            <img
+                                src={imgFarmerCowshedLookingAfterCows1}
+                                alt="Farm compliance"
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
                         <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
                             <h3
                                 className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
@@ -127,13 +134,6 @@ export function WhatYouGet() {
                                 <FeatureItem text="Documentation we follow on site" />
                                 <FeatureItem text="Licensed transport and safe handling practices" />
                             </div>
-                        </div>
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
-                            <img
-                                src={imgFarmerCowshedLookingAfterCows1}
-                                alt="Farm compliance"
-                                className="w-full h-full object-cover"
-                            />
                         </div>
                     </div>
                 </div>

@@ -75,7 +75,7 @@ function PricingCard({ title, price, yearly, features }: PricingCardProps) {
 
 export function ProgramOptions() {
     return (
-        <section className="w-full bg-[#f8f8f8] py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
+        <section className="w-full bg-[#f8f8f8] py-16 px-4 lg:py-[112px] lg:px-0 overflow-hidden">
             <div className="flex flex-col items-center gap-10 lg:gap-20 max-w-[1280px] mx-auto w-full">
                 <h2
                     className="font-bold text-4xl md:text-5xl lg:text-[60px] text-black text-center leading-tight tracking-tight m-0"
@@ -83,25 +83,33 @@ export function ProgramOptions() {
                 >
                     Program Options
                 </h2>
-                <div className="flex flex-col lg:flex-row gap-8 w-full">
-                    <PricingCard
-                        title="Basic"
-                        price="$19"
-                        yearly="or $199 yearly"
-                        features={['Collection service', 'Landfill diversion report']}
-                    />
-                    <PricingCard
-                        title="Standard"
-                        price="$29"
-                        yearly="or $299 yearly"
-                        features={['Collection', 'Processing', 'Monthly reports', 'Compliance toolkit']}
-                    />
-                    <PricingCard
-                        title="Custom"
-                        price="$49"
-                        yearly="or $499 yearly"
-                        features={['Revenue share options', 'Custom sorting', 'On site SOP training']}
-                    />
+
+                {/* Mobile Carousel Container */}
+                <div className="flex lg:flex-row gap-6 w-full overflow-x-auto snap-x snap-mandatory px-4 lg:px-16 scrollbar-hide pb-4 lg:pb-0">
+                    <div className="min-w-[85vw] md:min-w-[400px] lg:min-w-0 lg:flex-1 snap-start shrink-0 flex">
+                        <PricingCard
+                            title="Basic"
+                            price="$19"
+                            yearly="or $199 yearly"
+                            features={['Collection service', 'Landfill diversion report']}
+                        />
+                    </div>
+                    <div className="min-w-[85vw] md:min-w-[400px] lg:min-w-0 lg:flex-1 snap-start shrink-0 flex">
+                        <PricingCard
+                            title="Standard"
+                            price="$29"
+                            yearly="or $299 yearly"
+                            features={['Collection', 'Processing', 'Monthly reports', 'Compliance toolkit']}
+                        />
+                    </div>
+                    <div className="min-w-[85vw] md:min-w-[400px] lg:min-w-0 lg:flex-1 snap-start shrink-0 flex">
+                        <PricingCard
+                            title="Custom"
+                            price="$49"
+                            yearly="or $499 yearly"
+                            features={['Revenue share options', 'Custom sorting', 'On site SOP training']}
+                        />
+                    </div>
                 </div>
             </div>
         </section>

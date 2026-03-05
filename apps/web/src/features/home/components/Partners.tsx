@@ -1,8 +1,8 @@
 const partners = [
     { img: "/assets/imgPartner1.png", alt: "EcoWaste", size: "w-32 md:w-40 lg:w-48" },
-    { img: "/assets/imgPartner2.png", alt: "GreenEnergy", size: "w-24 md:w-32 lg:w-48 pt-4 md:pt-6 lg:pt-25" },
+    { img: "/assets/imgPartner2.png", alt: "GreenEnergy", size: "w-32 md:w-32 lg:w-48 pt-4 md:pt-6 lg:pt-25" },
     { img: "/assets/imgPartner3.png", alt: "PureSolutions", size: "w-28 md:w-36 lg:w-44" },
-    { img: "/assets/imgPartner4.png", alt: "Partner 4", size: "w-20 md:w-28 lg:w-48" },
+    { img: "/assets/imgPartner4.png", alt: "Partner 4", size: "w-32 md:w-28 lg:w-48" },
 ];
 
 export function Partners() {
