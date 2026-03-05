@@ -32,7 +32,7 @@ export function Footer() {
                             className="font-normal text-base md:text-lg leading-relaxed text-black m-0"
                             style={{ fontFamily: "'Open Sans', sans-serif" }}
                         >
-                            At Sheps Farm, we believe in real food, raised the right way — fresh, halal, and delivered to your door.
+                            At Sheps Farm, we believe in real food, raised the right way fresh, halal, and delivered to your door.
                         </p>
                     </div>
 

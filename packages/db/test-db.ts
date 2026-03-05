@@ -1,26 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL
-});
-
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 async function main() {
-    try {
-        console.log("Fetching stations...");
-        const stations = await prisma.station.findMany();
-        console.log(stations);
-
-        console.log("\nFetching users...");
-        const users = await prisma.user.findMany();
-        console.log(users.map(u => ({ email: u.email, id: u.id, role: u.role })));
-    } catch (err) {
-        console.error("Error:", err);
-    } finally {
-        await prisma.$disconnect();
-    }
+    // Reset stuck BIN-HEART-001 so the E2E test can start a fresh cycle
+    const cancelled = await prisma.binCycle.updateMany({
+        where: { bin: { qrCode: 'BIN-HEART-001' }, status: { in: ['ACTIVE', 'IN_TRANSIT'] } },
+        data: { status: 'COMPLETED' }
+    });
+    await prisma.bin.updateMany({ where: { qrCode: 'BIN-HEART-001' }, data: { status: 'IDLE' } });
+    console.log(`Reset: ${cancelled.count} cycle(s) cancelled, bin set back to IDLE`);
 }
 
-main();
+main().finally(() => prisma.$disconnect());

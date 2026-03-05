@@ -16,6 +16,9 @@ export function Hero() {
                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] md:w-[101.5%] pointer-events-none object-cover"
             />
 
+            {/* Light black film overlay */}
+            <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
+
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center pt-16 md:pt-24 px-4 text-center">
                 <div className="max-w-[768px]">

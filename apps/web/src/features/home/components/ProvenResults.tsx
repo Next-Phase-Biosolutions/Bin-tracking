@@ -1,7 +1,7 @@
 const results = [
-    { stat: "22,000", desc: "Litres of fuel saved annually by reducing transport needs." },
-    { stat: "8,000", desc: "Tonnes of waste diverted from landfill each year." },
-    { stat: "$20k+", desc: "Average annual savings for medium sized abattoir clients." },
+    { stat: "72", desc: "Tonnes diverted from landfill in the last 6 months." },
+    { stat: "35%", desc: "Average reduction in disposal cost at pilot sites" },
+    { stat: "48 Hrs", desc: "Typical onboarding to schedule first pickup" },
 ];
 
 export function ProvenResults() {
