@@ -16,7 +16,7 @@ export function AboutHero() {
             <img
                 src={imgHeroBg}
                 alt="About Hero Background (Desktop)"
-                className="hidden md:block absolute inset-0 w-full h-full object-contain md:scale-[0.90] object-center opacity-80"
+                className="hidden md:block absolute inset-0 w-full h-full object-contain md:scale-[1.4] object-center opacity-80"
             />
             {/* Dark overlay slightly to make text pop */}
             <div className="absolute inset-0 bg-black/40" />
