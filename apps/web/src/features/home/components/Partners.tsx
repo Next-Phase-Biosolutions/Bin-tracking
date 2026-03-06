@@ -7,9 +7,9 @@ const partners = [
 
 export function Partners() {
     return (
-        <section className="bg-[#eef2e3] py-16 px-4 md:py-24 md:px-16 flex flex-col items-center">
+        <section className="bg-[#eef2e3] py-8 px-4 md:py-12 md:px-16 flex flex-col items-center">
             <h2
-                className="font-bold text-3xl md:text-[48px] leading-tight tracking-tight text-[#043f2e] mb-10 md:mb-16 text-center max-w-[800px]"
+                className="font-bold text-3xl md:text-[40px] leading-tight tracking-tight text-[#043f2e] mb-6 md:mb-8 text-center max-w-[800px]"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
             >
                 Supported By
