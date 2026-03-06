@@ -28,9 +28,10 @@ export function Navbar() {
                 {/* Desktop Links */}
                 <div className="hidden md:flex gap-8 items-center">
                     <div className="flex gap-6">
-                        {["Home", "Solutions", "Process"].map((link) => {
+                        {["Home", "About Us", "Solutions", "Process"].map((link) => {
                             let target = "#";
                             if (link === "Home") target = "/";
+                            if (link === "About Us") target = "/about";
                             if (link === "Solutions") target = "/solutions";
                             if (link === "Process") target = "/process";
 
@@ -80,9 +81,10 @@ export function Navbar() {
             {isMobileMenuOpen && (
                 <div className="md:hidden absolute top-full left-0 right-0 bg-[#043F2E] border-t border-white/10 p-4 flex flex-col gap-4 shadow-lg z-50">
                     <div className="flex flex-col gap-4">
-                        {["Home", "Solutions", "Process"].map((link) => {
+                        {["Home", "About Us", "Solutions", "Process"].map((link) => {
                             let target = "#";
                             if (link === "Home") target = "/";
+                            if (link === "About Us") target = "/about";
                             if (link === "Solutions") target = "/solutions";
                             if (link === "Process") target = "/process";
 
