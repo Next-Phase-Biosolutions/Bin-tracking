@@ -1,9 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, MapPin } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
+import { BlockchainAnchorModal } from './BlockchainAnchorModal';
+
+type DatePreset = 'all' | '2d' | '7d' | 'custom';
+
+function toInputDate(d: Date) {
+    return d.toISOString().slice(0, 10);
+}
+
+function getPresetRange(preset: DatePreset): { from: Date | null; to: Date | null } {
+    const now = new Date();
+    if (preset === '2d') {
+        const from = new Date(now); from.setDate(from.getDate() - 2); from.setHours(0, 0, 0, 0);
+        return { from, to: now };
+    }
+    if (preset === '7d') {
+        const from = new Date(now); from.setDate(from.getDate() - 7); from.setHours(0, 0, 0, 0);
+        return { from, to: now };
+    }
+    return { from: null, to: null };
+}
 
 const TEST_ADMIN_TOKEN = import.meta.env.VITE_TEST_ADMIN_TOKEN || "";
 
@@ -158,18 +178,43 @@ function CycleCountdown({ item }: { item: CycleItem }) {
 export function DashboardPage() {
     const [selectedFacility, setSelectedFacility] = useState<string | undefined>(undefined);
     const [selectedCycle, setSelectedCycle] = useState<CycleItem | null>(null);
+    const [anchorModalOpen, setAnchorModalOpen] = useState(false);
+    const [datePreset, setDatePreset] = useState<DatePreset>('all');
+    const [customFrom, setCustomFrom] = useState<string>(toInputDate(new Date(Date.now() - 7 * 86400000)));
+    const [customTo, setCustomTo] = useState<string>(toInputDate(new Date()));
+    const [calendarOpen, setCalendarOpen] = useState(false);
+    const calendarRef = useRef<HTMLDivElement>(null);
 
     useState(() => { setAuthToken(TEST_ADMIN_TOKEN); });
 
+    // Close calendar when clicking outside
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+                setCalendarOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
     const { data: activeBins, isLoading: isBinsLoading, refetch } = trpc.dashboard.priorityQueue.useQuery(
-        { limit: 50 },
+        { limit: 100 },
         { refetchInterval: 10000 }
     );
     const { data: stats } = trpc.dashboard.stats.useQuery();
 
-    const filteredBins = selectedFacility
-        ? activeBins?.items.filter(i => i.facilityId === selectedFacility)
-        : activeBins?.items;
+    // Compute effective date range
+    const dateRange = datePreset === 'custom'
+        ? { from: customFrom ? new Date(customFrom + 'T00:00:00') : null, to: customTo ? new Date(customTo + 'T23:59:59') : null }
+        : getPresetRange(datePreset);
+
+    const filteredBins = (activeBins?.items || []).filter(i => {
+        if (selectedFacility && i.facilityId !== selectedFacility) return false;
+        if (dateRange.from && new Date(i.startedAt) < dateRange.from) return false;
+        if (dateRange.to && new Date(i.startedAt) > dateRange.to) return false;
+        return true;
+    });
 
     const uniqueFacilities = Array.from(
         new Map((activeBins?.items || []).map(i => [i.facilityId, i.facility])).entries()
@@ -195,6 +240,14 @@ export function DashboardPage() {
                     <div className="flex items-center gap-2 md:gap-4">
                         <Link to="/app/driver" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Driver</Link>
                         <Link to="/app/bin" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bin</Link>
+                        <button
+                            onClick={() => setAnchorModalOpen(true)}
+                            className="bg-purple-500 hover:bg-purple-400 text-white px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                            title="Post today's operations on Cardano blockchain"
+                        >
+                            <span>⛓</span>
+                            <span className="hidden md:inline">Post on Blockchain</span>
+                        </button>
                         <button onClick={() => refetch()} className="bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
                             <RefreshCw className="w-4 h-4" /><span className="hidden md:inline">Refresh</span>
                         </button>
@@ -226,22 +279,86 @@ export function DashboardPage() {
                     {/* Queue header */}
                     <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-                            Priority Queue
-                            <span className="bg-[#3d5aa8] text-white text-xs font-bold px-2 py-0.5 rounded-full">{filteredBins?.length || 0}</span>
+                            All Cycles
+                            <span className="bg-[#3d5aa8] text-white text-xs font-bold px-2 py-0.5 rounded-full">{filteredBins.length}</span>
                         </h2>
-                        <div className="flex items-center gap-3">
-                            <label htmlFor="facility-filter" className="text-sm font-medium text-gray-600 whitespace-nowrap">Filter:</label>
+                        <div className="flex flex-wrap items-center gap-3">
+
+                            {/* ── Facility filter ── */}
                             <select
                                 id="facility-filter"
                                 value={selectedFacility || ''}
                                 onChange={(e) => setSelectedFacility(e.target.value || undefined)}
-                                className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg p-2 pr-8 w-full sm:w-auto focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
+                                className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg p-2 pr-8 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
                             >
                                 <option value="">All Facilities</option>
                                 {uniqueFacilities.map(([fid, fac]) => (
                                     <option key={fid} value={fid}>{fac?.name || fid}</option>
                                 ))}
                             </select>
+
+                            {/* ── Date preset pills ── */}
+                            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                {(['all', '2d', '7d', 'custom'] as DatePreset[]).map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => { setDatePreset(p); if (p === 'custom') setCalendarOpen(true); else setCalendarOpen(false); }}
+                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors flex items-center gap-1 ${datePreset === p ? 'bg-white text-[#3d5aa8] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                    >
+                                        {p === 'custom' && <Calendar className="w-3 h-3" />}
+                                        {p === 'all' ? 'All Time' : p === '2d' ? '2 Days' : p === '7d' ? '7 Days' : 'Custom'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* ── Custom calendar popover ── */}
+                            {datePreset === 'custom' && (
+                                <div className="relative" ref={calendarRef}>
+                                    <button
+                                        onClick={() => setCalendarOpen(o => !o)}
+                                        className="flex items-center gap-2 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg px-3 py-2 hover:bg-gray-100 transition-colors"
+                                    >
+                                        <Calendar className="w-4 h-4 text-[#3d5aa8]" />
+                                        <span>{customFrom || 'From'}</span>
+                                        <span className="text-gray-400">→</span>
+                                        <span>{customTo || 'To'}</span>
+                                    </button>
+                                    {calendarOpen && (
+                                        <div className="absolute right-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Select Date Range</p>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs text-gray-500 font-medium mb-1 block">From</label>
+                                                    <input
+                                                        type="date"
+                                                        value={customFrom}
+                                                        max={customTo || toInputDate(new Date())}
+                                                        onChange={(e) => setCustomFrom(e.target.value)}
+                                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#3d5aa8] focus:border-transparent outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-500 font-medium mb-1 block">To</label>
+                                                    <input
+                                                        type="date"
+                                                        value={customTo}
+                                                        min={customFrom}
+                                                        max={toInputDate(new Date())}
+                                                        onChange={(e) => setCustomTo(e.target.value)}
+                                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#3d5aa8] focus:border-transparent outline-none"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => setCalendarOpen(false)}
+                                                    className="w-full bg-[#3d5aa8] hover:bg-[#2d4898] text-white text-sm font-semibold py-2 rounded-lg transition-colors"
+                                                >
+                                                    Apply
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -252,7 +369,7 @@ export function DashboardPage() {
                                 <div className="w-5 h-5 border-4 border-[#3d5aa8] border-t-transparent rounded-full animate-spin" />
                                 Loading...
                             </div>
-                        ) : filteredBins && filteredBins.length > 0 ? (
+                        ) : filteredBins.length > 0 ? (
                             filteredBins.map((item) => (
                                 <div key={item.id} className="p-4 space-y-3 active:bg-gray-50">
                                     {/* Countdown + status */}
@@ -276,7 +393,7 @@ export function DashboardPage() {
                                         <div>
                                             <p className="text-sm font-semibold text-gray-700">{(item as any).facility?.name || item.facilityId}</p>
                                             <p className="text-xs text-gray-400">
-                                                Started {new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                Started {new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                         <button
@@ -289,7 +406,7 @@ export function DashboardPage() {
                                 </div>
                             ))
                         ) : (
-                            <div className="p-8 text-center text-gray-500 text-sm">No active bins found.</div>
+                            <div className="p-8 text-center text-gray-500 text-sm">No cycles found.</div>
                         )}
                     </div>
 
@@ -311,7 +428,7 @@ export function DashboardPage() {
                                             Loading priority queue...
                                         </div>
                                     </td></tr>
-                                ) : filteredBins && filteredBins.length > 0 ? (
+                                ) : filteredBins.length > 0 ? (
                                     filteredBins.map((item) => (
                                         <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="p-4 align-middle"><CycleCountdown item={item as unknown as CycleItem} /></td>
@@ -328,7 +445,8 @@ export function DashboardPage() {
                                             <td className="p-4 align-middle"><span className={statusBadge(item.status)}>{statusLabel(item.status)}</span></td>
                                             <td className="p-4 align-middle text-gray-600 text-sm font-medium">{(item as any).facility?.name || item.facilityId}</td>
                                             <td className="p-4 align-middle text-gray-500 text-sm">
-                                                {new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                <p>{new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                                <p className="text-xs text-gray-400">{new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                             </td>
                                             <td className="p-4 align-middle text-right">
                                                 <button
@@ -341,7 +459,7 @@ export function DashboardPage() {
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr><td colSpan={7} className="p-8 text-center text-gray-500 bg-gray-50/50">No active bins found.</td></tr>
+                                    <tr><td colSpan={7} className="p-8 text-center text-gray-500 bg-gray-50/50">No cycles found.</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -351,6 +469,7 @@ export function DashboardPage() {
             </main>
 
             {selectedCycle && <DetailsSlideover cycle={selectedCycle} onClose={() => setSelectedCycle(null)} />}
+            {anchorModalOpen && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
         </div>
     );
 }
