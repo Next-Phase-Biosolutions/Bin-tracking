@@ -23,8 +23,15 @@ build/
 # Prisma
 packages/db/prisma/migrations/**/migration_lock.toml
 
+# Generated assets
+apps/web/dist/qr/
+
 # Test
 coverage/
 
 # Logs
 *.log
+pnpm-debug.log*
+
+# Binary / generated plan files
+plans/*.pdf
