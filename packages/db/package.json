@@ -16,6 +16,7 @@
         "migrate:status": "prisma migrate status",
         "migrate:reset": "prisma migrate reset",
         "seed": "tsx --env-file=../../.env prisma/seed.ts",
+        "seed:local": "tsx --env-file=../../.env prisma/seed.local.ts",
         "e2e": "tsx --env-file=../../.env e2e-test.ts",
         "studio": "prisma studio",
         "build": "tsc --noEmit",

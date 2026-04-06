@@ -115,27 +115,35 @@ bin-tracker/
 
 ## Local Development Setup
 
+There are **two ways** to run this project locally depending on your setup.
+
+| | Option A — Full Setup | Option B — Local Only |
+|---|---|---|
+| **Who** | Team members needing real auth | Juniors / contributors |
+| **Supabase** | ✅ Required | ❌ Not needed |
+| **Docker** | ❌ Not needed | ❌ Not needed |
+| **Postgres** | Supabase-hosted | Local install |
+| **Auth** | Full JWT auth | Bypassed (`DISABLE_AUTH=true`) |
+
+---
+
+## Option A — Full Setup (with Supabase)
+
 ### Prerequisites
 
 - **Node.js** `>= 20.0.0`
 - **pnpm** `>= 9.0.0`
-- **PostgreSQL** (local instance or Docker)
-- A [Supabase](https://supabase.com/) project for auth
+- A [Supabase](https://supabase.com/) project (free tier is fine)
 
-### 1. Clone the Repository
+### 1. Clone & Install
 
 ```bash
 git clone https://github.com/your-org/bin-tracker.git
 cd bin-tracker
-```
-
-### 2. Install Dependencies
-
-```bash
 pnpm install
 ```
 
-### 3. Configure Environment Variables
+### 2. Configure Environment Variables
 
 ```bash
 cp .env.example .env
@@ -143,29 +151,121 @@ cp .env.example .env
 
 Fill in the required values in `.env` (see [Environment Variables](#environment-variables)).
 
-### 4. Set Up the Database
+### 3. Set Up the Database
 
 ```bash
 # Run migrations
 pnpm db:migrate
 
-# Seed initial data (facilities, bin types, admin user)
+# Seed initial data (creates Supabase Auth users + DB records)
 pnpm db:seed
 ```
 
-### 5. Start the Development Servers
+### 4. Start the Development Servers
 
 ```bash
 pnpm dev
 ```
 
-This starts both the API (`http://localhost:3001`) and the frontend (`http://localhost:3000`) in parallel via Turborepo.
-
-### 6. Verify
+### 5. Verify
 
 - Frontend: [http://localhost:3000](http://localhost:3000)
 - API health check: [http://localhost:3001/health](http://localhost:3001/health)
 - Prisma Studio (DB browser): `pnpm db:studio`
+
+---
+
+## Option B — Local Only (No Supabase, No Docker)
+
+> Ideal for juniors and contributors who just need to run the project locally.
+> Auth is fully bypassed — no login required. The API auto-injects an admin user.
+
+### 🍎 Mac
+
+```bash
+# 1. Install Node.js >= 20 (one time only)
+brew install node@20
+
+# 2. Install pnpm (one time only)
+npm install -g pnpm
+
+# 3. Install PostgreSQL (one time only)
+brew install postgresql@16
+brew services start postgresql@16
+
+# 4. Create the local database (one time only)
+createdb bin_tracker
+
+# 5. Clone the repository
+git clone https://github.com/your-org/bin-tracker.git
+cd bin-tracker
+
+# 6. Install dependencies
+pnpm install
+
+# 7. Copy the local env file (no Supabase credentials needed — works as-is)
+cp .env.local.example .env
+
+# 8. Run database migrations
+pnpm db:migrate
+
+# 9. Seed the database (no Supabase, cuid IDs, safe to re-run)
+pnpm db:seed:local
+
+# 10. Start both servers
+pnpm dev
+```
+
+### 🪟 Windows
+
+```cmd
+:: 1. Install Node.js >= 20 (one time only)
+::    Download from: https://nodejs.org/en/download
+::    Choose the LTS version and run the installer.
+
+:: 2. Install pnpm (one time only — open a NEW terminal after installing Node)
+npm install -g pnpm
+
+:: 3. Download and install PostgreSQL 16 from:
+::    https://www.postgresql.org/download/windows/
+::    During install, set password for the "postgres" user (remember it!)
+::    Then start the PostgreSQL service from the Windows Services panel.
+
+:: 4. Open Command Prompt and create the local database
+createdb -U postgres bin_tracker
+:: (enter your postgres password when prompted)
+
+:: 5. Clone the repository
+git clone https://github.com/your-org/bin-tracker.git
+cd bin-tracker
+
+:: 6. Install dependencies
+pnpm install
+
+:: 7. Copy the local env file
+copy .env.local.example .env
+
+::    If you set a password during Postgres install, update DATABASE_URL in .env:
+::    DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/bin_tracker"
+
+:: 8. Run database migrations
+pnpm db:migrate
+
+:: 9. Seed the database
+pnpm db:seed:local
+
+:: 10. Start both servers
+pnpm dev
+```
+
+### Verify (Both Platforms)
+
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- API health check: [http://localhost:3001/health](http://localhost:3001/health)
+- Prisma Studio (DB browser): `pnpm db:studio`
+
+> **Note:** `SEED_ONLY_IF_EMPTY=true` is set by default in `.env.local.example`.
+> If you accidentally run `pnpm db:seed:local` again, it will detect existing data and skip — your data is safe.
 
 ---
 
@@ -183,7 +283,8 @@ Run all scripts from the **root** of the repository.
 | `pnpm format` | Format all `ts`, `tsx`, `json`, `md` files with Prettier |
 | `pnpm typecheck` | TypeScript type-check all packages |
 | `pnpm db:migrate` | Run Prisma migrations |
-| `pnpm db:seed` | Seed the database |
+| `pnpm db:seed` | Seed the database (requires Supabase) |
+| `pnpm db:seed:local` | Seed for local dev — no Supabase needed (use with `.env.local.example`) |
 | `pnpm db:studio` | Open Prisma Studio |
 | `pnpm db:generate` | Regenerate Prisma Client after schema changes |
 | `pnpm clean` | Remove all build artifacts and `node_modules` |

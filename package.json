@@ -20,6 +20,7 @@
         "db:generate": "pnpm --filter @bin-tracker/db generate",
         "db:migrate": "pnpm --filter @bin-tracker/db migrate:dev",
         "db:seed": "pnpm --filter @bin-tracker/db seed",
+        "db:seed:local": "pnpm --filter @bin-tracker/db seed:local",
         "db:studio": "pnpm --filter @bin-tracker/db studio",
         "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
     },
