@@ -2,6 +2,9 @@ import { createTRPCReact } from '@trpc/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import type { AppRouter } from '../../../api/src/routers/index.ts';
+import type { inferRouterOutputs } from '@trpc/server';
+
+export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
 export const trpc = createTRPCReact<AppRouter>();
 

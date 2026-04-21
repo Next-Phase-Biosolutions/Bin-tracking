@@ -240,6 +240,7 @@ export function DashboardPage() {
                     <div className="flex items-center gap-2 md:gap-4">
                         <Link to="/app/driver" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Driver</Link>
                         <Link to="/app/bin" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bin</Link>
+                        <Link to="/app/animalregistration" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Animal Registration</Link>
                         <button
                             onClick={() => setAnchorModalOpen(true)}
                             className="bg-purple-500 hover:bg-purple-400 text-white px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"

@@ -18,7 +18,7 @@ export function App() {
             <Route path="/app/bin" element={<TabletPage />} />
             <Route path="/app/driver" element={<DriverPage />} />
             <Route path="/app/dashboard" element={<DashboardPage />} />
-            <Route path="/app/farmer" element={<FarmerRegistrationPage />} />
+            <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
         </Routes>
     );
 }

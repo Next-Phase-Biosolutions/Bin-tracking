@@ -39,7 +39,7 @@ export default function FarmerRegistrationPage() {
                             const next = { ...prev };
                             for (const [key, val] of Object.entries(data.fields)) {
                                 if (val !== null) {
-                                    next[key as FieldKey] = val;
+                                    next[key as keyof ExtractedAnimalFields] = val;
                                 }
                             }
                             return next;

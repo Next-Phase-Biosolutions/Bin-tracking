@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { trpc } from '../../lib/trpc';
+import { trpc, type RouterOutputs } from '../../lib/trpc';
 import { QRScanner } from '../../components/QRScanner';
 import { Package, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 
+type BinOption = RouterOutputs['bin']['getActiveDynamicMatches'][number];
+
 const TEST_DRIVER_TOKEN = import.meta.env.VITE_TEST_DRIVER_TOKEN || "";
 
 export function DriverPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
-    const [binOptions, setBinOptions] = useState<Record<string, unknown>[]>([]);
+    const [binOptions, setBinOptions] = useState<BinOption[]>([]);
     const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
     const [actionSuccess, setActionSuccess] = useState<string | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
