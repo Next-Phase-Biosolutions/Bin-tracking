@@ -20,6 +20,7 @@ async function buildServer() {
             transport: IS_DEV ? { target: 'pino-pretty' } : undefined,
         },
         maxParamLength: 256,
+        bodyLimit: 20 * 1024 * 1024, // 20MB — audio recordings can be large
     });
 
     // ─── Security ────────────────────────────────────────────

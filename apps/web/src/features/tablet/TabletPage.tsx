@@ -6,9 +6,7 @@ import { Link } from 'react-router-dom';
 
 import { createStationTRPCClient } from '../../lib/trpc';
 
-// For the MVP context where tablet is always on, we use a mock station ID 
-// or one provided via URL/Config. Here we default to a test station.
-const TABLET_STATION_ID = "Detroit Tablet 1";
+const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || "Facility Scanner";
 const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || "";
 
 export function TabletPage() {
@@ -43,9 +41,6 @@ export function TabletPage() {
 
         try {
             const stationClient = createStationTRPCClient(TABLET_STATION_TOKEN);
-            console.log("Starting bin with station token:", TABLET_STATION_TOKEN);
-
-            // Call the new dynamic start endpoint for Option B
             await stationClient.bin.startDynamic.mutate({
                 masterQrCode: scannedBinId,
             });

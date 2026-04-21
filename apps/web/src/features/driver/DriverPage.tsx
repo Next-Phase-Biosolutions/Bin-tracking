@@ -5,12 +5,11 @@ import { Package, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 
-// Temporarily pull the driver token from Environment Variables for MVP testing
 const TEST_DRIVER_TOKEN = import.meta.env.VITE_TEST_DRIVER_TOKEN || "";
 
 export function DriverPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
-    const [binOptions, setBinOptions] = useState<any[]>([]);
+    const [binOptions, setBinOptions] = useState<Record<string, unknown>[]>([]);
     const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
     const [actionSuccess, setActionSuccess] = useState<string | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -21,7 +20,6 @@ export function DriverPage() {
     // Destination facility selection for deliver
     const [selectedDestinationId, setSelectedDestinationId] = useState<string>('');
 
-    // Temporary auth injection for testing without login
     useState(() => {
         setAuthToken(TEST_DRIVER_TOKEN);
     });
@@ -227,7 +225,7 @@ export function DriverPage() {
                         <div className="flex justify-between items-start mb-6 pt-2">
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Scanned Bin</h3>
-                                <p className="text-xl font-bold text-gray-900 mt-1 truncate max-w-[250px]">{scannedBinId}</p>
+                                <p className="text-xl font-bold text-gray-900 mt-1 truncate max-w-62.5">{scannedBinId}</p>
                             </div>
                             <button
                                 onClick={resetScan}

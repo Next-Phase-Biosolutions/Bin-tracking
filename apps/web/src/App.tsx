@@ -6,6 +6,7 @@ import TabletPage from './features/tablet/TabletPage';
 import DriverPage from './features/driver/DriverPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
+import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistrationPage';
 
 export function App() {
     return (
@@ -17,6 +18,7 @@ export function App() {
             <Route path="/app/bin" element={<TabletPage />} />
             <Route path="/app/driver" element={<DriverPage />} />
             <Route path="/app/dashboard" element={<DashboardPage />} />
+            <Route path="/app/farmer" element={<FarmerRegistrationPage />} />
         </Routes>
     );
 }

@@ -44,3 +44,12 @@ export {
     type LoginInput,
     type StationAuthInput,
 } from './auth.schema.js';
+
+export {
+    transcribeAudioSchema,
+    animalRegistrationSchema,
+    extractedAnimalFieldsSchema,
+    type TranscribeAudioInput,
+    type AnimalRegistrationInput,
+    type ExtractedAnimalFields,
+} from './farmer.schema.js';

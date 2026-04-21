@@ -210,3 +210,17 @@ model EventLog {
   @@index([timestamp])
   @@map("event_logs")
 }
+
+model AnimalRegistration {
+  id              String   @id @default(cuid())
+  animalType      String
+  breed           String?
+  age             String?
+  weight          String?
+  ownerName       String
+  healthCondition String?
+  rawTranscript   String?
+  createdAt       DateTime @default(now())
+
+  @@map("animal_registrations")
+}
