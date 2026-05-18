@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { trpc } from '../../lib/trpc';
 import { QRScanner } from '../../components/QRScanner';
-import { AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
+import { AlertCircle, CheckCircle2, QrCode, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { createStationTRPCClient } from '../../lib/trpc';
@@ -92,6 +92,15 @@ export function TabletPage() {
                             Driver
                         </Link>
                     </div>
+
+                    {/* Fill a Form shortcut */}
+                    <Link
+                        to="/app/forms"
+                        className="w-full mt-4 flex items-center justify-center gap-2 bg-[#F5F8F2] hover:bg-[#e8f0e0] border border-[#BCD19B] text-[#043F2E] px-4 py-3 rounded-xl font-semibold text-sm transition-colors"
+                    >
+                        <ClipboardList className="w-5 h-5" />
+                        Fill a Form
+                    </Link>
                 </div>
 
                 {!scannedBinId ? (

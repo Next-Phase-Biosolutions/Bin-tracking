@@ -53,6 +53,13 @@ enum UserRole {
   WORKER
 }
 
+enum FormType {
+  standard
+  checklist
+  matrix
+  repeating
+}
+
 // ─── Models ───────────────────────────────────────────────────────
 
 model User {
@@ -223,4 +230,20 @@ model AnimalRegistration {
   createdAt       DateTime @default(now())
 
   @@map("animal_registrations")
+}
+
+model FormTemplate {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  stage       String
+  formType    FormType
+  schema      Json
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([stage, isActive])
+  @@map("form_templates")
 }

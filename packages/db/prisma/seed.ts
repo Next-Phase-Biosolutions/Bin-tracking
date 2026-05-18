@@ -184,9 +184,292 @@ async function main(): Promise<void> {
         ),
     );
 
+    // ─── 10. Form Templates (the 4 digitized forms) ─────────────
+    console.log('📋 Seeding form templates...');
+    await prisma.formTemplate.deleteMany();
+    await prisma.formTemplate.createMany({
+        data: [
+            {
+                title: 'Customer Complaint Investigation Form',
+                description: 'Record and investigate product or service complaints from customers.',
+                stage: 'QUALITY',
+                formType: 'standard',
+                sortOrder: 0,
+                schema: {
+                    formType: 'standard',
+                    sections: [
+                        {
+                            id: 'header',
+                            title: null,
+                            fields: [
+                                { id: 'date', type: 'date', label: 'Date', required: true },
+                                { id: 'time', type: 'time', label: 'Time', required: true },
+                                { id: 'complaint_number', type: 'text', label: 'Complaint Number', required: true },
+                                { id: 'initiated_by', type: 'text', label: 'Initiated By', required: true },
+                            ],
+                        },
+                        {
+                            id: 'section1',
+                            title: 'Section 1 - Customer Details',
+                            fields: [
+                                { id: 'customer_name', type: 'text', label: 'Customer Name', required: true },
+                                { id: 'customer_address', type: 'textarea', label: 'Customer Address', required: false },
+                                { id: 'telephone', type: 'text', label: 'Telephone Number', required: false },
+                                { id: 'fax', type: 'text', label: 'Fax Number', required: false },
+                                { id: 'contact_name', type: 'text', label: 'Contact Name', required: false },
+                                { id: 'email', type: 'text', label: 'E-Mail Address', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section2',
+                            title: 'Section 2 - Product Details',
+                            fields: [
+                                { id: 'product_name', type: 'text', label: 'Product Name', required: true },
+                                { id: 'product_code', type: 'text', label: 'Product Code', required: false },
+                                { id: 'best_before_date', type: 'date', label: 'Best Before or Production Date', required: false },
+                                { id: 'packaging_type', type: 'text', label: 'Packaging Type (e.g. MAP, vacuum packaged)', required: false },
+                                { id: 'date_of_purchase', type: 'date', label: 'Date of Purchase or Receipt', required: false },
+                                { id: 'location_of_purchase', type: 'text', label: 'Location of Purchase', required: false },
+                                { id: 'amount_affected', type: 'text', label: 'Amount Affected', required: false },
+                                { id: 'amount_remaining', type: 'text', label: 'Amount Remaining', required: false },
+                                { id: 'disposition', type: 'textarea', label: 'Disposition of the Remaining Product', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section3',
+                            title: 'Section 3 - Nature of the Complaint',
+                            fields: [
+                                {
+                                    id: 'complaint_type',
+                                    type: 'radio',
+                                    label: 'Please choose one of the following',
+                                    required: true,
+                                    options: [
+                                        'Out of Spec',
+                                        'Packaging Compromised',
+                                        'Labelling',
+                                        'Off condition',
+                                        'Foreign Material',
+                                        'Taste',
+                                        'Allergic Reaction',
+                                        'Illness or Injury',
+                                        'Other',
+                                    ],
+                                },
+                                { id: 'other_description', type: 'textarea', label: 'If Other — Please Describe', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section4',
+                            title: 'Section 4 - Illness Details',
+                            showIf: { fieldId: 'complaint_type', values: ['Allergic Reaction', 'Illness or Injury'] },
+                            fields: [
+                                { id: 'consumed_when', type: 'text', label: 'When was the product consumed?', required: false },
+                                { id: 'amount_consumed', type: 'text', label: 'Amount of product consumed', required: false },
+                                { id: 'consumed_before', type: 'yes_no', label: 'Has the product been consumed before?', required: false },
+                                { id: 'persons_consuming', type: 'number', label: 'Number of persons consuming the product', required: false },
+                                { id: 'persons_ill', type: 'number', label: 'Number of persons ill', required: false },
+                                { id: 'time_ill', type: 'text', label: 'Time persons became ill', required: false },
+                                { id: 'medical_professional', type: 'yes_no', label: 'Has a medical professional been consulted?', required: false },
+                                { id: 'illness_status', type: 'text', label: 'Current Status of Illness', required: false },
+                                { id: 'persons_ill_names', type: 'textarea', label: 'Names and Ages of persons ill', required: false },
+                                { id: 'symptoms', type: 'textarea', label: 'Symptoms of illness in order of occurrence', required: false },
+                                { id: 'followup_required', type: 'yes_no', label: 'Any follow-up required?', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section5',
+                            title: 'Section 5 - Injury Details',
+                            showIf: { fieldId: 'complaint_type', values: ['Illness or Injury'] },
+                            fields: [
+                                { id: 'injury_nature', type: 'textarea', label: 'Nature of Injury', required: false },
+                                { id: 'injury_status', type: 'text', label: 'Current Status of Injury', required: false },
+                                { id: 'injury_medical', type: 'yes_no', label: 'Has a medical professional been consulted?', required: false },
+                                { id: 'injury_followup', type: 'yes_no', label: 'Any follow-up required?', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section6',
+                            title: 'Section 6 - Investigation Details',
+                            fields: [
+                                { id: 'investigation_date', type: 'date', label: 'Date', required: false },
+                                { id: 'investigation_time', type: 'time', label: 'Time', required: false },
+                                { id: 'completed_by', type: 'text', label: 'Completed By', required: false },
+                                { id: 'onsite_results', type: 'textarea', label: 'Results of On-Site Investigation', required: false },
+                                { id: 'records_results', type: 'textarea', label: 'Results of Records Review', required: false },
+                                { id: 'micro_results', type: 'textarea', label: 'Results of Micro Review if Required', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section7',
+                            title: 'Section 7 - Food Safety Assessment',
+                            fields: [
+                                { id: 'food_safety_compromised', type: 'yes_no', label: 'Has food safety been compromised?', required: false },
+                                { id: 'other_products_affected', type: 'yes_no', label: 'Are any other products affected by the complaint?', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section8',
+                            title: 'Section 8 - Corrective Actions',
+                            fields: [
+                                { id: 'immediate_actions', type: 'textarea', label: 'Immediate Corrective Actions', required: false },
+                                { id: 'preventive_measures', type: 'textarea', label: 'Preventive Measures', required: false },
+                            ],
+                        },
+                        {
+                            id: 'section9',
+                            title: 'Section 9 - Communication',
+                            fields: [
+                                { id: 'referred_to', type: 'textarea', label: 'Has the complaint been referred to anyone else? (e.g. Public Health, CFIA)', required: false },
+                                { id: 'response_sent', type: 'date', label: 'Date Response sent to Customer', required: false },
+                            ],
+                        },
+                    ],
+                },
+            },
+            {
+                title: 'Allergen Checklist',
+                description: 'Supplier allergen declaration — identify allergens present in product, on same line, and in plant.',
+                stage: 'RECEIVING',
+                formType: 'matrix',
+                sortOrder: 0,
+                schema: {
+                    formType: 'matrix',
+                    headerFields: [
+                        { id: 'supplier_name', type: 'text', label: 'Supplier Name', required: true },
+                        { id: 'completed_by', type: 'text', label: 'Form Completed By', required: true },
+                        { id: 'product_name', type: 'text', label: 'Product Name', required: true },
+                        { id: 'product_code', type: 'text', label: 'Product Code', required: false },
+                    ],
+                    columns: [
+                        { id: 'col_product', label: 'Present in the product' },
+                        { id: 'col_same_line', label: 'Present in other products on same line' },
+                        { id: 'col_same_plant', label: 'Present in same plant' },
+                    ],
+                    rows: [
+                        { id: 'peanut', label: 'Peanut or its derivatives (pieces, protein, oil, butter, flour, mandelona nuts)' },
+                        { id: 'tree_nuts', label: 'Tree Nuts (almonds, Brazil nuts, cashews, hazelnuts, macadamia, pecans, pine nuts, pistachios, walnuts)' },
+                        { id: 'sesame', label: 'Sesame or its derivatives (paste, oil)' },
+                        { id: 'milk', label: 'Milk or its derivatives (caseinate, whey, yogurt powder)' },
+                        { id: 'eggs', label: 'Eggs or its derivatives (frozen yolk, egg white powder, protein isolates)' },
+                        { id: 'fish', label: 'Fish or its derivatives (protein, oil, extracts)' },
+                        { id: 'crustaceans', label: 'Crustaceans & Shellfish (crab, crayfish, lobster, shrimp, clams, mussels, oysters)' },
+                        { id: 'soy', label: 'Soy or its derivatives (lecithin, oil, tofu, protein isolates)' },
+                        { id: 'wheat', label: 'Wheat, triticale or derivatives (flour, starches, brans, spelt, durum, kamut)' },
+                        { id: 'mustard', label: 'Mustard or its derivatives (seeds, flour, ground mustard, prepared mustard)' },
+                    ],
+                    footerFields: [
+                        {
+                            id: 'cross_contam_procedures',
+                            type: 'yes_no',
+                            label: 'Do you have effective procedures to avoid cross-contamination with allergens not present in the product but noted in columns II and III?',
+                            required: true,
+                        },
+                    ],
+                },
+            },
+            {
+                title: 'Equipment Review Form',
+                description: 'Evaluate equipment, instruments, measuring devices, and food contact surfaces against compliance criteria.',
+                stage: 'MAINTENANCE',
+                formType: 'checklist',
+                sortOrder: 0,
+                schema: {
+                    formType: 'checklist',
+                    headerFields: [
+                        { id: 'person_responsible', type: 'text', label: 'Person Responsible', required: true },
+                        { id: 'date', type: 'date', label: 'Date', required: true },
+                        { id: 'equipment_name', type: 'text', label: 'Equipment Name', required: true },
+                        { id: 'model_number', type: 'text', label: 'Model Number', required: false },
+                        { id: 'supplier', type: 'text', label: 'Equipment Supplier / Manufacturer', required: false },
+                        { id: 'installation_date', type: 'date', label: 'Date of Installation or Use', required: false },
+                        { id: 'location_purpose', type: 'text', label: 'Location or Purpose', required: false },
+                    ],
+                    groups: [
+                        {
+                            id: 'equipment_group',
+                            title: 'Equipment, Instruments and Measuring Devices',
+                            items: [
+                                { id: 'c9_04_15_01_01', label: '(C9.04.15.01.01) Equipment, instruments and measuring devices are designed in a manner that prevents contamination of meat products.' },
+                                { id: 'c9_04_15_01_02', label: '(C9.04.15.01.02) Constructed of materials that are corrosion resistant, do not transmit odour or taste, and are free of constituents likely to contaminate meat.' },
+                                { id: 'c9_04_15_01_03', label: '(C9.04.15.01.03) Located and installed in a manner that prevents contamination of meat products and allows for effective cleaning and sanitizing.' },
+                                { id: 'c9_04_15_02_01', label: '(C9.04.15.02.01) Each piece of equipment or utensil is effective for its intended purpose.' },
+                            ],
+                        },
+                        {
+                            id: 'food_contact',
+                            title: 'Food Contact Surfaces',
+                            items: [
+                                { id: 'c9_04_15_05_01', label: '(C9.04.15.05.01) They are non-absorbent, corrosion resistant and non-toxic.' },
+                                { id: 'c9_04_15_05_02', label: '(C9.04.15.05.02) They are designed and constructed to be free of niches for accumulation of food debris and microbial growth.' },
+                                { id: 'c9_04_15_05_03', label: '(C9.04.15.05.03) They are smooth and free from pitting, cracks and chipping.' },
+                                { id: 'c9_04_15_05_04', label: '(C9.04.15.05.04) They are capable of withstanding repeated cleaning and sanitizing.' },
+                            ],
+                        },
+                        {
+                            id: 'shelving',
+                            title: 'Shelving and Racks',
+                            items: [
+                                { id: 'c9_04_15_06_01', label: '(C9.04.15.06.01) Shelves and racks are designed, constructed, located, installed, and maintained to facilitate sanitary operation, with sufficient clearance from floor for cleaning.' },
+                            ],
+                        },
+                        {
+                            id: 'inedible',
+                            title: 'Inedible Equipment',
+                            items: [
+                                { id: 'c9_04_15_07_02', label: '(C9.04.15.07.02) All equipment used for inedible material intended for pet food or pharmaceutical use allows hygienic processing, packaging and labelling.' },
+                                { id: 'c9_04_15_07_03', label: '(C9.04.15.07.03) Equipment for inedible material is in good condition and made of durable materials that can be cleaned and sanitized.' },
+                            ],
+                        },
+                        {
+                            id: 'records',
+                            title: 'Records',
+                            items: [
+                                { id: 'rec_01', label: "Operator's manual has been received (includes cleaning, maintenance, and installation instructions)." },
+                                { id: 'rec_02', label: 'Equipment added to the Maintenance Schedule / Record.' },
+                                { id: 'rec_03', label: 'Equipment added to the Sanitation Schedule.' },
+                                { id: 'rec_04', label: 'Equipment added to the Pre-Operational Inspection.' },
+                                { id: 'rec_05', label: 'Instruments and Measuring Devices added to the Calibration Schedule / Record.' },
+                            ],
+                        },
+                    ],
+                },
+            },
+            {
+                title: 'Plant Receiving Record — Meat & Non-Meat',
+                description: 'Document all product and supplier information for each delivery received.',
+                stage: 'RECEIVING',
+                formType: 'repeating',
+                sortOrder: 1,
+                schema: {
+                    formType: 'repeating',
+                    instructions: [
+                        '1. Inspect the sanitary and structural condition of the transport vehicle. Ensure no objectionable odours, contamination, or temperature abuse. Check: clean and free of contamination; constructed of safe materials; hard, smooth, impervious interior surfaces in good repair.',
+                        '2. Check the transport container can maintain 4°C or less for fresh product and -18°C or less for frozen.',
+                        '3. If applicable, randomly check the temperature of the product.',
+                        '4. Visually evaluate product condition — no contamination, spoilage, damage, temperature abuse, or tampering (open boxes, broken straps, puncture holes).',
+                    ].join('\n'),
+                    columns: [
+                        { id: 'date', type: 'date', label: 'Date', required: true },
+                        { id: 'supplier_name', type: 'text', label: 'Supplier Name', required: true },
+                        { id: 'lot_number', type: 'text', label: 'Supplier / Company Lot #', required: false },
+                        { id: 'product_name', type: 'text', label: 'Product Name', required: true },
+                        { id: 'quantity', type: 'number', label: 'Quantity', required: true },
+                        { id: 'product_temp', type: 'number', label: 'Product Temp (°C)', required: true },
+                        { id: 'product_condition', type: 'select', label: 'Condition of Product', required: true, options: ['Satisfactory', 'Unsatisfactory'] },
+                        { id: 'truck_temp', type: 'number', label: 'Truck Temp', required: true },
+                        { id: 'truck_condition', type: 'select', label: 'Condition of Truck', required: true, options: ['Satisfactory', 'Unsatisfactory'] },
+                        { id: 'comments', type: 'textarea', label: 'Comments / Corrective Actions', required: false },
+                        { id: 'initials', type: 'text', label: 'Initials', required: true },
+                    ],
+                },
+            },
+        ],
+    });
+    console.log('  ✓ 4 form templates seeded');
+
     // ─── Done — print test guide ──────────────────────────────────
-    console.log('\n✅ Seed complete!\n');
-    console.log('═══════════════════════════════════════════════════════════');
+    console.log('\n✅ Seed complete!\n');    console.log('═══════════════════════════════════════════════════════════');
     console.log('  TEST ACCOUNTS');
     console.log('═══════════════════════════════════════════════════════════');
     for (const u of SEED_USERS) {

@@ -5,6 +5,7 @@ import { facilityRouter } from './facility.router.js';
 import { dashboardRouter } from './dashboard.router.js';
 import { blockchainRouter } from './blockchain.router.js';
 import { farmerRouter } from './farmer.router.js';
+import { formRouter } from './form.router.js';
 
 export const appRouter = router({
     bin: binRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
     dashboard: dashboardRouter,
     blockchain: blockchainRouter,
     farmer: farmerRouter,
+    form: formRouter,
 });
 
 export type AppRouter = typeof appRouter;
