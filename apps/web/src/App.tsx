@@ -8,6 +8,7 @@ import DashboardPage from './features/dashboard/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
 import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistrationPage';
 import FormListPage from './features/forms/FormListPage';
+import FormBuilderPage from './features/forms/FormBuilderPage';
 import FacilityLayout from './features/dashboard/FacilityLayout';
 import FacilityDashboardPage from './features/dashboard/FacilityDashboardPage';
 import ReceivingZonePage from './features/dashboard/ReceivingZonePage';
@@ -27,6 +28,7 @@ export function App() {
             <Route path="/app/dashboard" element={<DashboardPage />} />
             <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
             <Route path="/app/forms" element={<FormListPage />} />
+            <Route path="/app/forms/new" element={<FormBuilderPage />} />
             <Route path="/app/facility" element={<FacilityLayout />}>
                 <Route index element={<FacilityDashboardPage />} />
                 <Route path="receiving" element={<ReceivingZonePage />} />

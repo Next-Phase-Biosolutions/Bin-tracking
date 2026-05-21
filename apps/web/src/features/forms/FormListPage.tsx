@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { trpc } from '../../lib/trpc';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
 import { FormRenderer } from './FormRenderer';
+import { FormBuilder } from './FormBuilder';
 
 const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
 const STAGE = import.meta.env.VITE_STATION_STAGE || 'ALL';
@@ -45,6 +46,7 @@ function FormCard({ form, onOpen }: { form: FormTemplate; onOpen: () => void }) 
 
 export function FormListPage() {
     const [openForm, setOpenForm] = useState<FormTemplate | null>(null);
+    const [showBuilder, setShowBuilder] = useState(false);
 
     const { data: forms, isLoading, error } = trpc.form.listByStage.useQuery(
         { stage: STAGE },
@@ -53,6 +55,10 @@ export function FormListPage() {
             retry: 2,
         },
     );
+
+    if (showBuilder) {
+        return <FormBuilder onBack={() => setShowBuilder(false)} />;
+    }
 
     if (openForm) {
         return <FormRenderer form={openForm} onBack={() => setOpenForm(null)} />;
@@ -69,8 +75,20 @@ export function FormListPage() {
                     <ArrowLeft className="w-4 h-4" />
                     Back to Scanner
                 </Link>
-                <h1 className="text-2xl font-bold text-white">Forms</h1>
-                <p className="text-white/60 text-sm mt-1">Select a form to fill out</p>
+                <div className="flex items-end justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Forms</h1>
+                        <p className="text-white/60 text-sm mt-1">Select a form to fill out</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowBuilder(true)}
+                        className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+                    >
+                        <PlusCircle className="w-4 h-4" />
+                        Create a Form
+                    </button>
+                </div>
             </div>
 
             <div className="px-4 py-6 max-w-xl mx-auto">

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
@@ -244,6 +244,10 @@ export function DashboardPage() {
                         <Link to="/app/forms" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
                             <ClipboardList className="w-4 h-4" />
                             <span>Fill Form</span>
+                        </Link>
+                        <Link to="/app/forms/new" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+                            <PlusCircle className="w-4 h-4" />
+                            <span>Create a Form</span>
                         </Link>
                         <button
                             onClick={() => setAnchorModalOpen(true)}
