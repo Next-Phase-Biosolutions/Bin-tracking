@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2, PlusCircle } from 'lucide-react';
+import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2, PlusCircle, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { trpc } from '../../lib/trpc';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
@@ -80,14 +80,23 @@ export function FormListPage() {
                         <h1 className="text-2xl font-bold text-white">Forms</h1>
                         <p className="text-white/60 text-sm mt-1">Select a form to fill out</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setShowBuilder(true)}
-                        className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-                    >
-                        <PlusCircle className="w-4 h-4" />
-                        Create a Form
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Link
+                            to="/app/forms/import"
+                            className="flex items-center gap-2 bg-white text-[#043F2E] text-sm font-semibold px-4 py-2 rounded-xl transition-colors hover:bg-gray-100"
+                        >
+                            <Camera className="w-4 h-4" />
+                            From Photo
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => setShowBuilder(true)}
+                            className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+                        >
+                            <PlusCircle className="w-4 h-4" />
+                            Manual Builder
+                        </button>
+                    </div>
                 </div>
             </div>
 

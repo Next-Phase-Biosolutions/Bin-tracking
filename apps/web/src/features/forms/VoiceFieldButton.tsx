@@ -1,0 +1,89 @@
+import { useEffect } from 'react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { trpc } from '../../lib/trpc';
+import { useVoiceRecorder } from '../farmer-registration/useVoiceRecorder';
+import type { FieldType } from '@bin-tracker/types';
+
+interface VoiceFieldButtonProps {
+    fieldId: string;
+    fieldLabel: string;
+    fieldType?: FieldType;
+    onValue: (value: string) => void;
+    disabled?: boolean;
+}
+
+export function VoiceFieldButton({
+    fieldId,
+    fieldLabel,
+    fieldType,
+    onValue,
+    disabled,
+}: VoiceFieldButtonProps) {
+    const { status, startRecording, stopRecording, audioBase64, mimeType, error, clearAudio } =
+        useVoiceRecorder();
+
+    const transcribe = trpc.form.transcribeField.useMutation({
+        onSuccess: (data) => {
+            if (data.value) onValue(data.value);
+            clearAudio();
+        },
+    });
+
+    useEffect(() => {
+        if (!audioBase64 || transcribe.isPending) return;
+        transcribe.mutate({
+            audioBase64,
+            mimeType,
+            fieldId,
+            fieldLabel,
+            fieldType,
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [audioBase64]);
+
+    const busy = status === 'processing' || transcribe.isPending;
+
+    if (status === 'recording') {
+        return (
+            <button
+                type="button"
+                onClick={stopRecording}
+                disabled={disabled}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                title="Stop and fill field"
+            >
+                <MicOff className="h-3.5 w-3.5 animate-pulse" />
+                Stop
+            </button>
+        );
+    }
+
+    if (busy) {
+        return (
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Listening…
+            </span>
+        );
+    }
+
+    return (
+        <div className="inline-flex flex-col items-end gap-0.5">
+            <button
+                type="button"
+                onClick={() => void startRecording()}
+                disabled={disabled || transcribe.isPending}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#043F2E]/30 bg-[#F5F8F2] px-3 py-1.5 text-xs font-semibold text-[#043F2E] hover:bg-[#e8efe3] disabled:opacity-50"
+                title="Speak to fill this field"
+            >
+                <Mic className="h-3.5 w-3.5" />
+                Voice
+            </button>
+            {(error || transcribe.error) && (
+                <span className="text-[10px] text-red-600 max-w-[140px] text-right">
+                    {error ?? transcribe.error?.message}
+                </span>
+            )}
+        </div>
+    );
+}

@@ -1,24 +1,42 @@
 import type { FormField } from '@bin-tracker/types';
+import { VoiceFieldButton } from './VoiceFieldButton';
 
 interface BaseProps {
     field: FormField;
     value: string;
     onChange: (value: string) => void;
     error?: string;
+    showVoice?: boolean;
 }
 
-const labelCls = 'block text-sm font-semibold text-gray-700 mb-1';
+function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
+    const voice = showVoice && field.voiceEnabled;
+    return (
+        <div className="flex items-start justify-between gap-2 mb-1">
+            <label className="block text-sm font-semibold text-gray-700 flex-1">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            {voice && (
+                <VoiceFieldButton
+                    fieldId={field.id}
+                    fieldLabel={field.label}
+                    fieldType={field.type}
+                    onValue={onChange}
+                />
+            )}
+        </div>
+    );
+}
+
 const inputCls =
     'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#043F2E] focus:border-transparent disabled:bg-gray-50';
 const errorCls = 'text-red-600 text-xs mt-1';
 
-export function TextInput({ field, value, onChange, error }: BaseProps) {
+export function TextInput({ field, value, onChange, error, showVoice }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
             <input
                 type="text"
                 className={inputCls}
@@ -31,13 +49,10 @@ export function TextInput({ field, value, onChange, error }: BaseProps) {
     );
 }
 
-export function TextareaInput({ field, value, onChange, error }: BaseProps) {
+export function TextareaInput({ field, value, onChange, error, showVoice }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
             <textarea
                 rows={3}
                 className={`${inputCls} resize-none`}
@@ -53,10 +68,7 @@ export function TextareaInput({ field, value, onChange, error }: BaseProps) {
 export function NumberInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="number"
                 className={inputCls}
@@ -72,10 +84,7 @@ export function NumberInput({ field, value, onChange, error }: BaseProps) {
 export function DateInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="date"
                 className={inputCls}
@@ -90,10 +99,7 @@ export function DateInput({ field, value, onChange, error }: BaseProps) {
 export function TimeInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="time"
                 className={inputCls}
@@ -108,10 +114,7 @@ export function TimeInput({ field, value, onChange, error }: BaseProps) {
 export function SelectInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <select
                 className={inputCls}
                 value={value}
@@ -132,10 +135,7 @@ export function SelectInput({ field, value, onChange, error }: BaseProps) {
 export function RadioInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <div className="flex flex-col gap-2 mt-1">
                 {(field.options ?? []).map((opt) => (
                     <label key={opt} className="flex items-center gap-2 cursor-pointer">
@@ -159,10 +159,7 @@ export function RadioInput({ field, value, onChange, error }: BaseProps) {
 export function YesNoInput({ field, value, onChange, error }: BaseProps) {
     return (
         <div>
-            <label className={labelCls}>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
+            <FieldLabelRow field={field} value={value} onChange={onChange} />
             <div className="flex gap-3 mt-1">
                 {(['Yes', 'No'] as const).map((opt) => (
                     <button
@@ -187,10 +184,19 @@ export function YesNoInput({ field, value, onChange, error }: BaseProps) {
 }
 
 /** Renders the correct input component for any FormField */
-export function FieldInput({ field, value, onChange, error }: BaseProps) {
+export function FieldInput({ field, value, onChange, error, showVoice = true }: BaseProps) {
+    const voice = showVoice;
     switch (field.type) {
         case 'textarea':
-            return <TextareaInput field={field} value={value} onChange={onChange} error={error} />;
+            return (
+                <TextareaInput
+                    field={field}
+                    value={value}
+                    onChange={onChange}
+                    error={error}
+                    showVoice={voice}
+                />
+            );
         case 'number':
             return <NumberInput field={field} value={value} onChange={onChange} error={error} />;
         case 'date':
@@ -204,6 +210,14 @@ export function FieldInput({ field, value, onChange, error }: BaseProps) {
         case 'yes_no':
             return <YesNoInput field={field} value={value} onChange={onChange} error={error} />;
         default:
-            return <TextInput field={field} value={value} onChange={onChange} error={error} />;
+            return (
+                <TextInput
+                    field={field}
+                    value={value}
+                    onChange={onChange}
+                    error={error}
+                    showVoice={voice}
+                />
+            );
     }
 }

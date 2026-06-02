@@ -2,6 +2,21 @@
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'radio' | 'date' | 'time' | 'yes_no';
 
+export type FormTriggerTypeValue =
+    | 'on_arrival'
+    | 'on_cycle_start'
+    | 'scheduled'
+    | 'manual'
+    | 'inspection'
+    | 'other';
+
+export type FormFillFrequencyValue =
+    | 'per_animal'
+    | 'per_shift'
+    | 'daily'
+    | 'weekly'
+    | 'as_needed';
+
 export interface FormField {
     id: string;
     type: FieldType;
@@ -9,6 +24,7 @@ export interface FormField {
     required: boolean;
     placeholder?: string;
     options?: string[];
+    voiceEnabled?: boolean;
 }
 
 // ─── Standard Form (multi-section with optional conditional logic) ─────────
@@ -22,6 +38,8 @@ export interface StandardSection {
     id: string;
     title: string | null;
     fields: FormField[];
+    /** Multi-row table: column headers from paper form; workers add rows with Add row */
+    tableColumns?: RepeatingColumn[];
     showIf?: ShowIfCondition;
 }
 
@@ -77,6 +95,7 @@ export interface RepeatingColumn {
     label: string;
     required: boolean;
     options?: string[];
+    voiceEnabled?: boolean;
 }
 
 export interface RepeatingSchema {
@@ -98,8 +117,21 @@ export interface FormTemplate {
     stage: string;
     formType: FormTypeValue;
     schema: FormSchema;
+    sourceImageUrl: string | null;
+    triggerType: FormTriggerTypeValue | null;
+    triggerConfig: Record<string, unknown> | null;
+    fillFrequency: FormFillFrequencyValue | null;
     isActive: boolean;
     sortOrder: number;
     createdAt: Date;
     updatedAt: Date;
+}
+
+/** Draft returned from photo digitization before save */
+export interface FormDigitizeDraft {
+    title: string;
+    description: string | null;
+    formType: FormTypeValue;
+    schema: FormSchema;
+    warnings?: string[];
 }

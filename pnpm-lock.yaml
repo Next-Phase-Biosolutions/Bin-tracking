@@ -35,6 +35,9 @@ importers:
       '@fastify/rate-limit':
         specifier: ^10.2.0
         version: 10.3.0
+      '@google/generative-ai':
+        specifier: ^0.24.1
+        version: 0.24.1
       '@prisma/client':
         specifier: ^7.4.0
         version: 7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
@@ -762,6 +765,10 @@ packages:
 
   '@foxglove/crc@0.0.3':
     resolution: {integrity: sha512-DjIZsnL3CyP/yQ/vUYA9cjrD0a/8YXejI5ZmsaOiT16cLfZcTwaCxIN01/ys4jsy+dZCQ/9DnWFn7AEFbiMDaA==}
+
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
 
   '@harmoniclabs/bigint-utils@1.0.0':
     resolution: {integrity: sha512-OhZMHcdtH2hHKMlxWFHf71PmKHdoi9ARpjS9mUu0/cd8VWDDjT7VQoQwC5NN/68iyO4O5Dojrvrp9tjG5BDABA==}
@@ -3753,6 +3760,8 @@ snapshots:
       toad-cache: 3.7.0
 
   '@foxglove/crc@0.0.3': {}
+
+  '@google/generative-ai@0.24.1': {}
 
   '@harmoniclabs/bigint-utils@1.0.0':
     dependencies:

@@ -5,6 +5,7 @@ import type { RepeatingSchema } from '@bin-tracker/types';
 interface Props {
     schema: RepeatingSchema;
     onSubmit: () => void;
+    previewMode?: boolean;
 }
 
 type Row = Record<string, string>;
@@ -17,7 +18,7 @@ function emptyRow(schema: RepeatingSchema): Row {
     return row;
 }
 
-export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
+export function RepeatingRowFormRenderer({ schema, onSubmit, previewMode }: Props) {
     const [rows, setRows] = useState<Row[]>([emptyRow(schema)]);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -56,9 +57,10 @@ export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
         onSubmit();
     };
 
+    const cellBorder = 'border border-gray-400';
     const inputCls = (hasError: boolean) =>
-        `w-full border rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#043F2E] ${
-            hasError ? 'border-red-400' : 'border-gray-300'
+        `w-full min-w-[3.5rem] border-0 bg-transparent px-2 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#043F2E] focus:ring-inset ${
+            hasError ? 'bg-red-50 ring-1 ring-red-400' : ''
         }`;
 
     return (
@@ -74,31 +76,31 @@ export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
             )}
 
             {/* Rows table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-lg border border-gray-400 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-max">
+                    <table className="w-full min-w-max border-collapse border border-gray-400 text-xs">
                         <thead>
                             <tr className="bg-[#043F2E]">
                                 {schema.columns.map((col) => (
                                     <th
                                         key={col.id}
-                                        className="text-left text-white px-3 py-3 font-semibold whitespace-nowrap"
+                                        className={`${cellBorder} whitespace-nowrap px-3 py-2.5 text-left font-semibold text-white`}
                                     >
                                         {col.label}
-                                        {col.required && <span className="text-red-300 ml-0.5">*</span>}
+                                        {col.required && <span className="ml-0.5 text-red-300">*</span>}
                                     </th>
                                 ))}
-                                <th className="text-white px-3 py-3 w-8" />
+                                <th className={`${cellBorder} w-10 bg-[#043F2E] px-2 py-2.5`} />
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody>
                             {rows.map((row, rowIdx) => (
-                                <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <tr key={rowIdx} className="bg-white">
                                     {schema.columns.map((col) => {
                                         const errKey = `${rowIdx}_${col.id}`;
                                         const hasError = !!errors[errKey];
                                         return (
-                                            <td key={col.id} className="px-2 py-2 align-top">
+                                            <td key={col.id} className={`${cellBorder} min-w-[4rem] p-0 align-top`}>
                                                 {col.type === 'select' ? (
                                                     <select
                                                         className={inputCls(hasError)}
@@ -112,6 +114,25 @@ export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
                                                             </option>
                                                         ))}
                                                     </select>
+                                                ) : col.type === 'yes_no' ? (
+                                                    <div className="flex gap-1">
+                                                        {(['Yes', 'No'] as const).map((opt) => (
+                                                            <button
+                                                                key={opt}
+                                                                type="button"
+                                                                onClick={() => setCellValue(rowIdx, col.id, opt)}
+                                                                className={`rounded px-2 py-1 text-[10px] font-semibold ${
+                                                                    row[col.id] === opt
+                                                                        ? opt === 'Yes'
+                                                                            ? 'bg-green-600 text-white'
+                                                                            : 'bg-red-600 text-white'
+                                                                        : 'border border-gray-300 bg-white'
+                                                                }`}
+                                                            >
+                                                                {opt}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 ) : col.type === 'textarea' ? (
                                                     <textarea
                                                         rows={2}
@@ -138,7 +159,7 @@ export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
                                             </td>
                                         );
                                     })}
-                                    <td className="px-2 py-2 align-top">
+                                    <td className={`${cellBorder} px-1 py-1 align-middle`}>
                                         <button
                                             type="button"
                                             onClick={() => removeRow(rowIdx)}
@@ -168,13 +189,15 @@ export function RepeatingRowFormRenderer({ schema, onSubmit }: Props) {
 
             <p className="text-xs text-gray-400 text-center">{rows.length} {rows.length === 1 ? 'entry' : 'entries'}</p>
 
-            <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors"
-            >
-                Submit Form
-            </button>
+            {!previewMode && (
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors"
+                >
+                    Submit Form
+                </button>
+            )}
         </div>
     );
 }

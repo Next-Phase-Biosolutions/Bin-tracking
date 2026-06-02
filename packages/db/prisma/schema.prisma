@@ -60,6 +60,23 @@ enum FormType {
   repeating
 }
 
+enum FormTriggerType {
+  on_arrival
+  on_cycle_start
+  scheduled
+  manual
+  inspection
+  other
+}
+
+enum FormFillFrequency {
+  per_animal
+  per_shift
+  daily
+  weekly
+  as_needed
+}
+
 // ─── Models ───────────────────────────────────────────────────────
 
 model User {
@@ -233,16 +250,20 @@ model AnimalRegistration {
 }
 
 model FormTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  stage       String
-  formType    FormType
-  schema      Json
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String             @id @default(cuid())
+  title           String
+  description     String?
+  stage           String
+  formType        FormType
+  schema          Json
+  sourceImageUrl  String?
+  triggerType     FormTriggerType?
+  triggerConfig   Json?
+  fillFrequency   FormFillFrequency?
+  isActive        Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   @@index([stage, isActive])
   @@map("form_templates")

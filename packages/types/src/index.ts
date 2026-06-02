@@ -28,6 +28,8 @@ export type {
 export type {
     FieldType,
     FormField,
+    FormTriggerTypeValue,
+    FormFillFrequencyValue,
     ShowIfCondition,
     StandardSection,
     StandardSchema,
@@ -42,4 +44,5 @@ export type {
     FormSchema,
     FormTypeValue,
     FormTemplate,
+    FormDigitizeDraft,
 } from './form.js';

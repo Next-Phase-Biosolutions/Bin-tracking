@@ -245,7 +245,7 @@ export function DashboardPage() {
                             <ClipboardList className="w-4 h-4" />
                             <span>Fill Form</span>
                         </Link>
-                        <Link to="/app/forms/new" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+                        <Link to="/app/forms/import" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
                             <PlusCircle className="w-4 h-4" />
                             <span>Create a Form</span>
                         </Link>
