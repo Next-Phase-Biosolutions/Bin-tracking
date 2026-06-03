@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle, UserPlus, PawPrint, ScanLine } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
@@ -228,45 +228,60 @@ export function DashboardPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+        <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
 
-            {/* ── Header ── */}
-            <header className="bg-[#043F2E] text-white p-4 shadow-md sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-white/10 p-2 rounded-lg"><LayoutDashboard className="w-6 h-6" /></div>
-                        <h1 className="text-xl md:text-2xl font-bold tracking-tight">Ops Dashboard</h1>
-                    </div>
-                    <div className="flex items-center gap-2 md:gap-4">
-                        <Link to="/app/driver" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Driver</Link>
-                        <Link to="/app/bin" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bin</Link>
-                        <Link to="/app/animalregistration" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Animal Registration</Link>
-                        <Link to="/app/forms" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
-                            <ClipboardList className="w-4 h-4" />
-                            <span>Fill Form</span>
-                        </Link>
-                        <Link to="/app/forms/import" className="bg-white hover:bg-gray-100 text-[#043F2E] px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
-                            <PlusCircle className="w-4 h-4" />
-                            <span>Create a Form</span>
-                        </Link>
-                        <button
-                            onClick={() => setAnchorModalOpen(true)}
-                            className="bg-purple-500 hover:bg-purple-400 text-white px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-                            title="Post today's operations on Cardano blockchain"
-                        >
-                            <span>⛓</span>
-                            <span className="hidden md:inline">Post on Blockchain</span>
-                        </button>
-                        <Link to="/app/facility" className="bg-amber-500 hover:bg-amber-400 text-white px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
-                            <Factory className="w-4 h-4" />
-                            <span className="hidden md:inline">Facility Dashboard</span>
-                        </Link>
-                        <button onClick={() => refetch()} className="bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4" /><span className="hidden md:inline">Refresh</span>
-                        </button>
-                    </div>
+            {/* ── Sidebar ── */}
+            <aside className="bg-[#043F2E] text-white w-full md:w-64 md:shrink-0 md:h-screen md:sticky md:top-0 flex flex-col p-4 shadow-md overflow-y-auto">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-white/10 p-2 rounded-lg"><LayoutDashboard className="w-6 h-6" /></div>
+                    <h1 className="text-lg font-bold tracking-tight">Ops Dashboard</h1>
                 </div>
-            </header>
+
+                <nav className="flex flex-col gap-1.5">
+                    <Link to="/app/driver" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <Truck className="w-4 h-4" /><span>Driver</span>
+                    </Link>
+                    <Link to="/app/bin" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <Box className="w-4 h-4" /><span>Bin</span>
+                    </Link>
+                    <Link to="/app/animalregistration" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <PawPrint className="w-4 h-4" /><span>Animal Registration</span>
+                    </Link>
+                    <Link to="/app/employees/register" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <UserPlus className="w-4 h-4" /><span>Register Employee</span>
+                    </Link>
+                    <Link to="/app/timesheet" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <Clock className="w-4 h-4" /><span>Timesheet</span>
+                    </Link>
+                    <Link to="/app/guard" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <ScanLine className="w-4 h-4" /><span>Guard Scanner</span>
+                    </Link>
+                    <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <ClipboardList className="w-4 h-4" /><span>Fill Form</span>
+                    </Link>
+                    <Link to="/app/forms/import" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <PlusCircle className="w-4 h-4" /><span>Create a Form</span>
+                    </Link>
+                    <Link to="/app/facility" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <Factory className="w-4 h-4" /><span>Facility Dashboard</span>
+                    </Link>
+                </nav>
+
+                <div className="my-4 border-t border-white/10" />
+
+                <div className="flex flex-col gap-1.5 md:mt-auto">
+                    <button
+                        onClick={() => setAnchorModalOpen(true)}
+                        className="bg-purple-500 hover:bg-purple-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5"
+                        title="Post today's operations on Cardano blockchain"
+                    >
+                        <span>⛓</span><span>Post on Blockchain</span>
+                    </button>
+                    <button onClick={() => refetch()} className="bg-white/10 hover:bg-white/20 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <RefreshCw className="w-4 h-4" /><span>Refresh</span>
+                    </button>
+                </div>
+            </aside>
 
             <main className="flex-1 w-full max-w-7xl mx-auto p-3 md:p-6 lg:p-8">
 

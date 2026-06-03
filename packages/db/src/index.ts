@@ -7,6 +7,9 @@ export type {
     BinCycle,
     EventLog,
     User,
+    Employee,
+    WorkSession,
+    AttendanceEvent,
 } from '@prisma/client';
 
 export {
@@ -17,4 +20,6 @@ export {
     Urgency,
     EventType,
     UserRole,
+    EmployeeStatus,
+    AttendanceEventType,
 } from '@prisma/client';

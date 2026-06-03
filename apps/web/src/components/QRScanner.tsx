@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
 interface QRScannerProps {
     onScan: (decodedText: string) => void;
@@ -13,6 +13,28 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
     useEffect(() => {
         const scanner = new Html5Qrcode(containerId);
         scannerRef.current = scanner;
+
+        // Under React StrictMode the effect runs twice (mount, unmount, mount).
+        // start() is async, so the first instance can resolve AFTER its cleanup
+        // ran and attach a second camera feed. This flag lets us stop a stream
+        // that finished starting after the effect was torn down.
+        let cancelled = false;
+
+        const teardown = (s: Html5Qrcode) => {
+            try {
+                const state = s.getState();
+                if (
+                    state === Html5QrcodeScannerState.SCANNING ||
+                    state === Html5QrcodeScannerState.PAUSED
+                ) {
+                    s.stop().then(() => s.clear()).catch(() => { });
+                } else {
+                    s.clear();
+                }
+            } catch {
+                // Scanner had not started — nothing to tear down.
+            }
+        };
 
         scanner
             .start(
@@ -30,6 +52,10 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
                     // Scan errors fire every frame when no QR is visible — intentionally silenced
                 }
             )
+            .then(() => {
+                // Effect was already cleaned up before the camera finished starting.
+                if (cancelled) teardown(scanner);
+            })
             .catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
                 if (onError) onError(msg);
@@ -37,10 +63,8 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
             });
 
         return () => {
-            const s = scannerRef.current;
-            if (s) {
-                s.stop().then(() => s.clear()).catch(() => { });
-            }
+            cancelled = true;
+            teardown(scanner);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

@@ -53,6 +53,16 @@ enum UserRole {
   WORKER
 }
 
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AttendanceEventType {
+  CHECK_IN
+  CHECK_OUT
+}
+
 enum FormType {
   standard
   checklist
@@ -247,6 +257,65 @@ model AnimalRegistration {
   createdAt       DateTime @default(now())
 
   @@map("animal_registrations")
+}
+
+// ─── Employee Time Tracking ───────────────────────────────────────
+
+model Employee {
+  id           String         @id @default(cuid())
+  employeeCode String         @unique
+  fullName     String
+  email        String?
+  phone        String?
+  department   String?
+  position     String?
+  status       EmployeeStatus @default(ACTIVE)
+  qrCode       String         @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  sessions WorkSession[]
+  events   AttendanceEvent[]
+
+  @@index([status])
+  @@map("employees")
+}
+
+model WorkSession {
+  id          String    @id @default(cuid())
+  employeeId  String
+  checkInAt   DateTime  @default(now())
+  checkOutAt  DateTime?
+  durationMin Int?
+  autoClosed  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee Employee          @relation(fields: [employeeId], references: [id])
+  events   AttendanceEvent[]
+
+  // Used to find an employee's currently-open session quickly.
+  @@index([employeeId, checkOutAt])
+  @@index([checkInAt])
+  @@map("work_sessions")
+}
+
+// Append-only audit trail of every scan.
+model AttendanceEvent {
+  id         String              @id @default(cuid())
+  employeeId String
+  sessionId  String
+  eventType  AttendanceEventType
+  scannedAt  DateTime            @default(now())
+  source     String?
+  createdAt  DateTime            @default(now())
+
+  employee Employee    @relation(fields: [employeeId], references: [id])
+  session  WorkSession @relation(fields: [sessionId], references: [id])
+
+  @@index([employeeId])
+  @@index([scannedAt])
+  @@map("attendance_events")
 }
 
 model FormTemplate {

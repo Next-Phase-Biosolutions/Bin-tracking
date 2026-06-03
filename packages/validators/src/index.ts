@@ -55,6 +55,24 @@ export {
 } from './farmer.schema.js';
 
 export {
+    employeeRegisterSchema,
+    employeeGetByIdSchema,
+    employeeListSchema,
+    type EmployeeRegisterInput,
+    type EmployeeGetByIdInput,
+    type EmployeeListInput,
+} from './employee.schema.js';
+
+export {
+    attendanceScanSchema,
+    attendanceSummarySchema,
+    attendanceRecentSchema,
+    type AttendanceScanInput,
+    type AttendanceSummaryInput,
+    type AttendanceRecentInput,
+} from './attendance.schema.js';
+
+export {
     formListByStageSchema,
     formGetByIdSchema,
     formDigitizeFromPhotoSchema,

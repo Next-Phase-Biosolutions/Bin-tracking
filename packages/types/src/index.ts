@@ -11,6 +11,14 @@ export type {
 } from './cycle.js';
 export type { EventLog, EventType } from './event.js';
 export type { User, UserRole, UserInfo } from './user.js';
+export type { Employee, EmployeeStatus } from './employee.js';
+export type {
+    AttendanceEventType,
+    WorkSession,
+    AttendanceEvent,
+    AttendanceScanResult,
+    EmployeeHoursSummary,
+} from './attendance.js';
 export type {
     ApiSuccess,
     ApiError,

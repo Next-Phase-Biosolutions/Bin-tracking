@@ -10,6 +10,9 @@ import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistr
 import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
 import FormImportPage from './features/forms/import/FormImportPage';
+import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
+import GuardScannerPage from './features/guard/GuardScannerPage';
+import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage';
 import FacilityLayout from './features/dashboard/FacilityLayout';
 import FacilityDashboardPage from './features/dashboard/FacilityDashboardPage';
 import ReceivingZonePage from './features/dashboard/ReceivingZonePage';
@@ -28,6 +31,9 @@ export function App() {
             <Route path="/app/driver" element={<DriverPage />} />
             <Route path="/app/dashboard" element={<DashboardPage />} />
             <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
+            <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
+            <Route path="/app/guard" element={<GuardScannerPage />} />
+            <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
             <Route path="/app/forms" element={<FormListPage />} />
             <Route path="/app/forms/new" element={<FormBuilderPage />} />
             <Route path="/app/forms/import" element={<FormImportPage />} />
