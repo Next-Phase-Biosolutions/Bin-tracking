@@ -7,3 +7,4 @@ export * from "./ProvenResults";
 export * from "./Partners";
 export * from "./CTA";
 export * from "./Footer";
+export * from "./blinds/BlindsStage";

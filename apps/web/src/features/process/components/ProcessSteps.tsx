@@ -1,83 +1,125 @@
-import React from 'react';
 import { Check } from 'lucide-react';
 
 const steps = [
-    {
-        title: "Step 1 — Plant Audit",
-        items: [
-            "We visit your facility or hold a video call.",
-            "We list all by-product streams (hides, fats, off-cuts, etc.).",
-            "We identify quick wins to reduce disposal."
-        ]
-    },
-    {
-        title: "Step 2 — Plan & Pricing",
-        items: [
-            "We define what materials we'll handle.",
-            "We confirm bin types and pickup frequency.",
-            "You receive transparent pricing or a revenue-share option."
-        ]
-    },
-    {
-        title: "Step 3 — Setup",
-        items: [
-            "We deliver clean bins or totes.",
-            "Sorting labels and a 1-page SOP are provided (with photos).",
-            "Your staff knows exactly what to do."
-        ]
-    },
-    {
-        title: "Step 4 — Pickup & Processing",
-        items: [
-            "Scheduled pickups are arranged based on your operation.",
-            "Safe, licensed transport and processing.",
-            "Clean collection — no odour or mess."
-        ]
-    },
-    {
-        title: "Step 5 — Reporting",
-        items: [
-            "You receive a monthly diversion report (weight, % diverted, CO2 avoided).",
-            "Reports include compliance notes for audits.",
-            "You can show measurable ESG progress."
-        ]
-    }
+  {
+    num: "01",
+    title: "Plant Audit",
+    items: [
+      "We visit your facility or hold a video call.",
+      "We list all by-product streams (hides, fats, off-cuts, etc.).",
+      "We identify quick wins to reduce disposal.",
+    ],
+  },
+  {
+    num: "02",
+    title: "Plan & Pricing",
+    items: [
+      "We define what materials we'll handle.",
+      "We confirm bin types and pickup frequency.",
+      "You receive transparent pricing or a revenue-share option.",
+    ],
+  },
+  {
+    num: "03",
+    title: "Setup",
+    items: [
+      "We deliver clean bins or totes.",
+      "Sorting labels and a 1-page SOP are provided (with photos).",
+      "Your staff knows exactly what to do.",
+    ],
+  },
+  {
+    num: "04",
+    title: "Pickup & Processing",
+    items: [
+      "Scheduled pickups based on your operation.",
+      "Safe, licensed transport and processing.",
+      "Clean collection — no odour or mess.",
+    ],
+  },
+  {
+    num: "05",
+    title: "Reporting",
+    items: [
+      "Monthly diversion report: weight, % diverted, CO₂ avoided.",
+      "Reports include compliance notes for audits.",
+      "Measurable ESG progress.",
+    ],
+  },
 ];
 
 export function ProcessSteps() {
-    return (
-        <section className="bg-[#4b8a4f] py-16 lg:py-24 text-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <h2 className="text-3xl lg:text-4xl font-bold mb-16 text-center lg:text-left" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                    Step-by-Step Overview
-                </h2>
+  return (
+    <section id="steps" className="section-dark-2 py-20 px-5 lg:py-28 lg:px-16 overflow-hidden">
+      <div
+        className="liquid-blob-2"
+        style={{
+          width: 700, height: 600,
+          background: 'radial-gradient(circle, rgba(18,205,128,0.06), transparent 65%)',
+          top: '40%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
 
-                <div className="space-y-12 lg:space-y-16">
-                    {steps.map((step, index) => (
-                        <div key={index} className="flex flex-col lg:flex-row gap-8 lg:gap-16 border-b border-white/20 pb-12 last:border-0 last:pb-0">
-                            <div className="lg:w-1/3">
-                                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                                    {step.title}
-                                </h3>
-                            </div>
-                            <div className="lg:w-2/3">
-                                <ul className="space-y-4">
-                                    {step.items.map((item, itemIdx) => (
-                                        <li key={itemIdx} className="flex items-start gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-                                            <div className="flex-shrink-0 mt-1">
-                                                <div className="bg-white rounded-full p-1">
-                                                    <Check className="w-5 h-5 text-[#4b8a4f]" strokeWidth={3} />
-                                                </div>
-                                            </div>
-                                            <span className="text-lg">{item}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+      <div className="relative z-10 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center gap-3 text-center mb-14">
+          <div className="accent-line mx-auto" />
+          <h2
+            className="font-bold text-3xl md:text-5xl text-white leading-tight tracking-tight"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Step-by-Step Overview
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          {steps.map((step) => (
+            <div
+              key={step.num}
+              className="glass-card flex flex-col lg:flex-row gap-6 lg:gap-16 p-7 lg:p-10"
+            >
+              {/* Step number */}
+              <div className="lg:w-48 shrink-0 flex lg:flex-col items-center lg:items-start gap-4 lg:gap-3">
+                <span
+                  className="font-bold text-5xl lg:text-7xl leading-none"
+                  style={{ color: 'rgba(18,205,128,0.25)', fontFamily: "'Montserrat', sans-serif" }}
+                >
+                  {step.num}
+                </span>
+                <h3
+                  className="font-bold text-xl lg:text-2xl text-white m-0"
+                  style={{ fontFamily: "'Montserrat', sans-serif" }}
+                >
+                  {step.title}
+                </h3>
+              </div>
+
+              {/* Vertical divider (desktop) */}
+              <div className="hidden lg:block w-px shrink-0 self-stretch" style={{ background: 'rgba(18,205,128,0.15)' }} />
+
+              {/* Items */}
+              <ul className="flex flex-col gap-3 flex-1">
+                {step.items.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <div
+                      className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5"
+                      style={{ background: 'rgba(18,205,128,0.12)', border: '1px solid rgba(18,205,128,0.3)' }}
+                    >
+                      <Check className="w-3.5 h-3.5" style={{ color: '#12cd80' }} strokeWidth={3} />
+                    </div>
+                    <span
+                      className="text-base leading-relaxed"
+                      style={{ color: 'rgba(255,255,255,0.75)', fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-        </section>
-    );
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }

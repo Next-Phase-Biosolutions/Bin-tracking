@@ -1,20 +1,24 @@
 import { Check } from 'lucide-react';
 
-/* ─────────────────────────────────────────
-   CHECK LIST ITEM
-───────────────────────────────────────── */
 export function CheckItem({ text }: { text: string }) {
-    return (
-        <div className="flex items-start gap-3 md:gap-4 md:items-center">
-            <div className="w-6 h-6 md:w-8 md:h-8 flex-shrink-0 bg-[#2a6f2b] rounded-full flex justify-center items-center mt-1 md:mt-0">
-                <Check className="w-3.5 h-3.5 md:w-[18px] md:h-[18px] text-white" strokeWidth={3} />
-            </div>
-            <p
-                className="font-normal text-base md:text-[20px] leading-relaxed text-black m-0"
-                style={{ fontFamily: "'Open Sans', sans-serif" }}
-            >
-                {text}
-            </p>
-        </div>
-    );
+  return (
+    <div className="flex items-start gap-4">
+      <div
+        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5"
+        style={{
+          background: 'rgba(18,205,128,0.12)',
+          border: '1px solid rgba(18,205,128,0.3)',
+          boxShadow: '0 0 12px rgba(18,205,128,0.15)',
+        }}
+      >
+        <Check className="w-3.5 h-3.5" style={{ color: '#12cd80' }} strokeWidth={3} />
+      </div>
+      <p
+        className="text-base md:text-[18px] leading-relaxed m-0"
+        style={{ color: 'rgba(255,255,255,0.8)', fontFamily: "'Open Sans', sans-serif" }}
+      >
+        {text}
+      </p>
+    </div>
+  );
 }

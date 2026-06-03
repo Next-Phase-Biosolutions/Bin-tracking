@@ -5,45 +5,66 @@ const imgTrustSetup = "/assets/bolt.png";
 const imgTrustReduce = "/assets/recycle.png";
 
 const trustItems = [
-    { icon: imgTrustLocal, label: "Local Coverage up to 200 km" },
-    { icon: imgTrustLicensed, label: "Licensed and Compliant Handling" },
-    { icon: imgTrustTrace, label: "Traceability and Reporting" },
-    { icon: imgTrustSetup, label: "Fast, Easy Site Setup." },
-    { icon: imgTrustReduce, label: "Reduce Waste and Costs" },
+  { icon: imgTrustLocal, label: "Local Coverage", sub: "Up to 200 km" },
+  { icon: imgTrustLicensed, label: "Licensed Handling", sub: "Fully compliant" },
+  { icon: imgTrustTrace, label: "Traceability", sub: "Full reporting" },
+  { icon: imgTrustSetup, label: "Fast Setup", sub: "48 hr onboarding" },
+  { icon: imgTrustReduce, label: "Reduce Costs", sub: "35% avg savings" },
 ];
 
 export function TrustFactors() {
-    return (
-        <section className="bg-[#eef2e3] py-16 px-4 md:py-24 md:px-16 flex flex-col items-center overflow-hidden">
-            <h2 className="font-bold text-3xl md:text-[48px] leading-tight tracking-tight text-black mb-10 text-center" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                Our Trust Factors
-            </h2>
-            <div className="flex flex-wrap gap-8 md:gap-10 items-start justify-center max-w-7xl mx-auto">
-                {trustItems.map((item) => (
-                    <div
-                        key={item.label}
-                        className="flex flex-col items-center gap-3 w-40 md:w-48"
-                    >
-                        <div className="relative w-20 h-20 md:w-[94px] md:h-[94px] flex items-center justify-center">
-                            {/* The SVG background */}
-                            <img
-                                src="/assets/imgTrustLocal.svg"
-                                alt="Background"
-                                className="absolute inset-0 w-full h-full"
-                            />
-                            {/* The foreground icon */}
-                            <img
-                                src={item.icon}
-                                alt={item.label}
-                                className="relative w-10 h-10 md:w-12 md:h-12 z-10 object-contain"
-                            />
-                        </div>
-                        <p className="font-normal text-base md:text-[20px] leading-relaxed text-black text-center m-0" style={{ fontFamily: "'Open Sans', sans-serif" }}>
-                            {item.label}
-                        </p>
-                    </div>
-                ))}
+  return (
+    <section className="section-dark-2 py-20 px-5 md:py-28 md:px-16 overflow-hidden">
+      {/* Background blobs */}
+      <div
+        className="liquid-blob"
+        style={{
+          width: 600, height: 500,
+          background: 'radial-gradient(circle, rgba(18,205,128,0.07), transparent 65%)',
+          top: -100, left: '30%',
+        }}
+      />
+
+      <div className="relative z-10 max-w-7xl mx-auto flex flex-col items-center gap-12">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="accent-line" />
+          <h2
+            className="font-bold text-3xl md:text-5xl tracking-tight text-white"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Why Trust Us
+          </h2>
+        </div>
+
+        <div className="flex flex-wrap gap-5 md:gap-6 items-stretch justify-center">
+          {trustItems.map((item) => (
+            <div
+              key={item.label}
+              className="glass-card flex flex-col items-center gap-4 p-6 w-44 md:w-52 text-center"
+            >
+              {/* Icon ring */}
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'rgba(18,205,128,0.1)',
+                  border: '1px solid rgba(18,205,128,0.25)',
+                  boxShadow: '0 0 20px rgba(18,205,128,0.12)',
+                }}
+              >
+                <img src={item.icon} alt={item.label} className="w-8 h-8 object-contain" style={{ filter: 'brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(100deg)' }} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-white m-0" style={{ fontFamily: "'Inter', sans-serif" }}>
+                  {item.label}
+                </p>
+                <p className="text-xs mt-1 m-0" style={{ color: '#12cd80', fontFamily: "'Inter', sans-serif" }}>
+                  {item.sub}
+                </p>
+              </div>
             </div>
-        </section>
-    );
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }

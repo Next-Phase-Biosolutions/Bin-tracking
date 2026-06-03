@@ -4,109 +4,143 @@ import { Link } from 'react-router-dom';
 const imgLogo = "/assets/greenlogo.png";
 
 const socialLinks = [
-    { icon: <Facebook size={24} className="text-black" />, label: "Facebook" },
-    { icon: <Instagram size={24} className="text-black" />, label: "Instagram" },
-    { icon: <Twitter size={24} className="text-black" />, label: "X" },
-    { icon: <Linkedin size={24} className="text-black" />, label: "LinkedIn" },
-    { icon: <Youtube size={24} className="text-black" />, label: "YouTube" },
+  { icon: <Facebook size={20} />, label: "Facebook" },
+  { icon: <Instagram size={20} />, label: "Instagram" },
+  { icon: <Twitter size={20} />, label: "X" },
+  { icon: <Linkedin size={20} />, label: "LinkedIn" },
+  { icon: <Youtube size={20} />, label: "YouTube" },
 ];
 
-const quickLinks = ["Home Page", "About Us", "Shop page", "How it works"];
+const quickLinks = ["Home Page", "About Us", "Solutions", "Process"];
 
 export function Footer() {
-    return (
-        <footer className="bg-white py-12 px-4 md:py-[80px] md:px-[64px] font-sans border-t border-[#d0d0d0]">
-            <div className="max-w-[1280px] mx-auto">
-                <div className="flex flex-col lg:flex-row justify-between items-start gap-12 lg:gap-[128px] w-full mb-12 lg:mb-[80px]">
+  return (
+    <footer
+      className="relative overflow-hidden py-16 px-5 md:py-20 md:px-16"
+      style={{ background: '#030a06', borderTop: '1px solid rgba(18,205,128,0.12)' }}
+    >
+      {/* Decorative blob */}
+      <div
+        className="liquid-blob"
+        style={{
+          width: 500, height: 400,
+          background: 'radial-gradient(circle, rgba(18,205,128,0.06), transparent 70%)',
+          bottom: -150, left: -100,
+        }}
+      />
 
-                    {/* Brand & Description */}
-                    <div className="flex flex-col gap-6 w-full lg:w-[500px]">
-                        <Link to="/">
-                            <img
-                                src={imgLogo}
-                                alt="Sheps Farm"
-                                className="h-10 md:h-[70px] object-contain self-start"
-                            />
-                        </Link>
-                        <p
-                            className="font-normal text-base md:text-lg leading-relaxed text-black m-0"
-                            style={{ fontFamily: "'Open Sans', sans-serif" }}
-                        >
-                            At Sheps Farm, we believe in real food, raised the right way fresh, halal, and delivered to your door.
-                        </p>
-                    </div>
+      <div className="max-w-7xl mx-auto relative z-10">
+        <div className="flex flex-col lg:flex-row justify-between gap-12 lg:gap-24 mb-12">
 
-                    {/* Container for the columns */}
-                    <div className="flex flex-col md:flex-row gap-10 lg:gap-10 w-full lg:w-auto lg:flex-1 lg:justify-end">
-                        {/* Quick Links Column */}
-                        <div className="flex flex-col gap-4 w-full md:w-[200px]">
-                            <h4
-                                className="font-semibold text-lg leading-snug text-black m-0"
-                                style={{ fontFamily: "'Open Sans', sans-serif" }}
-                            >
-                                Quick Links
-                            </h4>
-                            <div className="flex flex-col">
-                                {quickLinks.map((l) => (
-                                    <a
-                                        key={l}
-                                        href="#"
-                                        className="block py-2 font-normal text-base leading-normal text-black no-underline hover:text-[#12cd80] transition-colors"
-                                        style={{ fontFamily: "'Open Sans', sans-serif" }}
-                                    >
-                                        {l}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Social Media Column */}
-                        <div className="flex flex-col gap-4 w-full md:w-[141px]">
-                            <h4
-                                className="font-semibold text-lg leading-snug text-black m-0"
-                                style={{ fontFamily: "'Open Sans', sans-serif" }}
-                            >
-                                Social Media
-                            </h4>
-                            <div className="flex flex-col">
-                                {socialLinks.map((s) => (
-                                    <a
-                                        key={s.label}
-                                        href="#"
-                                        className="flex items-center gap-3 py-2 no-underline hover:opacity-80 transition-opacity"
-                                    >
-                                        {s.icon}
-                                        <span
-                                            className="font-normal text-base leading-normal text-black"
-                                            style={{ fontFamily: "'Open Sans', sans-serif" }}
-                                        >
-                                            {s.label}
-                                        </span>
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Divider Line */}
-                <div className="w-full h-px bg-[#eef2e3]" />
-
-                {/* Bottom Row */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 py-6 md:py-[24px] w-full">
-                    <p
-                        className="font-normal text-sm md:text-base leading-normal text-[#043f2e] m-0 text-center md:text-left"
-                        style={{ fontFamily: "'Open Sans', sans-serif" }}
-                    >
-                        © 2025 Sheps Farm. All rights reserved.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-6">
-                        <a href="#" className="font-normal text-sm md:text-base leading-normal text-[#043f2e] no-underline hover:text-[#12cd80] transition-colors" style={{ fontFamily: "'Open Sans', sans-serif" }}>Privacy Policy</a>
-                        <a href="#" className="font-normal text-sm md:text-base leading-normal text-[#043f2e] no-underline hover:text-[#12cd80] transition-colors" style={{ fontFamily: "'Open Sans', sans-serif" }}>Terms of Service</a>
-                        <a href="#" className="font-normal text-sm md:text-base leading-normal text-[#043f2e] no-underline hover:text-[#12cd80] transition-colors" style={{ fontFamily: "'Open Sans', sans-serif" }}>Cookie Policy</a>
-                    </div>
-                </div>
+          {/* Brand */}
+          <div className="flex flex-col gap-5 lg:max-w-sm">
+            <Link to="/">
+              <img src={imgLogo} alt="Next Phase BioSolutions" className="h-12 object-contain object-left" />
+            </Link>
+            <p
+              className="text-base leading-relaxed"
+              style={{ color: 'rgba(255,255,255,0.55)', fontFamily: "'Open Sans', sans-serif" }}
+            >
+              Turning abattoir by-products into useful materials. Safe, local, and compliant landfill diversion for the meat processing industry.
+            </p>
+            <div className="flex gap-3 mt-1">
+              {socialLinks.map((s) => (
+                <a
+                  key={s.label}
+                  href="#"
+                  aria-label={s.label}
+                  className="w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 glass-card"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#12cd80')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                >
+                  {s.icon}
+                </a>
+              ))}
             </div>
-        </footer>
-    );
+          </div>
+
+          {/* Links columns */}
+          <div className="flex flex-col sm:flex-row gap-12 lg:gap-20">
+            {/* Quick Links */}
+            <div className="flex flex-col gap-4">
+              <h4
+                className="text-sm font-semibold tracking-widest uppercase"
+                style={{ color: '#12cd80', fontFamily: "'Inter', sans-serif" }}
+              >
+                Navigation
+              </h4>
+              <div className="flex flex-col gap-2">
+                {quickLinks.map((l) => (
+                  <a
+                    key={l}
+                    href="#"
+                    className="text-sm leading-relaxed transition-colors duration-200 no-underline"
+                    style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Open Sans', sans-serif" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#12cd80')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                  >
+                    {l}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div className="flex flex-col gap-4">
+              <h4
+                className="text-sm font-semibold tracking-widest uppercase"
+                style={{ color: '#12cd80', fontFamily: "'Inter', sans-serif" }}
+              >
+                Contact
+              </h4>
+              <div className="flex flex-col gap-2">
+                {["Get in Touch", "Book an Audit", "Support"].map((l) => (
+                  <a
+                    key={l}
+                    href="#"
+                    className="text-sm leading-relaxed transition-colors duration-200 no-underline"
+                    style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Open Sans', sans-serif" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#12cd80')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                  >
+                    {l}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="w-full h-px mb-8" style={{ background: 'rgba(18,205,128,0.08)' }} />
+
+        {/* Bottom bar */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <p
+            className="text-sm"
+            style={{ color: 'rgba(255,255,255,0.32)', fontFamily: "'Open Sans', sans-serif" }}
+          >
+            © 2025 Next Phase BioSolutions. All rights reserved.
+          </p>
+          <div className="flex gap-6">
+            {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((l) => (
+              <a
+                key={l}
+                href="#"
+                className="text-xs no-underline transition-colors duration-200"
+                style={{ color: 'rgba(255,255,255,0.32)', fontFamily: "'Open Sans', sans-serif" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#12cd80')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.32)')}
+              >
+                {l}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
 }
+
+export default Footer;

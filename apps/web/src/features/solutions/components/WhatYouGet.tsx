@@ -1,145 +1,112 @@
-import React from 'react';
 import { Check } from 'lucide-react';
 
 const img11 = "/assets/solutions/sol1.png";
 const img21 = "/assets/solutions/sol2.png";
 const img37 = "/assets/solutions/sol3.png";
-const imgFarmerCowshedLookingAfterCows1 = "/assets/solutions/sol4.png";
-
-function CheckIcon() {
-    return (
-        <div className="flex items-center justify-center w-[30.5px] h-[30.5px] shrink-0">
-            <Check className="w-6 h-6 text-[#12cd80]" strokeWidth={3} />
-        </div>
-    );
-}
+const imgFarmerCows = "/assets/solutions/sol4.png";
 
 function FeatureItem({ text }: { text: string }) {
-    return (
-        <div className="flex items-center gap-3 w-full">
-            <CheckIcon />
-            <p
-                className="font-normal text-lg md:text-[20px] text-black leading-relaxed m-0"
-                style={{ fontFamily: "'Open Sans', sans-serif" }}
-            >
-                {text}
-            </p>
-        </div>
-    );
+  return (
+    <div className="flex items-start gap-3">
+      <div
+        className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5"
+        style={{ background: 'rgba(18,205,128,0.12)', border: '1px solid rgba(18,205,128,0.3)' }}
+      >
+        <Check className="w-3.5 h-3.5" style={{ color: '#12cd80' }} strokeWidth={3} />
+      </div>
+      <p
+        className="text-base md:text-lg leading-relaxed m-0"
+        style={{ color: 'rgba(255,255,255,0.75)', fontFamily: "'Open Sans', sans-serif" }}
+      >
+        {text}
+      </p>
+    </div>
+  );
 }
 
+const services = [
+  {
+    img: img11,
+    title: "Collection and Logistics",
+    features: ["Clean bins and totes", "Scheduled pickups", "Clear instructions for sorting", "Easy communication with our ops team"],
+    flip: false,
+  },
+  {
+    img: img21,
+    title: "Processing and Upcycling",
+    features: ["We convert materials into usable inputs", "Collagen, leather prep, tallow, and bio-oils", "Safe and compliant processing"],
+    flip: true,
+  },
+  {
+    img: img37,
+    title: "Traceability and Reporting",
+    features: ["Monthly landfill diversion report", "Clear weight records and percentages", "Helpful for ESG, audits, and compliance"],
+    flip: false,
+  },
+  {
+    img: imgFarmerCows,
+    title: "Compliance Support",
+    features: ["SOPs for sorting and handling", "Documentation we follow on site", "Licensed transport and safe handling"],
+    flip: true,
+  },
+];
+
 export function WhatYouGet() {
-    return (
-        <section className="w-full bg-white py-16 px-4 lg:py-[112px] lg:px-16 overflow-hidden">
-            <div className="flex flex-col items-center gap-12 lg:gap-20 max-w-[1440px] mx-auto w-full">
-                <h2
-                    className="font-bold text-3xl md:text-5xl lg:text-[48px] text-black text-center leading-tight tracking-tight max-w-[768px] w-full m-0"
+  return (
+    <section className="section-dark py-20 px-5 lg:py-28 lg:px-16 overflow-hidden">
+      <div className="flex flex-col items-center gap-16 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="accent-line mx-auto" />
+          <h2
+            className="font-bold text-3xl md:text-5xl text-white text-center leading-tight tracking-tight"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            What You Get
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-16 w-full">
+          {services.map((s) => (
+            <div
+              key={s.title}
+              className={`flex flex-col ${s.flip ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-10 lg:gap-16`}
+            >
+              {/* Image */}
+              <div
+                className="w-full lg:w-1/2 shrink-0 rounded-2xl overflow-hidden aspect-4/3 lg:h-96 relative"
+                style={{
+                  border: '1px solid rgba(18,205,128,0.15)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+                }}
+              >
+                <img src={s.img} alt={s.title} className="w-full h-full object-cover" />
+                <div
+                  className="absolute inset-0"
+                  style={{ background: 'linear-gradient(135deg, rgba(18,205,128,0.05) 0%, transparent 60%)' }}
+                />
+              </div>
+
+              {/* Content */}
+              <div className="w-full lg:w-1/2 flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <div className="accent-line" />
+                  <h3
+                    className="font-bold text-2xl md:text-4xl text-white leading-tight tracking-tight m-0"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                    What You Get
-                </h2>
-
-                <div className="flex lg:flex-col gap-6 lg:gap-10 w-full overflow-x-auto snap-x snap-mandatory px-4 lg:px-0 scrollbar-hide pb-4 lg:pb-0">
-                    {/* Collection and Logistics */}
-                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
-                            <img
-                                src={img11}
-                                alt="Collection bins in facility"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-6 w-full lg:w-1/2">
-                            <h3
-                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
-                                style={{ fontFamily: "'Montserrat', sans-serif" }}
-                            >
-                                Collection and Logistics
-                            </h3>
-                            <div className="flex flex-col gap-3">
-                                <FeatureItem text="Clean bins and totes" />
-                                <FeatureItem text="Scheduled pickups" />
-                                <FeatureItem text="Clear instructions for sorting" />
-                                <FeatureItem text="Easy communication with our operations team" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Processing and Upcycling */}
-                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
-                            <img
-                                src={img21}
-                                alt="Laboratory processing"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
-                            <h3
-                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
-                                style={{ fontFamily: "'Montserrat', sans-serif" }}
-                            >
-                                Processing and Upcycling
-                            </h3>
-                            <div className="flex flex-col gap-3">
-                                <FeatureItem text="We convert materials into usable inputs" />
-                                <FeatureItem text="Output pathways include collagen, leather preparation, tallow, and bio oils" />
-                                <FeatureItem text="Safe and compliant processing" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Traceability and Reporting */}
-                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0">
-                            <img
-                                src={img37}
-                                alt="Reporting dashboard"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-6 w-full lg:w-1/2">
-                            <h3
-                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
-                                style={{ fontFamily: "'Montserrat', sans-serif" }}
-                            >
-                                Traceability and Reporting
-                            </h3>
-                            <div className="flex flex-col gap-3">
-                                <FeatureItem text="Monthly landfill diversion report" />
-                                <FeatureItem text="Clear weight records and percentages" />
-                                <FeatureItem text="Helpful for ESG, audits, and compliance paperwork" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Compliance Support */}
-                    <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-20 w-full min-w-[85vw] md:min-w-[500px] lg:min-w-0 snap-start shrink-0">
-                        <div className="w-full lg:w-1/2 aspect-video lg:h-[400px] bg-white rounded-[10px] overflow-hidden shrink-0 order-first lg:order-last">
-                            <img
-                                src={imgFarmerCowshedLookingAfterCows1}
-                                alt="Farm compliance"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-6 w-full lg:w-1/2 order-last lg:order-first">
-                            <h3
-                                className="font-bold text-3xl md:text-4xl lg:text-[48px] text-black leading-tight tracking-tight m-0"
-                                style={{ fontFamily: "'Montserrat', sans-serif" }}
-                            >
-                                Compliance Support
-                            </h3>
-                            <div className="flex flex-col gap-3">
-                                <FeatureItem text="SOPs for sorting and handling" />
-                                <FeatureItem text="Documentation we follow on site" />
-                                <FeatureItem text="Licensed transport and safe handling practices" />
-                            </div>
-                        </div>
-                    </div>
+                  >
+                    {s.title}
+                  </h3>
                 </div>
+                <div className="flex flex-col gap-3">
+                  {s.features.map((f) => <FeatureItem key={f} text={f} />)}
+                </div>
+              </div>
             </div>
-        </section>
-    );
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default WhatYouGet;

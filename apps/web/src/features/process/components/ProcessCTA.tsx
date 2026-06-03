@@ -1,44 +1,53 @@
-import React from 'react';
-
 export function ProcessCTA() {
-    return (
-        <section className="bg-[#f0ece1] py-16 lg:py-24">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+  return (
+    <section className="section-dark py-20 px-5 lg:py-28 lg:px-16 overflow-hidden">
+      <div
+        className="liquid-blob"
+        style={{
+          width: 700, height: 500,
+          background: 'radial-gradient(circle, rgba(18,205,128,0.1), transparent 65%)',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
 
-                    {/* Left Image */}
-                    <div className="w-full md:w-1/4 aspect-[4/3] rounded-xl overflow-hidden shadow-lg order-2 md:order-1 hidden md:block">
-                        <img
-                            src="/assets/process/soil.png"
-                            alt="Soil and plants"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
+      <div className="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">
+        {/* Left image */}
+        <div
+          className="hidden md:block w-64 aspect-4/3 rounded-2xl overflow-hidden shrink-0"
+          style={{ border: '1px solid rgba(18,205,128,0.2)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
+        >
+          <img src="/assets/process/soil.png" alt="Soil and plants" className="w-full h-full object-cover" />
+        </div>
 
-                    {/* Center Content */}
-                    <div className="w-full md:w-1/2 text-center order-1 md:order-2">
-                        <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 mb-6" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                            Ready to Start<br />Your Zero-Waste<br />Program?
-                        </h2>
-                        <p className="text-lg text-gray-700 mb-8 mx-auto max-w-md" style={{ fontFamily: "'Inter', sans-serif" }}>
-                            A clean, efficient factory team managing zero-waste collection and reporting process.
-                        </p>
-                        <button className="bg-[#0b5c3b] hover:bg-[#08482f] text-white font-semibold py-3 px-8 rounded-full transition-colors duration-300">
-                            Book a Zero Waste Audit
-                        </button>
-                    </div>
+        {/* Center content */}
+        <div className="flex flex-col items-center text-center gap-8 max-w-lg mx-auto flex-1">
+          <div className="accent-line mx-auto" />
+          <h2
+            className="font-bold text-3xl md:text-5xl text-white leading-tight m-0"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Ready to Start Your Zero-Waste Program?
+          </h2>
+          <p
+            className="text-base md:text-lg leading-relaxed"
+            style={{ color: 'rgba(255,255,255,0.62)', fontFamily: "'Inter', sans-serif" }}
+          >
+            Our team will audit your operation, define a clear plan, and have you running in 48 hours.
+          </p>
+          <button className="btn-glow px-8 py-4 text-lg font-bold rounded-full">
+            Book a Zero Waste Audit
+          </button>
+        </div>
 
-                    {/* Right Image */}
-                    <div className="w-full md:w-1/4 aspect-[3/4] rounded-xl overflow-hidden shadow-lg order-3 md:order-3 hidden md:block">
-                        <img
-                            src="/assets/process/paper.png"
-                            alt="Working hands"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-
-                </div>
-            </div>
-        </section>
-    );
+        {/* Right image */}
+        <div
+          className="hidden md:block w-64 aspect-3/4 rounded-2xl overflow-hidden shrink-0"
+          style={{ border: '1px solid rgba(18,205,128,0.2)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
+        >
+          <img src="/assets/process/paper.png" alt="Working hands" className="w-full h-full object-cover" />
+        </div>
+      </div>
+    </section>
+  );
 }

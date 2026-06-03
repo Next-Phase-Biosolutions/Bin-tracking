@@ -1,73 +1,77 @@
-import React from 'react';
+const pillars = [
+  {
+    icon: "📍",
+    title: "Local & Nimble",
+    body: "We are locally tied to farms and communities here, and actively adapt our solutions to match your volume fluctuations — no rigid contracts.",
+  },
+  {
+    icon: "🔍",
+    title: "Transparent",
+    body: "Our process is open-door. You see exactly where your materials are going, with full tracking and monthly reports you can use for audits.",
+  },
+  {
+    icon: "⚙️",
+    title: "Practical & Reliable",
+    body: "100% dependable. We handle the heavy lifting — clean collection, compliant transport, consistent processing — so your team doesn't have to.",
+  },
+];
 
 export function HowWereDifferent() {
-    return (
-        <section className="bg-[#f2f6ee] py-16 lg:py-[100px] px-6 md:px-16 w-full">
-            <div className="max-w-[1280px] mx-auto flex flex-col items-center gap-12 lg:gap-16">
+  return (
+    <section className="section-dark py-20 px-5 md:py-28 md:px-16 overflow-hidden">
+      <div
+        className="liquid-blob"
+        style={{
+          width: 600, height: 500,
+          background: 'radial-gradient(circle, rgba(18,205,128,0.07), transparent 65%)',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
 
-                <h2
-                    className="font-bold text-3xl md:text-[40px] text-black text-center leading-tight m-0"
-                    style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                    How We're Different
-                </h2>
+      <div className="relative z-10 max-w-7xl mx-auto flex flex-col items-center gap-14">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="accent-line mx-auto" />
+          <h2
+            className="font-bold text-3xl md:text-5xl text-white leading-tight tracking-tight"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            How We're Different
+          </h2>
+        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 w-full">
-                    {/* Column 1 */}
-                    <div className="flex flex-col gap-4">
-                        <h3
-                            className="font-semibold text-xl lg:text-2xl text-black leading-snug m-0"
-                            style={{ fontFamily: "'Montserrat', sans-serif" }}
-                        >
-                            Local to Nimble
-                        </h3>
-                        <p
-                            className="font-normal text-base text-black/80 leading-relaxed m-0"
-                            style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                            We are locally tied to farms and communities here, and can actively adapt
-                            solutions to match volume fluctuations.
-                        </p>
-                    </div>
-
-                    {/* Column 2 */}
-                    <div className="flex flex-col gap-4">
-                        <h3
-                            className="font-semibold text-xl lg:text-2xl text-black leading-snug m-0"
-                            style={{ fontFamily: "'Montserrat', sans-serif" }}
-                        >
-                            Transparent
-                        </h3>
-                        <p
-                            className="font-normal text-base text-black/80 leading-relaxed m-0"
-                            style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                            Our process is open door—there's no mystery involved. We ensure that you
-                            see where your materials are heading into, giving you maximum efficiency in reporting.
-                        </p>
-                    </div>
-
-                    {/* Column 3 */}
-                    <div className="flex flex-col gap-4">
-                        <h3
-                            className="font-semibold text-xl lg:text-2xl text-black leading-snug m-0"
-                            style={{ fontFamily: "'Montserrat', sans-serif" }}
-                        >
-                            Practical & Reliable
-                        </h3>
-                        <p
-                            className="font-normal text-base text-black/80 leading-relaxed m-0"
-                            style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                            We serve as a 100% dependable and secure solution that handles the heavy
-                            lifting, producing consistently, and is a complete system ready to use.
-                        </p>
-                    </div>
-                </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+          {pillars.map((p) => (
+            <div key={p.title} className="glass-card p-8 flex flex-col gap-5">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+                style={{
+                  background: 'rgba(18,205,128,0.1)',
+                  border: '1px solid rgba(18,205,128,0.2)',
+                  boxShadow: '0 0 20px rgba(18,205,128,0.1)',
+                }}
+              >
+                {p.icon}
+              </div>
+              <div className="w-8 h-px" style={{ background: 'rgba(18,205,128,0.35)' }} />
+              <h3
+                className="font-bold text-xl text-white m-0"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                {p.title}
+              </h3>
+              <p
+                className="text-sm leading-relaxed m-0"
+                style={{ color: 'rgba(255,255,255,0.62)', fontFamily: "'Inter', sans-serif" }}
+              >
+                {p.body}
+              </p>
             </div>
-        </section>
-    );
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default HowWereDifferent;

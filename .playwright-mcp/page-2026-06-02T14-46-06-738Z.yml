@@ -1,0 +1,247 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "Next Phase BioSolutions" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "Next Phase BioSolutions" [ref=e7]
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - link "Home" [ref=e10] [cursor=pointer]:
+              - /url: /
+              - text: Home
+            - link "About Us" [ref=e12] [cursor=pointer]:
+              - /url: /about
+            - link "Solutions" [ref=e13] [cursor=pointer]:
+              - /url: /solutions
+            - link "Process" [ref=e14] [cursor=pointer]:
+              - /url: /process
+          - generic [ref=e15]:
+            - link "Contact Us" [ref=e16] [cursor=pointer]:
+              - /url: "#"
+            - link "Launch App" [ref=e17] [cursor=pointer]:
+              - /url: /app/dashboard
+    - generic [ref=e19]:
+      - generic [ref=e27]:
+        - generic [ref=e28]: Zero Waste · Circular Economy · Abattoir Solutions
+        - paragraph [ref=e29]:
+          - generic [ref=e30]: Zero
+          - generic [ref=e31]: Waste
+          - generic [ref=e32]: Solutions
+          - generic [ref=e33]: for
+          - generic [ref=e34]: Abattoirs
+        - paragraph [ref=e35]: We turn by-products that go to landfill into useful materials. Safe, local, and fully compliant.
+        - generic [ref=e36]:
+          - button "Book a Zero Waste Audit" [ref=e37] [cursor=pointer]
+          - link "Learn How It Works" [ref=e38] [cursor=pointer]:
+            - /url: "#solutions"
+        - generic [ref=e41]: Scroll
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=2]: Why Trust Us
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Local Coverage
+                        - paragraph: Up to 200 km
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Licensed Handling
+                        - paragraph: Fully compliant
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Traceability
+                        - paragraph: Full reporting
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Fast Setup
+                        - paragraph: 48 hr onboarding
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Reduce Costs
+                        - paragraph: 35% avg savings
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic:
+                      - heading [level=2]: The Problem
+                    - paragraph: Abattoirs face mounting pressure to deal with by-products responsibly — but current options are costly, risky, and hard to keep up with.
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: Disposal is expensive and creates ongoing financial risk.
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: Landfill creates odour, pests, and serious environmental pollution.
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: Regulations change often and add extra compliance work for your team.
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - heading [level=2]: Our Solution
+                    - paragraph: A simple, closed-loop system that transforms your by-product problem into a sustainability advantage.
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: We collect hides, skins, fats, and selected off-cuts from your plant.
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: We upcycle materials into collagen pathways, leather inputs, and bio-oils.
+                      - generic:
+                        - generic:
+                          - img
+                        - paragraph: We provide clear monthly reports showing how much waste is diverted from landfill.
+                  - generic:
+                    - img
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=2]: Proven Results
+                    - paragraph: Real numbers from real operations — tracked, verified, reported.
+                  - generic:
+                    - generic:
+                      - paragraph: "72"
+                      - paragraph: Tonnes
+                      - paragraph: diverted from landfill in the last 6 months
+                    - generic:
+                      - paragraph: 35%
+                      - paragraph: Cost Reduction
+                      - paragraph: average at pilot sites on disposal spend
+                    - generic:
+                      - paragraph: 48hrs
+                      - paragraph: Onboarding
+                      - paragraph: from first contact to scheduled first pickup
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - paragraph: Supported By
+                  - generic:
+                    - img
+                    - img
+                    - img
+                    - img
+      - img:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Ready to Reduce Waste and Costs?
+                  - paragraph: Book a free plant audit. We review your by-product streams and show how much you can divert from landfill — at no cost to you.
+                  - generic:
+                    - button: Book a Zero Waste Audit
+                    - link:
+                      - /url: /about
+                      - text: Learn More
+    - contentinfo [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - link "Next Phase BioSolutions" [ref=e46] [cursor=pointer]:
+              - /url: /
+              - img "Next Phase BioSolutions" [ref=e47]
+            - paragraph [ref=e48]: Turning abattoir by-products into useful materials. Safe, local, and compliant landfill diversion for the meat processing industry.
+            - generic [ref=e49]:
+              - link "Facebook" [ref=e50] [cursor=pointer]:
+                - /url: "#"
+                - img [ref=e51]
+              - link "Instagram" [ref=e53] [cursor=pointer]:
+                - /url: "#"
+                - img [ref=e54]
+              - link "X" [ref=e57] [cursor=pointer]:
+                - /url: "#"
+                - img [ref=e58]
+              - link "LinkedIn" [ref=e60] [cursor=pointer]:
+                - /url: "#"
+                - img [ref=e61]
+              - link "YouTube" [ref=e65] [cursor=pointer]:
+                - /url: "#"
+                - img [ref=e66]
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - heading "Navigation" [level=4] [ref=e71]
+              - generic [ref=e72]:
+                - link "Home Page" [ref=e73] [cursor=pointer]:
+                  - /url: "#"
+                - link "About Us" [ref=e74] [cursor=pointer]:
+                  - /url: "#"
+                - link "Solutions" [ref=e75] [cursor=pointer]:
+                  - /url: "#"
+                - link "Process" [ref=e76] [cursor=pointer]:
+                  - /url: "#"
+            - generic [ref=e77]:
+              - heading "Contact" [level=4] [ref=e78]
+              - generic [ref=e79]:
+                - link "Get in Touch" [ref=e80] [cursor=pointer]:
+                  - /url: "#"
+                - link "Book an Audit" [ref=e81] [cursor=pointer]:
+                  - /url: "#"
+                - link "Support" [ref=e82] [cursor=pointer]:
+                  - /url: "#"
+        - generic [ref=e84]:
+          - paragraph [ref=e85]: © 2025 Next Phase BioSolutions. All rights reserved.
+          - generic [ref=e86]:
+            - link "Privacy Policy" [ref=e87] [cursor=pointer]:
+              - /url: "#"
+            - link "Terms of Service" [ref=e88] [cursor=pointer]:
+              - /url: "#"
+            - link "Cookie Policy" [ref=e89] [cursor=pointer]:
+              - /url: "#"
+  - generic [ref=e91]:
+    - generic [ref=e93]:
+      - generic [ref=e94]:
+        - button "Select element" [ref=e97] [cursor=pointer]:
+          - img [ref=e98]
+        - generic:
+          - generic:
+            - button "Open history":
+              - generic:
+                - img
+        - generic:
+          - generic:
+            - button "Copy all history items":
+              - img
+        - button "Open more actions menu" [ref=e103] [cursor=pointer]:
+          - img [ref=e104]
+      - button "Disable React Grab" [pressed] [ref=e109] [cursor=pointer]
+    - button "Collapse toolbar" [ref=e112] [cursor=pointer]:
+      - img [ref=e113]

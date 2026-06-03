@@ -1,47 +1,61 @@
-const imgHeroOverlay = "/assets/imgHeroOverlay.png";
-const imgHeroVector = "/assets/imgHeroVector.png";
+import { LiquidChrome } from '../../../lib/reactbits/LiquidChrome';
+import { BlurText } from '../../../lib/reactbits/BlurText';
 
 export function Hero() {
-    return (
-        <section className="relative min-h-[500px] lg:min-h-[800px] overflow-hidden bg-transparent flex flex-col justify-center">
-            {/* Background images */}
-            <img
-                src={imgHeroOverlay}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            />
-            <img
-                src={imgHeroVector}
-                alt=""
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] md:w-[101.5%] pointer-events-none object-cover"
-            />
+  return (
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden" style={{ background: '#050d0a' }}>
+      {/* LiquidChrome WebGL background */}
+      <LiquidChrome
+        baseColor={[0.02, 0.14, 0.07]}
+        speed={0.16}
+        amplitude={0.26}
+        frequencyX={2.6}
+        frequencyY={2.8}
+        interactive
+      />
 
-            {/* Light black film overlay */}
-            <div className="absolute inset-0 bg-black/40 pointer-events-none z-0" />
+      {/* Dark depth overlay */}
+      <div className="absolute inset-0 z-10" style={{ background: 'linear-gradient(to bottom, rgba(5,13,10,0.65) 0%, rgba(3,8,5,0.55) 60%, rgba(5,13,10,0.9) 100%)' }} />
 
-            {/* Content */}
-            <div className="relative z-10 flex flex-col items-center pt-16 md:pt-24 px-4 text-center">
-                <div className="max-w-[768px]">
-                    <h1
-                        className="font-bold text-4xl md:text-6xl lg:text-[68px] leading-tight tracking-tight text-white mb-6"
-                        style={{ fontFamily: "'Montserrat', sans-serif" }}
-                    >
-                        Zero Waste Solutions for Abattoirs
-                    </h1>
-                    <p
-                        className="font-normal text-lg md:text-[22px] leading-relaxed text-white mb-6 px-2 md:px-0"
-                        style={{ fontFamily: "'Inter', sans-serif" }}
-                    >
-                        We turn by products that usually go to landfill into useful materials. Safe, local, and compliant.
-                    </p>
-                    <button
-                        className="bg-[#043f2e] hover:bg-[#032a1f] text-white border-none rounded-full px-8 py-3.5 font-semibold text-lg md:text-[20px] cursor-pointer transition-colors"
-                        style={{ fontFamily: "'Inter', sans-serif" }}
-                    >
-                        Book a Zero Waste
-                    </button>
-                </div>
-            </div>
-        </section>
-    );
+      {/* Radial vignette */}
+      <div className="absolute inset-0 z-10" style={{ background: 'radial-gradient(ellipse 80% 70% at 50% 50%, transparent 40%, rgba(3,8,5,0.75) 100%)' }} />
+
+      {/* Content */}
+      <div className="relative z-20 flex flex-col items-center text-center px-5 pt-8 pb-16 max-w-4xl mx-auto">
+        {/* Headline with blur animation */}
+        <BlurText
+          text="Zero Waste Solutions for Abattoirs"
+          className="font-bold text-5xl md:text-6xl lg:text-[72px] leading-[1.08] tracking-tight text-white m-0"
+          animateBy="words"
+          direction="top"
+          delay={100}
+          stepDuration={0.4}
+          // Override p tag with h1 appearance
+        />
+
+        {/* Subtext */}
+        <p
+          className="text-lg md:text-xl leading-relaxed mt-6 mb-10 max-w-xl mx-auto"
+          style={{ color: 'rgba(255,255,255,0.72)', fontFamily: "'Inter', sans-serif" }}
+        >
+          We turn by-products that go to landfill into useful materials. Safe, local, and fully compliant.
+        </p>
+
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <button
+            className="btn-glow px-8 py-4 text-lg font-bold rounded-full"
+          >
+            Book a Zero Waste Audit
+          </button>
+          <a
+            href="#solutions"
+            className="btn-glass px-8 py-4 text-lg font-semibold rounded-full"
+          >
+            Learn How It Works
+          </a>
+        </div>
+      </div>
+    </section>
+  );
 }

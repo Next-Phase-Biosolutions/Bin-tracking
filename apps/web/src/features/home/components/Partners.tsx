@@ -1,29 +1,40 @@
 const partners = [
-    { img: "/assets/imgPartner1.png", alt: "EcoWaste", size: "w-32 md:w-40 lg:w-48" },
-    { img: "/assets/imgPartner2.png", alt: "GreenEnergy", size: "w-32 md:w-32 lg:w-48 pt-4 md:pt-6 lg:pt-25" },
-    { img: "/assets/imgPartner3.png", alt: "PureSolutions", size: "w-28 md:w-36 lg:w-44" },
-    { img: "/assets/imgPartner4.png", alt: "Partner 4", size: "w-32 md:w-28 lg:w-48" },
+  { img: "/assets/imgPartner1.png", alt: "EcoWaste" },
+  { img: "/assets/imgPartner2.png", alt: "GreenEnergy" },
+  { img: "/assets/imgPartner3.png", alt: "PureSolutions" },
+  { img: "/assets/imgPartner4.png", alt: "Partner 4" },
 ];
 
 export function Partners() {
-    return (
-        <section className="bg-[#eef2e3] py-8 px-4 md:py-12 md:px-16 flex flex-col items-center">
-            <h2
-                className="font-bold text-3xl md:text-[40px] leading-tight tracking-tight text-[#043f2e] mb-6 md:mb-8 text-center max-w-[800px]"
-                style={{ fontFamily: "'Montserrat', sans-serif" }}
-            >
-                Supported By
-            </h2>
-            <div className="flex justify-center items-center gap-8 md:gap-20 lg:gap-[120px] flex-wrap max-w-7xl mx-auto w-full">
-                {partners.map((p, i) => (
-                    <img
-                        key={i}
-                        src={p.img}
-                        alt={p.alt}
-                        className={`${p.size} h-auto object-contain`}
-                    />
-                ))}
-            </div>
-        </section>
-    );
+  return (
+    <section className="section-dark-2 py-14 px-5 md:py-20 md:px-16 overflow-hidden">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-10">
+        <p
+          className="text-xs font-semibold tracking-widest uppercase text-center"
+          style={{ color: 'rgba(255,255,255,0.35)', fontFamily: "'Inter', sans-serif" }}
+        >
+          Supported By
+        </p>
+
+        {/* Partner logos in a glass strip */}
+        <div
+          className="w-full rounded-2xl px-8 py-6 flex flex-wrap justify-center items-center gap-10 md:gap-16"
+          style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          {partners.map((p, i) => (
+            <img
+              key={i}
+              src={p.img}
+              alt={p.alt}
+              className="h-10 md:h-12 w-auto object-contain opacity-50 hover:opacity-80 transition-opacity duration-300"
+              style={{ filter: 'brightness(0) invert(1)' }}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
