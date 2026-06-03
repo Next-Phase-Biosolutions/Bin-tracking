@@ -63,6 +63,11 @@ enum AttendanceEventType {
   CHECK_OUT
 }
 
+enum ShipmentCondition {
+  GOOD
+  DAMAGED
+}
+
 enum FormType {
   standard
   checklist
@@ -135,6 +140,7 @@ model Facility {
   bins       Bin[]          @relation("CurrentFacility")
   cycles     BinCycle[]     @relation("CycleFacility")
   deliveries BinCycle[]     @relation("CycleDestination")
+  shipments  Shipment[]     @relation("FacilityShipments")
 
   @@map("facilities")
 }
@@ -316,6 +322,34 @@ model AttendanceEvent {
   @@index([employeeId])
   @@index([scannedAt])
   @@map("attendance_events")
+}
+
+// ─── Supplier Shipments ───────────────────────────────────────────
+// A single inbound package recorded by staff when it arrives.
+
+model Shipment {
+  id            String            @id @default(cuid())
+  shipmentCode  String            @unique
+  supplier      String
+  reference     String?
+  contents      String?
+  quantity      Int?
+  weightKg      Float?
+  condition     ShipmentCondition @default(GOOD)
+  conditionNote String?
+  receivedBy    String?
+  expectedAt    DateTime?
+  receivedAt    DateTime          @default(now())
+  facilityId    String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  facility Facility? @relation("FacilityShipments", fields: [facilityId], references: [id])
+
+  @@index([receivedAt])
+  @@index([supplier])
+  @@index([facilityId])
+  @@map("shipments")
 }
 
 model FormTemplate {

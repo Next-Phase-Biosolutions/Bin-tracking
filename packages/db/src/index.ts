@@ -10,6 +10,7 @@ export type {
     Employee,
     WorkSession,
     AttendanceEvent,
+    Shipment,
 } from '@prisma/client';
 
 export {
@@ -22,4 +23,5 @@ export {
     UserRole,
     EmployeeStatus,
     AttendanceEventType,
+    ShipmentCondition,
 } from '@prisma/client';

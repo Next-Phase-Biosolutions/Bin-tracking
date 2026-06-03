@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle, UserPlus, PawPrint, ScanLine } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle, UserPlus, PawPrint, ScanLine, Package } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
@@ -255,6 +255,12 @@ export function DashboardPage() {
                     </Link>
                     <Link to="/app/guard" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                         <ScanLine className="w-4 h-4" /><span>Guard Scanner</span>
+                    </Link>
+                    <Link to="/app/shipments" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <Package className="w-4 h-4" /><span>Shipments</span>
+                    </Link>
+                    <Link to="/app/shipments/new" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                        <PlusCircle className="w-4 h-4" /><span>Record Shipment</span>
                     </Link>
                     <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                         <ClipboardList className="w-4 h-4" /><span>Fill Form</span>

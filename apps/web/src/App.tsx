@@ -13,6 +13,9 @@ import FormImportPage from './features/forms/import/FormImportPage';
 import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
 import GuardScannerPage from './features/guard/GuardScannerPage';
 import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage';
+import ShipmentRegisterPage from './features/shipments/ShipmentRegisterPage';
+import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage';
+import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import FacilityLayout from './features/dashboard/FacilityLayout';
 import FacilityDashboardPage from './features/dashboard/FacilityDashboardPage';
 import ReceivingZonePage from './features/dashboard/ReceivingZonePage';
@@ -34,6 +37,9 @@ export function App() {
             <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
             <Route path="/app/guard" element={<GuardScannerPage />} />
             <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
+            <Route path="/app/shipments" element={<ShipmentsDashboardPage />} />
+            <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
+            <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
             <Route path="/app/forms" element={<FormListPage />} />
             <Route path="/app/forms/new" element={<FormBuilderPage />} />
             <Route path="/app/forms/import" element={<FormImportPage />} />

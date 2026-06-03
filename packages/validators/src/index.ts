@@ -73,6 +73,16 @@ export {
 } from './attendance.schema.js';
 
 export {
+    shipmentConditionEnum,
+    shipmentRegisterSchema,
+    shipmentGetByIdSchema,
+    shipmentListSchema,
+    type ShipmentRegisterInput,
+    type ShipmentGetByIdInput,
+    type ShipmentListInput,
+} from './shipment.schema.js';
+
+export {
     formListByStageSchema,
     formGetByIdSchema,
     formDigitizeFromPhotoSchema,

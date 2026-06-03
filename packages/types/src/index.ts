@@ -19,6 +19,7 @@ export type {
     AttendanceScanResult,
     EmployeeHoursSummary,
 } from './attendance.js';
+export type { Shipment, ShipmentCondition, ShipmentWithFacility } from './shipment.js';
 export type {
     ApiSuccess,
     ApiError,
