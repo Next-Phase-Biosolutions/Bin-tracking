@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import JsBarcode from 'jsbarcode';
 import { Link } from 'react-router-dom';
 import { UserPlus, Download, Printer, CheckCircle2, IdCard } from 'lucide-react';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
@@ -169,6 +170,8 @@ interface EmployeeBadgeProps {
 function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
     const [qrError, setQrError] = useState<string | null>(null);
+    const barcodeRef = useRef<HTMLCanvasElement | null>(null);
+    const [barcodeDataUrl, setBarcodeDataUrl] = useState<string | null>(null);
 
     useEffect(() => {
         let active = true;
@@ -184,17 +187,39 @@ function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
         };
     }, [employee.qrCode]);
 
+    // Render the same token as a Code 128 1D barcode for handheld scanners (e.g. Inateck BCST-70).
+    useEffect(() => {
+        if (!barcodeRef.current) return;
+        try {
+            JsBarcode(barcodeRef.current, employee.qrCode, {
+                format: 'CODE128',
+                displayValue: true,
+                fontSize: 14,
+                height: 70,
+                margin: 10,
+                width: 2,
+            });
+            setBarcodeDataUrl(barcodeRef.current.toDataURL('image/png'));
+        } catch {
+            setBarcodeDataUrl(null);
+        }
+    }, [employee.qrCode]);
+
     const handlePrint = () => {
         if (!qrDataUrl) return;
-        const win = window.open('', '_blank', 'width=420,height=560');
+        const win = window.open('', '_blank', 'width=460,height=680');
         if (!win) return;
+        const barcodeImg = barcodeDataUrl
+            ? `<img src="${barcodeDataUrl}" alt="Barcode" style="max-width: 100%; margin-top: 16px;" />`
+            : '';
         win.document.write(`
             <html>
                 <head><title>${employee.fullName} — Badge</title></head>
                 <body style="font-family: sans-serif; text-align: center; padding: 32px;">
                     <h2 style="margin-bottom: 4px;">${employee.fullName}</h2>
                     <p style="color: #555; margin-top: 0;">${employee.employeeCode}</p>
-                    <img src="${qrDataUrl}" alt="QR" style="width: 320px; height: 320px;" />
+                    <img src="${qrDataUrl}" alt="QR" style="width: 280px; height: 280px;" />
+                    ${barcodeImg}
                 </body>
             </html>
         `);
@@ -216,7 +241,7 @@ function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
                     <IdCard className="h-4 w-4" /> {employee.employeeCode}
                 </p>
 
-                <div className="my-6 flex h-[320px] w-[320px] items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white">
+                <div className="my-6 flex h-[280px] w-[280px] items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white">
                     {qrError ? (
                         <span className="px-4 text-sm text-red-600">{qrError}</span>
                     ) : qrDataUrl ? (
@@ -226,7 +251,17 @@ function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
                     )}
                 </div>
 
-                <div className="flex w-full max-w-sm gap-3">
+                {/* Code 128 barcode for handheld scanners (e.g. Inateck BCST-70) */}
+                <div className="mb-2 w-full max-w-sm">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-400">
+                        Barcode (handheld scanner)
+                    </p>
+                    <div className="flex w-full items-center justify-center overflow-x-auto rounded-xl border border-gray-200 bg-white p-3">
+                        <canvas ref={barcodeRef} className="max-w-full" />
+                    </div>
+                </div>
+
+                <div className="flex w-full max-w-sm flex-wrap gap-3">
                     <a
                         href={qrDataUrl ?? '#'}
                         download={`${employee.employeeCode}-qr.png`}
@@ -235,7 +270,17 @@ function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
                             qrDataUrl ? '' : 'pointer-events-none opacity-50'
                         }`}
                     >
-                        <Download className="h-5 w-5" /> Download
+                        <Download className="h-5 w-5" /> QR
+                    </a>
+                    <a
+                        href={barcodeDataUrl ?? '#'}
+                        download={`${employee.employeeCode}-barcode.png`}
+                        aria-disabled={!barcodeDataUrl}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-3 font-semibold text-white transition-colors hover:bg-[#032f22] ${
+                            barcodeDataUrl ? '' : 'pointer-events-none opacity-50'
+                        }`}
+                    >
+                        <Download className="h-5 w-5" /> Barcode
                     </a>
                     <button
                         onClick={handlePrint}

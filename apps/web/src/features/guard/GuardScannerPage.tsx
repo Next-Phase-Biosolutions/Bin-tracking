@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck } from 'lucide-react';
+import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
 import { QRScanner } from '../../components/QRScanner';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
+
+type ScanMode = 'handheld' | 'camera';
 
 type ScanResult = RouterOutputs['attendance']['scan'];
 
@@ -15,12 +17,14 @@ function formatDuration(minutes: number | null): string {
 }
 
 export default function GuardScannerPage() {
+    const [scanMode, setScanMode] = useState<ScanMode>('handheld');
     const [scannerActive, setScannerActive] = useState(true);
     const [result, setResult] = useState<ScanResult | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [manualCode, setManualCode] = useState('');
     // Guards against the scanner firing the same code repeatedly per frame.
     const [lastScanned, setLastScanned] = useState<string | null>(null);
+    const handheldRef = useRef<HTMLInputElement | null>(null);
 
     const scanMutation = trpc.attendance.scan.useMutation();
 
@@ -29,6 +33,7 @@ export default function GuardScannerPage() {
         setLastScanned(qrCode);
         setScannerActive(false);
         setErrorMsg(null);
+        setManualCode('');
         scanMutation.mutate(
             { qrCode, source: 'Guard Post' },
             {
@@ -46,6 +51,15 @@ export default function GuardScannerPage() {
         scanMutation.reset();
         setScannerActive(true);
     };
+
+    // Keep the handheld input focused so a Bluetooth/USB scanner (HID keyboard)
+    // can fire scans hands-free without the guard tapping the field first.
+    const showScanPanel = !result && !errorMsg;
+    useEffect(() => {
+        if (scanMode === 'handheld' && showScanPanel) {
+            handheldRef.current?.focus();
+        }
+    }, [scanMode, showScanPanel, scanMutation.isPending]);
 
     const isCheckIn = result?.action === 'CHECK_IN';
 
@@ -70,47 +84,110 @@ export default function GuardScannerPage() {
             </header>
 
             <main className="mx-auto w-full max-w-md flex-1">
-                {!result && !errorMsg && (
+                {showScanPanel && (
                     <div className="flex flex-col items-center rounded-3xl border border-gray-100 bg-white p-6 text-center shadow-sm">
+                        {/* Mode toggle: handheld scanner (Inateck BCST-70) vs phone camera */}
+                        <div className="mb-5 flex w-full rounded-xl bg-gray-100 p-1">
+                            <button
+                                onClick={() => setScanMode('handheld')}
+                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                                    scanMode === 'handheld' ? 'bg-white text-[#043F2E] shadow-sm' : 'text-gray-500'
+                                }`}
+                            >
+                                <Barcode className="h-4 w-4" /> Handheld scanner
+                            </button>
+                            <button
+                                onClick={() => setScanMode('camera')}
+                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                                    scanMode === 'camera' ? 'bg-white text-[#043F2E] shadow-sm' : 'text-gray-500'
+                                }`}
+                            >
+                                <Camera className="h-4 w-4" /> Camera
+                            </button>
+                        </div>
+
                         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                             <ScanLine className="h-8 w-8" />
                         </div>
                         <h2 className="mb-2 text-2xl font-bold text-gray-900">Scan Badge</h2>
-                        <p className="mb-6 text-gray-500">Point the camera at the employee's QR code.</p>
 
-                        {scannerActive ? (
-                            <div className="w-full">
-                                <QRScanner onScan={submitScan} />
-                            </div>
+                        {scanMode === 'handheld' ? (
+                            <>
+                                <p className="mb-6 text-gray-500">
+                                    Scan the employee's barcode with the handheld scanner. Keep this box focused.
+                                </p>
+                                <input
+                                    ref={handheldRef}
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Waiting for scan… (or type the code and press Enter)"
+                                    value={manualCode}
+                                    onChange={(e) => setManualCode(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            submitScan(manualCode.trim());
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        // Re-grab focus so the wedge scanner always lands here.
+                                        if (scanMode === 'handheld' && showScanPanel) {
+                                            setTimeout(() => handheldRef.current?.focus(), 0);
+                                        }
+                                    }}
+                                    className="w-full rounded-xl border-2 border-[#043F2E]/30 px-4 py-4 text-center text-lg text-gray-900 focus:border-[#043F2E] focus:ring-[#043F2E]"
+                                />
+                                <div className="mt-3 flex items-center gap-2 text-sm text-emerald-600">
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    </span>
+                                    Ready to scan
+                                </div>
+                            </>
                         ) : (
-                            <button
-                                onClick={() => setScannerActive(true)}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-4 text-lg font-bold text-white transition-colors hover:bg-[#032f22]"
-                            >
-                                <ScanLine className="h-5 w-5" /> Tap to Start Scanning
-                            </button>
+                            <>
+                                <p className="mb-6 text-gray-500">Point the camera at the employee's QR code.</p>
+                                {scannerActive ? (
+                                    <div className="w-full">
+                                        <QRScanner onScan={submitScan} />
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setScannerActive(true)}
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-4 text-lg font-bold text-white transition-colors hover:bg-[#032f22]"
+                                    >
+                                        <ScanLine className="h-5 w-5" /> Tap to Start Scanning
+                                    </button>
+                                )}
+                                <div className="mt-6 flex w-full gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter code manually"
+                                        value={manualCode}
+                                        onChange={(e) => setManualCode(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                submitScan(manualCode.trim());
+                                            }
+                                        }}
+                                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#043F2E] focus:ring-[#043F2E]"
+                                    />
+                                    <button
+                                        onClick={() => submitScan(manualCode.trim())}
+                                        disabled={!manualCode.trim()}
+                                        className="rounded-lg bg-[#043F2E] px-4 py-2 font-medium text-white transition-colors hover:bg-[#032f22] disabled:opacity-50"
+                                    >
+                                        Submit
+                                    </button>
+                                </div>
+                            </>
                         )}
 
                         {scanMutation.isPending && (
                             <p className="mt-4 text-sm text-gray-500">Recording scan…</p>
                         )}
-
-                        <div className="mt-6 flex w-full gap-2">
-                            <input
-                                type="text"
-                                placeholder="Enter QR code manually"
-                                value={manualCode}
-                                onChange={(e) => setManualCode(e.target.value)}
-                                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#043F2E] focus:ring-[#043F2E]"
-                            />
-                            <button
-                                onClick={() => submitScan(manualCode.trim())}
-                                disabled={!manualCode.trim()}
-                                className="rounded-lg bg-[#043F2E] px-4 py-2 font-medium text-white transition-colors hover:bg-[#032f22] disabled:opacity-50"
-                            >
-                                Submit
-                            </button>
-                        </div>
                     </div>
                 )}
 
