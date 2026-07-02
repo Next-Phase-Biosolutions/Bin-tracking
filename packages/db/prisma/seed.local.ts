@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     const adapter = new PrismaPg({ connectionString: process.env['DATABASE_URL'] });
     const prisma = new PrismaClient({ adapter, log: [] });
 
-    // ─── Safety guard (matches masumi-payment-service pattern) ────
+    // ─── Safety guard ────
     // Set SEED_ONLY_IF_EMPTY=true in .env to skip if data already exists.
     // Prevents accidental re-wipes when running seed a second time.
     if (process.env['SEED_ONLY_IF_EMPTY']?.toLowerCase() === 'true') {

@@ -48,7 +48,7 @@ Prettier settings: 2-space indent, single quotes, trailing commas, 100-char line
 
 ### Database Migrations
 
-We use a Masumi-style workflow: each developer has their own local Postgres; production runs on Supabase. See [docs/database-setup.md](./docs/database-setup.md) for the full guide.
+We use a workflow: each developer has their own local Postgres; production runs on Supabase. See [docs/database-setup.md](./docs/database-setup.md) for the full guide.
 
 **Rules:**
 

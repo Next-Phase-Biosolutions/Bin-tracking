@@ -44,7 +44,7 @@ To **create** a new migration while developing (local only):
 pnpm db:migrate:dev --name describe_your_change
 ```
 
-See [docs/database-setup.md](../docs/database-setup.md) for the full Masumi-style workflow.
+See [docs/database-setup.md](../docs/database-setup.md) for the full workflow.
 
 ### What's New in Prisma 7
 

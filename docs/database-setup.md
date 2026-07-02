@@ -1,6 +1,6 @@
 # Database Setup Guide — Local Postgres per Developer + Supabase Production
 
-This project uses a **Masumi-style** database workflow:
+This project uses a  database workflow:
 
 - **Each developer** runs their own isolated local PostgreSQL database (same schema, own data).
 - **Production** runs on **Supabase** (managed PostgreSQL).

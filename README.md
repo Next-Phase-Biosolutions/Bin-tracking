@@ -117,7 +117,7 @@ bin-tracker/
 
 ## Local Development Setup
 
-We use a **Masumi-style database workflow**: each developer runs their **own local PostgreSQL** database. Production lives on **Supabase** — developers never connect to it directly. Schema changes are committed as Prisma migration files and applied to production via CI/CD.
+We use a **database workflow**: each developer runs their **own local PostgreSQL** database. Production lives on **Supabase** — developers never connect to it directly. Schema changes are committed as Prisma migration files and applied to production via CI/CD.
 
 See the full guide: **[docs/database-setup.md](./docs/database-setup.md)**
 
