@@ -1,15 +1,15 @@
 name: Deploy Production
 
-# Applies Prisma migrations (and optional bootstrap seed) to Supabase production.
+# Applies Prisma migrations to Supabase production.
 # Run automatically on merge to main, or manually via workflow_dispatch.
 #
 # Required GitHub environment: production
 # Required environment secrets:
-#   DATABASE_URL          — Supabase transaction pooler (port 6543, ?pgbouncer=true)
-#   DIRECT_URL            — Supabase direct connection (port 5432)
-#   SUPABASE_URL
-#   SUPABASE_SERVICE_ROLE_KEY
-#   SUPABASE_ANON_KEY
+#   DIRECT_URL            — Supabase direct connection (port 5432) — used for migrations
+#   DATABASE_URL          — Supabase pooler (port 6543) — optional here until seed is re-enabled
+#
+# NOTE: Bootstrap seed is disabled until packages/db/prisma/seed.ts with
+# SEED_ONLY_IF_EMPTY guard is pushed to main. Run seed manually once if needed.
 
 on:
     workflow_dispatch:
@@ -41,21 +41,12 @@ jobs:
 
             - name: Validate required secrets
               env:
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
                   DIRECT_URL: ${{ secrets.DIRECT_URL }}
-                  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-                  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-                  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
               run: |
-                  missing=0
-                  for name in DATABASE_URL DIRECT_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SUPABASE_ANON_KEY; do
-                    value="${!name}"
-                    if [ -z "$value" ]; then
-                      echo "::error title=Missing secret::$name is not set in the production environment"
-                      missing=1
-                    fi
-                  done
-                  exit $missing
+                  if [ -z "$DIRECT_URL" ]; then
+                    echo "::error title=Missing secret::DIRECT_URL is not set in the production environment"
+                    exit 1
+                  fi
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -64,24 +55,11 @@ jobs:
               run: pnpm --filter @bin-tracker/db generate
 
             # Migrations must use the DIRECT connection (not the pooler).
-            # We set DATABASE_URL=DIRECT_URL here so this works even before prisma.config.ts
-            # is updated to read DIRECT_URL separately.
             - name: Apply migrations to Supabase
               run: pnpm --filter @bin-tracker/db migrate:deploy
               env:
                   DATABASE_URL: ${{ secrets.DIRECT_URL }}
                   DIRECT_URL: ${{ secrets.DIRECT_URL }}
-
-            - name: Bootstrap seed (skipped if data already exists)
-              run: pnpm --filter @bin-tracker/db seed
-              env:
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-                  DIRECT_URL: ${{ secrets.DIRECT_URL }}
-                  NODE_ENV: production
-                  SEED_ONLY_IF_EMPTY: 'true'
-                  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-                  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-                  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
             - name: Migration status
               run: pnpm --filter @bin-tracker/db migrate:status

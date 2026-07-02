@@ -7,7 +7,8 @@ on:
         branches: [dev, main]
 
 jobs:
-    lint:
+    check:
+        name: Typecheck
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
@@ -24,16 +25,18 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # @bin-tracker/types imports Prisma types — client must exist before turbo build/lint
+            # @bin-tracker/types imports Prisma types — client must exist before turbo build
             - name: Generate Prisma Client
               run: pnpm --filter @bin-tracker/db generate
 
-            - name: Lint
-              run: pnpm lint
+            # Uses typecheck instead of lint until eslint deps are on main
+            # (apps/api/package.json + pnpm-lock.yaml with eslint must be pushed first)
+            - name: Typecheck
+              run: pnpm typecheck
 
     migrate-and-test:
         runs-on: ubuntu-latest
-        needs: lint
+        needs: check
 
         services:
             postgres:
@@ -79,9 +82,6 @@ jobs:
 
             - name: Seed test data
               run: pnpm --filter @bin-tracker/db seed:local
-
-            - name: Typecheck
-              run: pnpm typecheck
 
             - name: Test
               run: pnpm test

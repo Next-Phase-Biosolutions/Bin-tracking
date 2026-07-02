@@ -19,6 +19,10 @@ try {
 
 export default defineConfig({
     datasource: {
-        url: process.env['DATABASE_URL'],
+        // Prisma 7 removed `directUrl`. The CLI (migrate, studio) uses this `url`.
+        // Use DIRECT_URL (direct Postgres) for Supabase migrations; locally both
+        // env vars are typically the same localhost connection string.
+        // Runtime queries use DATABASE_URL via the driver adapter in client.ts.
+        url: process.env['DIRECT_URL'] ?? process.env['DATABASE_URL'],
     },
 });

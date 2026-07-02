@@ -21,7 +21,7 @@ build/
 .DS_Store
 
 # Prisma
-packages/db/prisma/migrations/**/migration_lock.toml
+# migration_lock.toml must be committed — do not ignore it
 
 # Generated assets
 apps/web/dist/qr/
@@ -35,3 +35,5 @@ pnpm-debug.log*
 
 # Binary / generated plan files
 plans/*.pdf
+agentdb.rvf*
+ruvector.db

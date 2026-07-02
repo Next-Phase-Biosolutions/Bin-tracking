@@ -102,22 +102,51 @@ When configuring the service, set the exact values below. These are critical for
 * **Root Directory:** *(Leave this completely BLANK. Do not put apps/api here, because Turborepo must run from the root Folder).*
 * **Environment:** `Node`
 * **Build Command:** `pnpm install && pnpm db:generate && pnpm --filter=@bin-tracker/api build`
+* **Pre-Deploy Command (schema changes):** `pnpm db:migrate`
 * **Start Command:** `cd apps/api && pnpm start`
+
+> **Important:** Run `pnpm db:migrate` (`migrate deploy`) as a **pre-deploy step** whenever the release includes new files in `packages/db/prisma/migrations/`. Apply schema changes **before** deploying new app code. Do not run migrations inside the container on every restart.
 
 *(Make sure you select the "Free" tier at the bottom of the page).*
 
 ## Step 3: Set Environment Variables
 The backend API absolutely requires the database connection string and Supabase secret. Scroll down and click **Advanced**, then click **Add Environment Variable**. Add all of these:
 
-1. `DATABASE_URL` -> *(Paste your full PostgreSQL URL starting with postgresql://...)*
-2. `SUPABASE_URL` -> *(Your Supabase URL)*
-3. `SUPABASE_SERVICE_ROLE_KEY` -> *(Your Supabase Service Role Key from your local .env)*
-4. `SUPABASE_JWT_SECRET` -> *(Your JWT Secret from your local .env)*
-5. `PORT` -> `3001`
-6. `CORS_ORIGIN` -> `*` (Setting this to wildcard `*` is fine for testing, but in production, you should set this to your Netlify URL, e.g., `https://your-netlify-app.netlify.app`)
+1. `DATABASE_URL` -> *(Supabase **transaction pooler** URL, port 6543, with `?pgbouncer=true`)*
+2. `DIRECT_URL` -> *(Supabase **direct** connection URL, port 5432 — required for migrations)*
+3. `SUPABASE_URL` -> *(Your Supabase URL)*
+4. `SUPABASE_SERVICE_ROLE_KEY` -> *(Your Supabase Service Role Key from your local .env)*
+5. `SUPABASE_JWT_SECRET` -> *(Your JWT Secret from your local .env)*
+6. `PORT` -> `3001`
+7. `CORS_ORIGIN` -> `*` (Setting this to wildcard `*` is fine for testing, but in production, you should set this to your Netlify URL, e.g., `https://your-netlify-app.netlify.app`)
+8. `SEED_ONLY_IF_EMPTY` -> `true`
+9. `DISABLE_AUTH` -> `false`
 
 ## Step 4: Deploy and Link
-1. Click **Create Web Service**. 
+
+### Automated database migrations (recommended)
+
+Migrations to Supabase production run via GitHub Actions when code is pushed to `main`:
+
+1. In GitHub → **Settings → Environments**, create a `production` environment with required reviewers.
+2. Add secrets to the `production` environment:
+   - `DATABASE_URL` (Supabase pooler, port 6543)
+   - `DIRECT_URL` (Supabase direct, port 5432)
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`
+3. Merge to `main` — the `Deploy Production` workflow runs `pnpm db:migrate` then safe bootstrap seed.
+
+You can also trigger it manually: **Actions → Deploy Production → Run workflow**.
+
+### Manual migration (fallback)
+
+```bash
+DATABASE_URL="<pooler>" DIRECT_URL="<direct>" pnpm db:migrate
+SEED_ONLY_IF_EMPTY=true NODE_ENV=production pnpm db:seed
+```
+
+### Link frontend to API
+
+1. Click **Create Web Service** on Render (if not done yet).
 2. Render will take a few minutes to install `pnpm`, build the backend, and start the server. 
 3. When it is successful, Render will give you a live URL in the top left corner (like `https://bin-tracker-api-x9za.onrender.com`).
 4. **Final Step:** Go back to your **Netlify** dashboard. Go to Environment Variables, and add `VITE_API_URL` with a value of your new Render URL (e.g., `https://bin-tracker-api-x9za.onrender.com`). Trigger a new Netlify deploy so your frontend knows where the live backend is!

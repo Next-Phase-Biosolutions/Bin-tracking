@@ -11,6 +11,7 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Local Development Setup](#local-development-setup)
+- [Database & Prisma Commands](#database--prisma-commands)
 - [Available Scripts](#available-scripts)
 - [Environment Variables](#environment-variables)
 - [Contributing](#contributing)
@@ -106,8 +107,9 @@ bin-tracker/
 │   ├── db/                   # Prisma schema + migrations + seed
 │   ├── types/                # Shared TypeScript types
 │   └── validators/           # Shared Zod validators
+├── docs/                     # Guides (database setup, specs)
 ├── plans/                    # Architecture docs and specs
-├── .env.example              # Environment variable template
+├── .env.example              # Environment variable template (copy to .env)
 └── turbo.json                # Turborepo pipeline config
 ```
 
@@ -115,157 +117,131 @@ bin-tracker/
 
 ## Local Development Setup
 
-There are **two ways** to run this project locally depending on your setup.
+We use a **Masumi-style database workflow**: each developer runs their **own local PostgreSQL** database. Production lives on **Supabase** — developers never connect to it directly. Schema changes are committed as Prisma migration files and applied to production via CI/CD.
 
-| | Option A — Full Setup | Option B — Local Only |
-|---|---|---|
-| **Who** | Team members needing real auth | Juniors / contributors |
-| **Supabase** | ✅ Required | ❌ Not needed |
-| **Docker** | ❌ Not needed | ❌ Not needed |
-| **Postgres** | Supabase-hosted | Local install |
-| **Auth** | Full JWT auth | Bypassed (`DISABLE_AUTH=true`) |
-
----
-
-## Option A — Full Setup (with Supabase)
+See the full guide: **[docs/database-setup.md](./docs/database-setup.md)**
 
 ### Prerequisites
 
 - **Node.js** `>= 20.0.0`
 - **pnpm** `>= 9.0.0`
-- A [Supabase](https://supabase.com/) project (free tier is fine)
+- **PostgreSQL 16** — install locally:
+  - [Download PostgreSQL](https://www.postgresql.org/download/) (all platforms)
+  - [macOS](https://www.postgresql.org/download/macosx/)
+  - [Windows](https://www.postgresql.org/download/windows/)
+  - [Linux](https://www.postgresql.org/download/linux/)
 
-### 1. Clone & Install
+### One-time PostgreSQL setup
+
+**Mac (Homebrew):**
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+createdb bin_tracker
+```
+
+**Windows:** Install from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/), start the PostgreSQL service, then:
+
+```cmd
+createdb -U postgres bin_tracker
+```
+
+**Linux:** Use your distro packages or [postgresql.org/download/linux](https://www.postgresql.org/download/linux/), then:
+
+```bash
+createdb bin_tracker
+```
+
+### Quick Start
 
 ```bash
 git clone https://github.com/your-org/bin-tracker.git
 cd bin-tracker
-pnpm install
-```
 
-### 2. Configure Environment Variables
-
-```bash
 cp .env.example .env
-```
+# Edit .env if your Postgres user/password differs from the defaults
 
-Fill in the required values in `.env` (see [Environment Variables](#environment-variables)).
-
-### 3. Set Up the Database
-
-```bash
-# Run migrations
+pnpm install
+pnpm db:generate
 pnpm db:migrate
-
-# Seed initial data (creates Supabase Auth users + DB records)
-pnpm db:seed
-```
-
-### 4. Start the Development Servers
-
-```bash
+pnpm db:seed:local
 pnpm dev
 ```
 
-### 5. Verify
+| Service | URL |
+|---|---|
+| Frontend | [http://localhost:3000](http://localhost:3000) |
+| API health | [http://localhost:3001/health](http://localhost:3001/health) |
+| DB browser | `pnpm db:studio` |
 
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- API health check: [http://localhost:3001/health](http://localhost:3001/health)
-- Prisma Studio (DB browser): `pnpm db:studio`
+Auth is bypassed locally (`DISABLE_AUTH=true`). The API auto-injects the admin user — no login required.
+
+### After pulling new code
+
+When teammates merge database changes:
+
+```bash
+git pull
+pnpm db:migrate
+pnpm db:generate
+```
+
+### Optional: Supabase Auth testing
+
+To test real JWT login locally, fill in `SUPABASE_*` and `VITE_SUPABASE_*` in `.env` using a **personal dev** Supabase project. Keep `DATABASE_URL` and `DIRECT_URL` pointed at **local Postgres** — never use the production Supabase database URL.
+
+Set `DISABLE_AUTH=false` only while testing login.
 
 ---
 
-## Option B — Local Only (No Supabase, No Docker)
+## Database & Prisma Commands
 
-> Ideal for juniors and contributors who just need to run the project locally.
-> Auth is fully bypassed — no login required. The API auto-injects an admin user.
+Run all commands from the **repository root**.
 
-### 🍎 Mac
+### Daily commands
+
+| Command | When to use |
+|---|---|
+| `pnpm db:generate` | After pulling schema changes or editing `schema.prisma` |
+| `pnpm db:migrate` | Apply committed migrations to your local DB (or CI/production) |
+| `pnpm db:seed:local` | Bootstrap local test data (no Supabase) |
+| `pnpm db:studio` | Browse your local database in a GUI |
+
+### Schema changes (developers only)
+
+When **you** are adding or changing tables:
 
 ```bash
-# 1. Install Node.js >= 20 (one time only)
-brew install node@20
+# 1. Edit packages/db/prisma/schema.prisma
+# 2. Create migration locally (never run this against production)
+pnpm db:migrate:dev --name describe_your_change
 
-# 2. Install pnpm (one time only)
-npm install -g pnpm
-
-# 3. Install PostgreSQL (one time only)
-brew install postgresql@16
-brew services start postgresql@16
-
-# 4. Create the local database (one time only)
-createdb bin_tracker
-
-# 5. Clone the repository
-git clone https://github.com/your-org/bin-tracker.git
-cd bin-tracker
-
-# 6. Install dependencies
-pnpm install
-
-# 7. Copy the local env file (no Supabase credentials needed — works as-is)
-cp .env.local.example .env
-
-# 8. Run database migrations
-pnpm db:migrate
-
-# 9. Seed the database (no Supabase, cuid IDs, safe to re-run)
-pnpm db:seed:local
-
-# 10. Start both servers
-pnpm dev
+# 3. Test, then commit the migration files
+git add packages/db/prisma/
+git commit -m "feat(db): describe_your_change"
 ```
 
-### 🪟 Windows
+Open a PR to `dev`. CI validates migrations on a fresh Postgres before merge.
 
-```cmd
-:: 1. Install Node.js >= 20 (one time only)
-::    Download from: https://nodejs.org/en/download
-::    Choose the LTS version and run the installer.
+### Reset your local database
 
-:: 2. Install pnpm (one time only — open a NEW terminal after installing Node)
-npm install -g pnpm
+Safe anytime on your own machine:
 
-:: 3. Download and install PostgreSQL 16 from:
-::    https://www.postgresql.org/download/windows/
-::    During install, set password for the "postgres" user (remember it!)
-::    Then start the PostgreSQL service from the Windows Services panel.
-
-:: 4. Open Command Prompt and create the local database
-createdb -U postgres bin_tracker
-:: (enter your postgres password when prompted)
-
-:: 5. Clone the repository
-git clone https://github.com/your-org/bin-tracker.git
-cd bin-tracker
-
-:: 6. Install dependencies
-pnpm install
-
-:: 7. Copy the local env file
-copy .env.local.example .env
-
-::    If you set a password during Postgres install, update DATABASE_URL in .env:
-::    DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/bin_tracker"
-
-:: 8. Run database migrations
-pnpm db:migrate
-
-:: 9. Seed the database
-pnpm db:seed:local
-
-:: 10. Start both servers
-pnpm dev
+```bash
+pnpm db:migrate:reset
 ```
 
-### Verify (Both Platforms)
+### Production commands (ops / CI only)
 
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- API health check: [http://localhost:3001/health](http://localhost:3001/health)
-- Prisma Studio (DB browser): `pnpm db:studio`
+| Command | Purpose |
+|---|---|
+| `pnpm db:migrate` | Apply pending migrations to Supabase (`migrate deploy`) |
+| `pnpm db:seed` | One-time production bootstrap with Supabase Auth users |
 
-> **Note:** `SEED_ONLY_IF_EMPTY=true` is set by default in `.env.local.example`.
-> If you accidentally run `pnpm db:seed:local` again, it will detect existing data and skip — your data is safe.
+Set `SEED_ONLY_IF_EMPTY=true` in production. Developers should **not** have production database credentials.
+
+Production migrations run automatically via `.github/workflows/deploy-production.yml` on merge to `main`.
 
 ---
 
@@ -282,26 +258,31 @@ Run all scripts from the **root** of the repository.
 | `pnpm lint:fix` | Lint and auto-fix all packages |
 | `pnpm format` | Format all `ts`, `tsx`, `json`, `md` files with Prettier |
 | `pnpm typecheck` | TypeScript type-check all packages |
-| `pnpm db:migrate` | Run Prisma migrations |
-| `pnpm db:seed` | Seed the database (requires Supabase) |
-| `pnpm db:seed:local` | Seed for local dev — no Supabase needed (use with `.env.local.example`) |
-| `pnpm db:studio` | Open Prisma Studio |
 | `pnpm db:generate` | Regenerate Prisma Client after schema changes |
+| `pnpm db:migrate` | Apply committed migrations (`migrate deploy`) — local sync, CI, production |
+| `pnpm db:migrate:dev` | **Local only** — create a new migration while developing |
+| `pnpm db:migrate:reset` | **Local only** — wipe DB, reapply migrations, re-run `seed.local.ts` |
+| `pnpm db:migrate:status` | Show which migrations have been applied |
+| `pnpm db:seed` | Seed with Supabase Auth users (production bootstrap / ops only) |
+| `pnpm db:seed:local` | Seed for local dev — no Supabase needed |
+| `pnpm db:studio` | Open Prisma Studio (local DB browser) |
 | `pnpm clean` | Remove all build artifacts and `node_modules` |
 
 ---
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the values below.
+Copy `.env.example` to `.env` and adjust for your local Postgres credentials.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | ✅ | Supabase public anon key (frontend) |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key (API) |
-| `SUPABASE_JWT_SECRET` | ✅ | Used to verify Supabase JWTs in the API |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string (local Postgres in dev; Supabase pooler in prod) |
+| `DIRECT_URL` | ✅ | Direct Postgres URL (same as `DATABASE_URL` locally; Supabase direct in prod) |
+| `SEED_ONLY_IF_EMPTY` | ⚠️ | `true` locally and in production — prevents accidental re-seed |
+| `SUPABASE_URL` | ⚠️ | Optional locally (`DISABLE_AUTH=true`); required in production |
+| `SUPABASE_ANON_KEY` | ⚠️ | Optional locally; required in production (frontend + API) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ⚠️ | Optional locally; required in production (API only) |
+| `SUPABASE_JWT_SECRET` | ⚠️ | Optional locally; required in production (API) |
 | `PORT` | ✅ | API server port (default: `3001`) |
 | `HOST` | ✅ | API server host (default: `0.0.0.0`) |
 | `CORS_ORIGIN` | ✅ | Allowed frontend origin (e.g., `http://localhost:3000`) |

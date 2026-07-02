@@ -14,7 +14,7 @@
         "migrate:dev": "prisma migrate dev",
         "migrate:deploy": "prisma migrate deploy",
         "migrate:status": "prisma migrate status",
-        "migrate:reset": "prisma migrate reset",
+        "migrate:reset": "prisma migrate reset --force",
         "seed": "tsx --env-file=../../.env prisma/seed.ts",
         "seed:local": "tsx --env-file=../../.env prisma/seed.local.ts",
         "e2e": "tsx --env-file=../../.env e2e-test.ts",
@@ -33,5 +33,8 @@
         "prisma": "^7.4.0",
         "tsx": "^4.19.0",
         "typescript": "^5.7.0"
+    },
+    "prisma": {
+        "seed": "tsx --env-file=../../.env prisma/seed.local.ts"
     }
 }

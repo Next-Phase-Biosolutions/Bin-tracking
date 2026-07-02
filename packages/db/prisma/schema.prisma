@@ -283,6 +283,9 @@ model Employee {
   sessions WorkSession[]
   events   AttendanceEvent[]
 
+  payrollLineItems  PayrollLineItem[]
+  payrollExceptions PayrollException[]
+
   @@index([status])
   @@map("employees")
 }
@@ -299,6 +302,8 @@ model WorkSession {
 
   employee Employee          @relation(fields: [employeeId], references: [id])
   events   AttendanceEvent[]
+
+  payrollExceptions PayrollException[]
 
   // Used to find an employee's currently-open session quickly.
   @@index([employeeId, checkOutAt])
@@ -370,4 +375,113 @@ model FormTemplate {
 
   @@index([stage, isActive])
   @@map("form_templates")
+}
+
+// ─── Payroll ──────────────────────────────────────────────────────
+// Sits on top of the in/out tables (employees, work_sessions). Turns
+// recorded minutes into money. Existing tables are unchanged.
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+  HELD
+}
+
+enum PayrollExceptionType {
+  NO_CHECKOUT
+  AUTO_CLOSED
+}
+
+// Company-wide config. Single row enforced by the unique `singleton` flag.
+model Settings {
+  id                  String   @id @default(cuid())
+  singleton           Boolean  @unique @default(true)
+  flatHourlyRateCents Int
+  currency            String   @default("CAD")
+  companyTimezone     String   @default("America/Toronto")
+  managerEmail        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// One payroll per month. UNIQUE(period) prevents paying a month twice.
+model PayrollRun {
+  id              String           @id @default(cuid())
+  period          String           @unique // 'YYYY-MM'
+  status          PayrollRunStatus @default(DRAFT)
+  rateCents       Int // flat rate snapshot used for this run
+  currency        String           @default("CAD")
+  totalEmployees  Int              @default(0)
+  totalMinutes    Int              @default(0)
+  totalGrossCents Int              @default(0)
+  notes           String?
+  computedAt        DateTime? // when the run's line items were calculated
+  approvedAt        DateTime?
+  approvedBy        String? // who approved (manager identifier)
+  approvalCodeHash  String? // hashed one-time 2FA approval code
+  approvalExpiresAt DateTime? // expiry for the approval code
+  paidAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  lineItems  PayrollLineItem[]
+  exceptions PayrollException[]
+
+  @@index([status])
+  @@map("payroll_runs")
+}
+
+// One row per employee per run: their hours and resulting gross pay.
+model PayrollLineItem {
+  id           String       @id @default(cuid())
+  runId        String
+  employeeId   String
+  minutes      Int          @default(0)
+  hours        Float        @default(0)
+  rateCents    Int
+  grossCents   Int          @default(0)
+  payoutStatus PayoutStatus @default(PENDING)
+  payoutRef    String? // payout provider's transaction reference
+  paidAt       DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  run      PayrollRun @relation(fields: [runId], references: [id])
+  employee Employee   @relation(fields: [employeeId], references: [id])
+
+  @@unique([runId, employeeId])
+  @@index([employeeId])
+  @@index([payoutStatus])
+  @@map("payroll_line_items")
+}
+
+// Flagged dirty sessions (no checkout / auto-closed) held back from auto-pay.
+model PayrollException {
+  id         String               @id @default(cuid())
+  runId      String
+  employeeId String
+  sessionId  String
+  type       PayrollExceptionType
+  resolved   Boolean              @default(false)
+  resolvedAt DateTime?
+  note       String?
+  createdAt  DateTime             @default(now())
+
+  run      PayrollRun  @relation(fields: [runId], references: [id])
+  employee Employee    @relation(fields: [employeeId], references: [id])
+  session  WorkSession @relation(fields: [sessionId], references: [id])
+
+  @@index([runId])
+  @@index([employeeId])
+  @@map("payroll_exceptions")
 }

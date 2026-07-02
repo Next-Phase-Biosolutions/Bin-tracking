@@ -31,12 +31,20 @@ pnpm install
 # 2. Generate Prisma Client with new types
 pnpm db:generate
 
-# 3. Apply migrations (if database exists)
+# 3. Apply committed migrations (local sync, CI, or production)
 pnpm db:migrate
 
-# 4. (Optional) Run seed data
-pnpm db:seed
+# 4. (Optional) Seed local data
+pnpm db:seed:local
 ```
+
+To **create** a new migration while developing (local only):
+
+```bash
+pnpm db:migrate:dev --name describe_your_change
+```
+
+See [docs/database-setup.md](../docs/database-setup.md) for the full Masumi-style workflow.
 
 ### What's New in Prisma 7
 

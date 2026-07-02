@@ -1,7 +1,7 @@
 /**
  * seed.local.ts — Local development seed (no Supabase required)
  *
- * Use this when running against a local Postgres instance (Docker).
+ * Use this when running against a local Postgres instance.
  * Skips Supabase Auth user creation entirely — Prisma generates user IDs via cuid().
  * Requires DISABLE_AUTH=true in .env to bypass JWT verification.
  *
@@ -48,6 +48,16 @@ async function main(): Promise<void> {
     }
     // ─── 1. Clean DB (FK constraint order matters) ────────────────
     console.log('🧹 Cleaning existing data...');
+    await prisma.payrollException.deleteMany();
+    await prisma.payrollLineItem.deleteMany();
+    await prisma.payrollRun.deleteMany();
+    await prisma.settings.deleteMany();
+    await prisma.attendanceEvent.deleteMany();
+    await prisma.workSession.deleteMany();
+    await prisma.employee.deleteMany();
+    await prisma.shipment.deleteMany();
+    await prisma.formTemplate.deleteMany();
+    await prisma.animalRegistration.deleteMany();
     await prisma.eventLog.deleteMany();
     await prisma.binCycle.deleteMany();
     await prisma.bin.deleteMany();

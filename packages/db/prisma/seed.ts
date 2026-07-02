@@ -59,6 +59,55 @@ async function createAuthUser(email: string, password: string, name: string): Pr
     return data.id;
 }
 
+/** Return existing Supabase Auth user id or create one — never deletes. */
+async function getOrCreateAuthUser(
+    email: string,
+    password: string,
+    name: string,
+    existingAuth: Array<{ id: string; email: string }>,
+): Promise<string> {
+    const found = existingAuth.find((u) => u.email === email);
+    if (found) {
+        console.log(`  ↪ Auth user exists: ${email}`);
+        return found.id;
+    }
+    const id = await createAuthUser(email, password, name);
+    console.log(`  ✓ Created auth user: ${email}`);
+    return id;
+}
+
+async function wipeDatabase(prisma: PrismaClient): Promise<void> {
+    console.log('🧹 Cleaning existing data (SEED_FORCE=true)...');
+    await prisma.payrollException.deleteMany();
+    await prisma.payrollLineItem.deleteMany();
+    await prisma.payrollRun.deleteMany();
+    await prisma.settings.deleteMany();
+    await prisma.attendanceEvent.deleteMany();
+    await prisma.workSession.deleteMany();
+    await prisma.employee.deleteMany();
+    await prisma.shipment.deleteMany();
+    await prisma.formTemplate.deleteMany();
+    await prisma.animalRegistration.deleteMany();
+    await prisma.eventLog.deleteMany();
+    await prisma.binCycle.deleteMany();
+    await prisma.bin.deleteMany();
+    await prisma.station.deleteMany();
+    await prisma.binType.deleteMany();
+    await prisma.userFacility.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.facility.deleteMany();
+}
+
+async function wipeSeedAuthUsers(): Promise<void> {
+    console.log('🔐 Removing seed Supabase Auth users (SEED_FORCE=true)...');
+    const existingAuth = await listAuthUsers();
+    const seedEmails = new Set(SEED_USERS.map((u) => u.email as string));
+    for (const authUser of existingAuth.filter((u) => seedEmails.has(u.email))) {
+        await deleteAuthUser(authUser.id);
+        console.log(`  ✗ Deleted auth user: ${authUser.email}`);
+    }
+}
+
 // ─── Seed data ─────────────────────────────────────────────────────────────
 
 const SEED_USERS = [
@@ -72,38 +121,58 @@ const SEED_USERS = [
 // ─── Main ──────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-    const adapter = new PrismaPg({ connectionString: process.env['DATABASE_URL'] });
+    const isProduction = process.env['NODE_ENV'] === 'production';
+    const seedForce = process.env['SEED_FORCE']?.toLowerCase() === 'true';
+    const seedOnlyIfEmpty = process.env['SEED_ONLY_IF_EMPTY']?.toLowerCase() === 'true';
+
+    if (isProduction && seedForce) {
+        console.error('❌ SEED_FORCE is not allowed when NODE_ENV=production');
+        process.exit(1);
+    }
+
+    if (isProduction && !seedOnlyIfEmpty) {
+        console.error('❌ Production seed requires SEED_ONLY_IF_EMPTY=true');
+        process.exit(1);
+    }
+
+    const connectionString =
+        process.env['DIRECT_URL'] ?? process.env['DATABASE_URL'];
+    const adapter = new PrismaPg({ connectionString });
     const prisma = new PrismaClient({ adapter, log: [] });
 
-    // ─── 1. Clean DB (order matters — FK constraints) ──────────
-    console.log('🧹 Cleaning existing data...');
-    await prisma.eventLog.deleteMany();
-    await prisma.binCycle.deleteMany();
-    await prisma.bin.deleteMany();
-    await prisma.station.deleteMany();
-    await prisma.binType.deleteMany();
-    await prisma.userFacility.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.facility.deleteMany();
-
-    // ─── 2. Clean Supabase Auth (remove old seed users) ────────
-    console.log('🔐 Cleaning Supabase Auth users...');
-    const existingAuth = await listAuthUsers();
-    const seedEmails = new Set(SEED_USERS.map(u => u.email as string));
-    for (const authUser of existingAuth.filter(u => seedEmails.has(u.email))) {
-        await deleteAuthUser(authUser.id);
-        console.log(`  ✗ Deleted old auth user: ${authUser.email}`);
+    if (seedOnlyIfEmpty) {
+        const existing = await prisma.user.findFirst();
+        if (existing) {
+            console.log('✅ Database already seeded — skipping (SEED_ONLY_IF_EMPTY=true)');
+            await prisma.$disconnect();
+            return;
+        }
+    } else if (!seedForce && (await prisma.user.findFirst())) {
+        console.error(
+            '❌ Database is not empty. Set SEED_ONLY_IF_EMPTY=true to skip, or SEED_FORCE=true (dev only) to wipe first.',
+        );
+        process.exit(1);
     }
 
-    // ─── 3. Create Supabase Auth users → get real UUIDs ────────
-    console.log('👤 Creating Supabase Auth users...');
+    if (seedForce) {
+        await wipeDatabase(prisma);
+        await wipeSeedAuthUsers();
+    }
+
+    // ─── Supabase Auth users → get or create (never delete in bootstrap mode) ─
+    console.log('👤 Ensuring Supabase Auth users...');
+    const existingAuth = await listAuthUsers();
     const authIds: Record<string, string> = {};
     for (const u of SEED_USERS) {
-        authIds[u.email] = await createAuthUser(u.email, u.password, u.name);
-        console.log(`  ✓ ${u.role.padEnd(12)} ${u.email}`);
+        authIds[u.email] = await getOrCreateAuthUser(
+            u.email,
+            u.password,
+            u.name,
+            existingAuth,
+        );
     }
 
-    // ─── 4. Mirror users in our DB using Supabase Auth UUIDs ───
+    // ─── Mirror users in our DB using Supabase Auth UUIDs ───
     console.log('📝 Creating database users...');
     const dbUsers = await Promise.all(
         SEED_USERS.map(u =>
@@ -184,10 +253,11 @@ async function main(): Promise<void> {
         ),
     );
 
-    // ─── 10. Form Templates (the 4 digitized forms) ─────────────
+    // ─── Form Templates (the 4 digitized forms) ─────────────
     console.log('📋 Seeding form templates...');
-    await prisma.formTemplate.deleteMany();
-    await prisma.formTemplate.createMany({
+    const existingFormCount = await prisma.formTemplate.count();
+    if (existingFormCount === 0) {
+        await prisma.formTemplate.createMany({
         data: [
             {
                 title: 'Customer Complaint Investigation Form',
@@ -465,8 +535,11 @@ async function main(): Promise<void> {
                 },
             },
         ],
-    });
-    console.log('  ✓ 4 form templates seeded');
+        });
+        console.log('  ✓ 4 form templates seeded');
+    } else {
+        console.log(`  ↪ ${existingFormCount} form templates already present — skipping`);
+    }
 
     // ─── Done — print test guide ──────────────────────────────────
     console.log('\n✅ Seed complete!\n');    console.log('═══════════════════════════════════════════════════════════');

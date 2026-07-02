@@ -21,6 +21,15 @@ export type {
 } from './attendance.js';
 export type { Shipment, ShipmentCondition, ShipmentWithFacility } from './shipment.js';
 export type {
+    PayrollRunStatus,
+    PayoutStatus,
+    PayrollExceptionType,
+    PayrollLineItemView,
+    PayrollExceptionView,
+    PayrollRunView,
+    PayrollRunSummary,
+} from './payroll.js';
+export type {
     ApiSuccess,
     ApiError,
     ApiResponse,
