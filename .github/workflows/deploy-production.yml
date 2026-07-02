@@ -4,7 +4,7 @@ name: Deploy Production
 # Run automatically on merge to main, or manually via workflow_dispatch.
 #
 # Required GitHub environment: production
-# Required secrets (environment or repo):
+# Required environment secrets:
 #   DATABASE_URL          — Supabase transaction pooler (port 6543, ?pgbouncer=true)
 #   DIRECT_URL            — Supabase direct connection (port 5432)
 #   SUPABASE_URL
@@ -25,6 +25,7 @@ jobs:
         name: Migrate production database
         runs-on: ubuntu-latest
         environment: production
+        timeout-minutes: 15
 
         steps:
             - uses: actions/checkout@v4
@@ -35,23 +36,44 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: '20'
+                  node-version: '22'
                   cache: 'pnpm'
+
+            - name: Validate required secrets
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DIRECT_URL: ${{ secrets.DIRECT_URL }}
+                  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+                  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+                  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+              run: |
+                  missing=0
+                  for name in DATABASE_URL DIRECT_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SUPABASE_ANON_KEY; do
+                    value="${!name}"
+                    if [ -z "$value" ]; then
+                      echo "::error title=Missing secret::$name is not set in the production environment"
+                      missing=1
+                    fi
+                  done
+                  exit $missing
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
-              run: pnpm db:generate
+              run: pnpm --filter @bin-tracker/db generate
 
+            # Migrations must use the DIRECT connection (not the pooler).
+            # We set DATABASE_URL=DIRECT_URL here so this works even before prisma.config.ts
+            # is updated to read DIRECT_URL separately.
             - name: Apply migrations to Supabase
-              run: pnpm db:migrate
+              run: pnpm --filter @bin-tracker/db migrate:deploy
               env:
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DATABASE_URL: ${{ secrets.DIRECT_URL }}
                   DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
             - name: Bootstrap seed (skipped if data already exists)
-              run: pnpm db:seed
+              run: pnpm --filter @bin-tracker/db seed
               env:
                   DATABASE_URL: ${{ secrets.DATABASE_URL }}
                   DIRECT_URL: ${{ secrets.DIRECT_URL }}
@@ -62,7 +84,7 @@ jobs:
                   SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
             - name: Migration status
-              run: pnpm db:migrate:status
+              run: pnpm --filter @bin-tracker/db migrate:status
               env:
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DATABASE_URL: ${{ secrets.DIRECT_URL }}
                   DIRECT_URL: ${{ secrets.DIRECT_URL }}

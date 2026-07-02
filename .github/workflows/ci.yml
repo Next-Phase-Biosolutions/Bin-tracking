@@ -18,11 +18,15 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: '20'
+                  node-version: '22'
                   cache: 'pnpm'
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+
+            # @bin-tracker/types imports Prisma types — client must exist before turbo build/lint
+            - name: Generate Prisma Client
+              run: pnpm --filter @bin-tracker/db generate
 
             - name: Lint
               run: pnpm lint
@@ -61,20 +65,20 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: '20'
+                  node-version: '22'
                   cache: 'pnpm'
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
-              run: pnpm db:generate
+              run: pnpm --filter @bin-tracker/db generate
 
             - name: Apply migrations (migrate deploy)
-              run: pnpm db:migrate
+              run: pnpm --filter @bin-tracker/db migrate:deploy
 
             - name: Seed test data
-              run: pnpm db:seed:local
+              run: pnpm --filter @bin-tracker/db seed:local
 
             - name: Typecheck
               run: pnpm typecheck
