@@ -1,0 +1,68 @@
+name: Deploy Production
+
+# Applies Prisma migrations (and optional bootstrap seed) to Supabase production.
+# Run automatically on merge to main, or manually via workflow_dispatch.
+#
+# Required GitHub environment: production
+# Required secrets (environment or repo):
+#   DATABASE_URL          — Supabase transaction pooler (port 6543, ?pgbouncer=true)
+#   DIRECT_URL            — Supabase direct connection (port 5432)
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_ANON_KEY
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+
+concurrency:
+    group: deploy-production
+    cancel-in-progress: false
+
+jobs:
+    migrate:
+        name: Migrate production database
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9.15.4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Generate Prisma Client
+              run: pnpm db:generate
+
+            - name: Apply migrations to Supabase
+              run: pnpm db:migrate
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+            - name: Bootstrap seed (skipped if data already exists)
+              run: pnpm db:seed
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DIRECT_URL: ${{ secrets.DIRECT_URL }}
+                  NODE_ENV: production
+                  SEED_ONLY_IF_EMPTY: 'true'
+                  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+                  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+                  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+            - name: Migration status
+              run: pnpm db:migrate:status
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DIRECT_URL: ${{ secrets.DIRECT_URL }}
