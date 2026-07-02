@@ -81,7 +81,7 @@ jobs:
               run: pnpm --filter @bin-tracker/db migrate:deploy
 
             - name: Seed test data
-              run: pnpm --filter @bin-tracker/db seed:local
+              run: pnpm --filter @bin-tracker/db seed:ci
 
             - name: Test
               run: pnpm test
