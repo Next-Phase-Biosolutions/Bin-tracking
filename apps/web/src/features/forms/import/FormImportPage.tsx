@@ -14,6 +14,8 @@ import type { FormDigitizeDraft, FormFillFrequencyValue, FormTriggerTypeValue } 
 import { trpc } from '../../../lib/trpc';
 import { fileToBase64, cropImageRegion } from './image-utils';
 import { FormDraftLivePreview } from './FormDraftLivePreview';
+import { useSubscription } from '../../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../../components/UpgradePrompt';
 
 const STAGES = ['RECEIVING', 'KILL_FLOOR', 'WET_AGING', 'VALUE_ADD', 'SHIPPING'] as const;
 
@@ -102,6 +104,15 @@ export default function FormImportPage() {
         },
         [digitize],
     );
+
+    const { hasModule } = useSubscription();
+    if (!hasModule('FORMS_AI_DIGITIZE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="FORMS_AI_DIGITIZE" />
+            </div>
+        );
+    }
 
     const handleFile = async (file: File) => {
         const { base64, mimeType: mime } = await fileToBase64(file);

@@ -5,6 +5,8 @@ import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock,
 import { setAuthToken } from '../../lib/trpc';
 import { Link } from 'react-router-dom';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
+import { useSubscription } from '../../context/SubscriptionContext';
 
 type DatePreset = 'all' | '2d' | '7d' | 'custom';
 
@@ -184,6 +186,7 @@ export function DashboardPage() {
     const [customTo, setCustomTo] = useState<string>(toInputDate(new Date()));
     const [calendarOpen, setCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
+    const { hasModule } = useSubscription();
 
     useState(() => { setAuthToken(TEST_ADMIN_TOKEN); });
 
@@ -238,36 +241,54 @@ export function DashboardPage() {
                 </div>
 
                 <nav className="flex flex-col gap-1.5">
+                    {/* Core tracking — never module-gated */}
                     <Link to="/app/driver" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                         <Truck className="w-4 h-4" /><span>Driver</span>
                     </Link>
                     <Link to="/app/bin" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                         <Box className="w-4 h-4" /><span>Bin</span>
                     </Link>
-                    <Link to="/app/animalregistration" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <PawPrint className="w-4 h-4" /><span>Animal Registration</span>
-                    </Link>
-                    <Link to="/app/employees/register" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <UserPlus className="w-4 h-4" /><span>Register Employee</span>
-                    </Link>
-                    <Link to="/app/timesheet" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <Clock className="w-4 h-4" /><span>Timesheet</span>
-                    </Link>
-                    <Link to="/app/guard" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <ScanLine className="w-4 h-4" /><span>Guard Scanner</span>
-                    </Link>
-                    <Link to="/app/shipments" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <Package className="w-4 h-4" /><span>Shipments</span>
-                    </Link>
-                    <Link to="/app/shipments/new" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <PlusCircle className="w-4 h-4" /><span>Record Shipment</span>
-                    </Link>
-                    <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <ClipboardList className="w-4 h-4" /><span>Fill Form</span>
-                    </Link>
-                    <Link to="/app/forms/import" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <PlusCircle className="w-4 h-4" /><span>Create a Form</span>
-                    </Link>
+
+                    {hasModule('ANIMAL_INTAKE') && (
+                        <Link to="/app/animalregistration" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                            <PawPrint className="w-4 h-4" /><span>Animal Registration</span>
+                        </Link>
+                    )}
+                    {hasModule('WORKFORCE') && (
+                        <>
+                            <Link to="/app/employees/register" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                                <UserPlus className="w-4 h-4" /><span>Register Employee</span>
+                            </Link>
+                            <Link to="/app/timesheet" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                                <Clock className="w-4 h-4" /><span>Timesheet</span>
+                            </Link>
+                            <Link to="/app/guard" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                                <ScanLine className="w-4 h-4" /><span>Guard Scanner</span>
+                            </Link>
+                        </>
+                    )}
+                    {hasModule('SHIPMENTS') && (
+                        <>
+                            <Link to="/app/shipments" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                                <Package className="w-4 h-4" /><span>Shipments</span>
+                            </Link>
+                            <Link to="/app/shipments/new" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                                <PlusCircle className="w-4 h-4" /><span>Record Shipment</span>
+                            </Link>
+                        </>
+                    )}
+                    {hasModule('FORMS') && (
+                        <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                            <ClipboardList className="w-4 h-4" /><span>Fill Form</span>
+                        </Link>
+                    )}
+                    {hasModule('FORMS_AI_DIGITIZE') && (
+                        <Link to="/app/forms/import" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
+                            <PlusCircle className="w-4 h-4" /><span>Create a Form</span>
+                        </Link>
+                    )}
+
+                    {/* Core tracking — never module-gated */}
                     <Link to="/app/facility" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                         <Factory className="w-4 h-4" /><span>Facility Dashboard</span>
                     </Link>
@@ -503,7 +524,15 @@ export function DashboardPage() {
             </main>
 
             {selectedCycle && <DetailsSlideover cycle={selectedCycle} onClose={() => setSelectedCycle(null)} />}
-            {anchorModalOpen && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
+            {anchorModalOpen && hasModule('BLOCKCHAIN_ANCHOR') && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
+            {anchorModalOpen && !hasModule('BLOCKCHAIN_ANCHOR') && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setAnchorModalOpen(false)}>
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="relative" onClick={(e) => e.stopPropagation()}>
+                        <UpgradePrompt module="BLOCKCHAIN_ANCHOR" />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

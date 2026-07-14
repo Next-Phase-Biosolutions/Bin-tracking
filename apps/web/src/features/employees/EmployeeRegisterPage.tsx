@@ -4,6 +4,8 @@ import JsBarcode from 'jsbarcode';
 import { Link } from 'react-router-dom';
 import { UserPlus, Download, Printer, CheckCircle2, IdCard } from 'lucide-react';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 type Employee = RouterOutputs['employee']['register'];
 
@@ -30,6 +32,15 @@ export default function EmployeeRegisterPage() {
     const registerMutation = trpc.employee.register.useMutation({
         onSuccess: (employee) => setRegistered(employee),
     });
+    const { hasModule } = useSubscription();
+
+    if (!hasModule('WORKFORCE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
 
     const handleChange = (field: keyof FormState, value: string) => {
         setForm((prev) => ({ ...prev, [field]: value }));

@@ -4,6 +4,8 @@ import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
 import { AnimalForm } from './AnimalForm';
 import { VoiceRecorder } from './VoiceRecorder';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 // farmer.transcribe/register both require stationProcedure — scoped to
 // these two calls rather than a page-level auth flag.
@@ -66,6 +68,15 @@ export default function FarmerRegistrationPage() {
         },
         [transcribeMutation],
     );
+
+    const { hasModule } = useSubscription();
+    if (!hasModule('ANIMAL_INTAKE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="ANIMAL_INTAKE" />
+            </div>
+        );
+    }
 
     const handleFieldChange = (field: keyof ExtractedAnimalFields, value: string) => {
         setFormFields((prev) => ({ ...prev, [field]: value || null }));

@@ -2,6 +2,8 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, PackageCheck } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
 import { ConditionBadge } from './ShipmentsDashboardPage';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 const ACCENT = '#043F2E';
 
@@ -19,6 +21,15 @@ function formatDateTime(value: string | Date | null): string {
 export default function ShipmentDetailPage() {
     const { id = '' } = useParams();
     const query = trpc.shipment.getById.useQuery({ id }, { enabled: id.length > 0 });
+    const { hasModule } = useSubscription();
+
+    if (!hasModule('SHIPMENTS')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="SHIPMENTS" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">

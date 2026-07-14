@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { PackagePlus, CheckCircle2, PackageCheck, LayoutDashboard } from 'lucide-react';
 import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 // This is a kiosk-style page with no user session — both calls it makes
 // (register, facilityOptions) are stationProcedure, so a single scoped
@@ -65,6 +67,15 @@ export default function ShipmentRegisterPage() {
             stationClient.shipment.register.mutate(input),
         onSuccess: (shipment) => setRegistered(shipment),
     });
+    const { hasModule } = useSubscription();
+
+    if (!hasModule('SHIPMENTS')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="SHIPMENTS" />
+            </div>
+        );
+    }
 
     const set = (field: keyof FormState, value: string) =>
         setForm((prev) => ({ ...prev, [field]: value }) as FormState);

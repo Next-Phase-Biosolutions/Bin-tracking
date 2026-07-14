@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Users, LogIn, LogOut, RefreshCw, UserPlus, ScanLine } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 function todayStr(): string {
     return new Date().toISOString().slice(0, 10);
@@ -27,6 +29,15 @@ export default function TimesheetDashboardPage() {
 
     const summaryQuery = trpc.attendance.summary.useQuery(range, { staleTime: 10_000 });
     const recentQuery = trpc.attendance.recent.useQuery({ limit: 20 }, { staleTime: 10_000 });
+    const { hasModule } = useSubscription();
+
+    if (!hasModule('WORKFORCE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
 
     const rows = (summaryQuery.data ?? [])
         .filter((r) => r.sessionCount > 0)

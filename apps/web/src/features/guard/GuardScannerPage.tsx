@@ -4,6 +4,8 @@ import { useMutation } from '@tanstack/react-query';
 import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
 import { QRScanner } from '../../components/QRScanner';
 import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 // attendance.scan requires stationProcedure — scoped to this one call so it
 // doesn't collide with any bearer-gated call elsewhere on the page.
@@ -68,6 +70,15 @@ export default function GuardScannerPage() {
             handheldRef.current?.focus();
         }
     }, [scanMode, showScanPanel, scanMutation.isPending]);
+
+    const { hasModule } = useSubscription();
+    if (!hasModule('WORKFORCE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
 
     const isCheckIn = result?.action === 'CHECK_IN';
 

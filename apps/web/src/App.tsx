@@ -23,6 +23,7 @@ import KillFloorPage from './features/dashboard/KillFloorPage';
 import WetAgingPage from './features/dashboard/WetAgingPage';
 import ValueAddPage from './features/dashboard/ValueAddPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
+import BillingSettingsPage from './features/billing/BillingSettingsPage';
 
 export function App() {
     return (
@@ -45,6 +46,7 @@ export function App() {
             <Route path="/app/forms/new" element={<FormBuilderPage />} />
             <Route path="/app/forms/import" element={<FormImportPage />} />
             <Route path="/admin/orgs" element={<OrgModulesPage />} />
+            <Route path="/settings/billing" element={<BillingSettingsPage />} />
             <Route path="/app/facility" element={<FacilityLayout />}>
                 <Route index element={<FacilityDashboardPage />} />
                 <Route path="receiving" element={<ReceivingZonePage />} />

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { router, orgAdminProcedure, orgProcedure, publicProcedure } from '../trpc/trpc.js';
 import { billingService } from '../services/billing.service.js';
+import { getEnabledModules } from '../services/module.service.js';
 
 export const billingRouter = router({
     /** Starts a Stripe Checkout session for the org to subscribe/upgrade to `plan`. */
@@ -13,6 +14,9 @@ export const billingRouter = router({
 
     /** Current plan/status/renewal date for the org. */
     current: orgProcedure.query(async ({ ctx }) => billingService.getCurrentSubscription(ctx.orgId)),
+
+    /** Modules currently enabled for the org (Task 17: drives nav filtering + hasModule on the frontend). */
+    enabledModules: orgProcedure.query(async ({ ctx }) => getEnabledModules(ctx.prisma, ctx.orgId)),
 
     /**
      * Whether billing is turned on at all. Public (no tenant data) — the
