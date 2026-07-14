@@ -1,36 +1,35 @@
-import { router, protectedProcedure, stationProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure } from '../trpc/trpc.js';
 import {
     shipmentRegisterSchema,
     shipmentGetByIdSchema,
     shipmentListSchema,
 } from '@bin-tracker/validators';
 import { shipmentService } from '../services/shipment.service.js';
-import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const shipmentRouter = router({
     /** Record a new inbound supplier shipment on arrival */
-    register: stationProcedure
+    register: stationOrgProcedure
         .input(shipmentRegisterSchema)
-        .mutation(async ({ input }) => {
-            return shipmentService.register(input, await getDefaultOrganizationId());
+        .mutation(async ({ input, ctx }) => {
+            return shipmentService.register(input, ctx.orgId);
         }),
 
     /** List shipments (optionally filtered by condition) */
-    list: protectedProcedure
+    list: orgProcedure
         .input(shipmentListSchema)
-        .query(async ({ input }) => {
-            return shipmentService.list(input);
+        .query(async ({ input, ctx }) => {
+            return shipmentService.list(ctx.orgId, input);
         }),
 
     /** Fetch a single shipment by id */
-    getById: protectedProcedure
+    getById: orgProcedure
         .input(shipmentGetByIdSchema)
-        .query(async ({ input }) => {
-            return shipmentService.getById(input.id);
+        .query(async ({ input, ctx }) => {
+            return shipmentService.getById(ctx.orgId, input.id);
         }),
 
-    /** Public id/name list of facilities for the arrival form dropdown */
-    facilityOptions: stationProcedure.query(async () => {
-        return shipmentService.facilityOptions();
+    /** Id/name list of facilities for the arrival form dropdown (station-scoped to the station's org) */
+    facilityOptions: stationOrgProcedure.query(async ({ ctx }) => {
+        return shipmentService.facilityOptions(ctx.orgId);
     }),
 });

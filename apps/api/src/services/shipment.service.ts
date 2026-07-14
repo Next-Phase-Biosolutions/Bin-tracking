@@ -75,9 +75,9 @@ export const shipmentService = {
         });
     },
 
-    async list(input: ShipmentListInput): Promise<ShipmentWithFacility[]> {
+    async list(orgId: string, input: ShipmentListInput): Promise<ShipmentWithFacility[]> {
         const rows = await prisma.shipment.findMany({
-            where: input.condition ? { condition: input.condition } : undefined,
+            where: { organizationId: orgId, ...(input.condition ? { condition: input.condition } : {}) },
             orderBy: { receivedAt: 'desc' },
             take: input.limit,
             include: { facility: { select: { name: true } } },
@@ -85,21 +85,23 @@ export const shipmentService = {
         return rows.map(toWithFacility);
     },
 
-    async getById(id: string): Promise<ShipmentWithFacility> {
+    async getById(orgId: string, id: string): Promise<ShipmentWithFacility> {
         const row = await prisma.shipment.findUnique({
             where: { id },
             include: { facility: { select: { name: true } } },
         });
-        if (!row) {
+        // Cross-org mismatch reports as NOT_FOUND (never FORBIDDEN) — same
+        // discipline as cycle.service.ts.
+        if (!row || row.organizationId !== orgId) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Shipment not found' });
         }
         return toWithFacility(row);
     },
 
-    /** Lightweight id/name list of facilities for the (open) arrival form dropdown. */
-    async facilityOptions(): Promise<{ id: string; name: string }[]> {
+    /** Lightweight id/name list of facilities for the arrival form dropdown. */
+    async facilityOptions(orgId: string): Promise<{ id: string; name: string }[]> {
         return prisma.facility.findMany({
-            where: { deletedAt: null },
+            where: { organizationId: orgId, deletedAt: null },
             select: { id: true, name: true },
             orderBy: { name: 'asc' },
         });
