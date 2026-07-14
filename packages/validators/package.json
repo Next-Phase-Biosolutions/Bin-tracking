@@ -16,6 +16,7 @@
         "clean": "rm -rf dist"
     },
     "dependencies": {
+        "@bin-tracker/types": "workspace:*",
         "zod": "^3.24.0"
     },
     "devDependencies": {
