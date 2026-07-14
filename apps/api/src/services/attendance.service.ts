@@ -30,11 +30,11 @@ export const attendanceService = {
      *
      * Runs Serializable to prevent a double-tap from opening two sessions.
      */
-    async scan(input: AttendanceScanInput): Promise<AttendanceScanResult> {
-        // qrCode is now unique per-organization (not globally) — findFirst until
-        // Task 8 adds real org scoping to this lookup.
-        const employee = await prisma.employee.findFirst({
-            where: { qrCode: input.qrCode },
+    async scan(orgId: string, input: AttendanceScanInput): Promise<AttendanceScanResult> {
+        // qrCode is unique per-organization — look up via the compound key so a
+        // badge from another org's namespace can never resolve here.
+        const employee = await prisma.employee.findUnique({
+            where: { organizationId_qrCode: { organizationId: orgId, qrCode: input.qrCode } },
         });
 
         if (!employee) {
@@ -141,7 +141,7 @@ export const attendanceService = {
      * Closed sessions use their recorded duration; an open session counts
      * elapsed time up to "now".
      */
-    async summary(input: AttendanceSummaryInput): Promise<EmployeeHoursSummary[]> {
+    async summary(orgId: string, input: AttendanceSummaryInput): Promise<EmployeeHoursSummary[]> {
         const now = new Date();
         const from = input.from ? new Date(input.from) : undefined;
         const to = input.to ? new Date(input.to) : undefined;
@@ -150,6 +150,7 @@ export const attendanceService = {
             from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } : undefined;
 
         const employees = await prisma.employee.findMany({
+            where: { organizationId: orgId },
             orderBy: { fullName: 'asc' },
             include: {
                 sessions: {
@@ -184,8 +185,11 @@ export const attendanceService = {
     },
 
     /** Recent scan feed for the dashboard. */
-    async recent(input: AttendanceRecentInput) {
+    async recent(orgId: string, input: AttendanceRecentInput) {
+        // AttendanceEvent has no organizationId column of its own — it chains
+        // through Employee, so the org boundary is enforced via relation filter.
         const events = await prisma.attendanceEvent.findMany({
+            where: { employee: { organizationId: orgId } },
             orderBy: { scannedAt: 'desc' },
             take: input.limit,
             include: { employee: true },

@@ -2,9 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── In-memory Prisma fake ────────────────────────────────────
 // Mirrors only the queries attendance.service.ts actually uses.
+//
+// Regression focus: WorkSession/AttendanceEvent have no organizationId
+// column of their own (they chain through Employee) — before this batch,
+// summary() and recent() had no org filter at all (real cross-tenant
+// leaks), and scan()'s employee lookup used a global findFirst on qrCode
+// even though qrCode is only unique per-organization.
 
 interface FakeEmployee {
     id: string;
+    organizationId: string;
     employeeCode: string;
     fullName: string;
     qrCode: string;
@@ -45,8 +52,20 @@ const fakePrisma = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 vi.mock('@bin-tracker/db', () => {
     const employee = {
-        findFirst: ({ where }: { where: { qrCode?: string } }) =>
-            Promise.resolve(store.employees.find((e) => e.qrCode === where.qrCode) ?? null),
+        findUnique: ({ where }: { where: { organizationId_qrCode: { organizationId: string; qrCode: string } } }) =>
+            Promise.resolve(
+                store.employees.find(
+                    (e) =>
+                        e.organizationId === where.organizationId_qrCode.organizationId &&
+                        e.qrCode === where.organizationId_qrCode.qrCode,
+                ) ?? null,
+            ),
+        findMany: ({ where }: { where: { organizationId: string } }) =>
+            Promise.resolve(
+                store.employees
+                    .filter((e) => e.organizationId === where.organizationId)
+                    .map((e) => ({ ...e, sessions: store.sessions.filter((s) => s.employeeId === e.id) })),
+            ),
     };
     const workSession = {
         findFirst: ({ where, orderBy }: { where: { employeeId: string; checkOutAt?: null }; orderBy?: { checkInAt?: 'asc' | 'desc' } }) => {
@@ -92,6 +111,16 @@ vi.mock('@bin-tracker/db', () => {
             const session = store.sessions.find((s) => s.id === event.sessionId);
             return Promise.resolve({ ...event, session });
         },
+        findMany: ({ where }: { where: { employee: { organizationId: string } } }) => {
+            const orgEmployeeIds = new Set(
+                store.employees.filter((e) => e.organizationId === where.employee.organizationId).map((e) => e.id),
+            );
+            const rows = store.events
+                .filter((e) => orgEmployeeIds.has(e.employeeId))
+                .sort((a, b) => b.scannedAt.getTime() - a.scannedAt.getTime())
+                .map((e) => ({ ...e, employee: store.employees.find((emp) => emp.id === e.employeeId)! }));
+            return Promise.resolve(rows);
+        },
         create: ({ data }: { data: Omit<FakeEvent, 'id'> }) => {
             const event: FakeEvent = { id: nextId('e'), ...data };
             store.events.push(event);
@@ -112,9 +141,13 @@ vi.mock('@bin-tracker/db', () => {
 // Import AFTER the mock is registered.
 const { attendanceService } = await import('./attendance.service.js');
 
+const ORG_A = 'org-a';
+const ORG_B = 'org-b';
+
 function seedEmployee(overrides: Partial<FakeEmployee> = {}): FakeEmployee {
     const employee: FakeEmployee = {
         id: nextId('emp'),
+        organizationId: ORG_A,
         employeeCode: 'EMP-TEST',
         fullName: 'Jane Doe',
         qrCode: 'ATT-token-1',
@@ -125,17 +158,17 @@ function seedEmployee(overrides: Partial<FakeEmployee> = {}): FakeEmployee {
     return employee;
 }
 
-describe('attendanceService.scan', () => {
-    beforeEach(() => {
-        store.employees.length = 0;
-        store.sessions.length = 0;
-        store.events.length = 0;
-        store.seq = 0;
-    });
+beforeEach(() => {
+    store.employees.length = 0;
+    store.sessions.length = 0;
+    store.events.length = 0;
+    store.seq = 0;
+});
 
+describe('attendanceService.scan', () => {
     it('opens a session (CHECK_IN) on first scan', async () => {
         const emp = seedEmployee();
-        const result = await attendanceService.scan({ qrCode: emp.qrCode });
+        const result = await attendanceService.scan(ORG_A, { qrCode: emp.qrCode });
 
         expect(result.action).toBe('CHECK_IN');
         expect(result.debounced).toBe(false);
@@ -165,7 +198,7 @@ describe('attendanceService.scan', () => {
             source: null,
         });
 
-        const result = await attendanceService.scan({ qrCode: emp.qrCode });
+        const result = await attendanceService.scan(ORG_A, { qrCode: emp.qrCode });
 
         expect(result.action).toBe('CHECK_OUT');
         expect(result.durationMin).toBeGreaterThanOrEqual(119);
@@ -175,8 +208,8 @@ describe('attendanceService.scan', () => {
 
     it('debounces an accidental double scan', async () => {
         const emp = seedEmployee();
-        await attendanceService.scan({ qrCode: emp.qrCode }); // CHECK_IN
-        const second = await attendanceService.scan({ qrCode: emp.qrCode }); // immediate re-scan
+        await attendanceService.scan(ORG_A, { qrCode: emp.qrCode }); // CHECK_IN
+        const second = await attendanceService.scan(ORG_A, { qrCode: emp.qrCode }); // immediate re-scan
 
         expect(second.debounced).toBe(true);
         expect(second.action).toBe('CHECK_IN');
@@ -186,11 +219,42 @@ describe('attendanceService.scan', () => {
     });
 
     it('rejects an unknown QR code', async () => {
-        await expect(attendanceService.scan({ qrCode: 'nope' })).rejects.toThrow();
+        await expect(attendanceService.scan(ORG_A, { qrCode: 'nope' })).rejects.toThrow();
     });
 
     it('rejects an inactive employee', async () => {
         const emp = seedEmployee({ status: 'INACTIVE', qrCode: 'ATT-inactive' });
-        await expect(attendanceService.scan({ qrCode: emp.qrCode })).rejects.toThrow();
+        await expect(attendanceService.scan(ORG_A, { qrCode: emp.qrCode })).rejects.toThrow();
+    });
+
+    it('rejects a qrCode that belongs to a different org', async () => {
+        const emp = seedEmployee({ organizationId: ORG_B, qrCode: 'ATT-other-org' });
+        await expect(attendanceService.scan(ORG_A, { qrCode: emp.qrCode })).rejects.toThrow();
+    });
+});
+
+describe('attendanceService.summary', () => {
+    it('only includes employees belonging to the requesting org', async () => {
+        seedEmployee({ id: 'emp-a', organizationId: ORG_A, qrCode: 'ATT-a' });
+        seedEmployee({ id: 'emp-b', organizationId: ORG_B, qrCode: 'ATT-b' });
+
+        const result = await attendanceService.summary(ORG_A, {});
+
+        expect(result.map((r) => r.employeeId)).toEqual(['emp-a']);
+    });
+});
+
+describe('attendanceService.recent', () => {
+    it('only includes events for employees in the requesting org', async () => {
+        const empA = seedEmployee({ id: 'emp-a', organizationId: ORG_A, qrCode: 'ATT-a' });
+        const empB = seedEmployee({ id: 'emp-b', organizationId: ORG_B, qrCode: 'ATT-b' });
+        store.events.push(
+            { id: 'ev-a', employeeId: empA.id, sessionId: 's-a', eventType: 'CHECK_IN', scannedAt: new Date(), source: null },
+            { id: 'ev-b', employeeId: empB.id, sessionId: 's-b', eventType: 'CHECK_IN', scannedAt: new Date(), source: null },
+        );
+
+        const result = await attendanceService.recent(ORG_A, { limit: 10 });
+
+        expect(result.map((r) => r.id)).toEqual(['ev-a']);
     });
 });
