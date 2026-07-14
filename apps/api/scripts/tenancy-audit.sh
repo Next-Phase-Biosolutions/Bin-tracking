@@ -25,11 +25,26 @@
 #
 # HOW THIS FAILS ON A REGRESSION: if a new prisma.<model>.<method>( call is
 # added anywhere in apps/api/src/services/ without organizationId on that
-# same line, its (file, line-content) pair will not be in ALLOWLIST below,
-# so the diff in step 3 is non-empty and the script exits 1. Editing an
-# *existing* allowlisted line's content also drops it out of the allowlist
-# (forcing re-justification) unless the edit is only to add organizationId
-# to that same line, in which case the grep stops matching it entirely.
+# same line, its (file, line-content) pair either won't be in ALLOWLIST at
+# all, or will push that pair's occurrence COUNT past what ALLOWLIST lists
+# for it — either way the script exits 1. Editing an *existing* allowlisted
+# line's content also drops it out of the allowlist (forcing
+# re-justification) unless the edit is only to add organizationId to that
+# same line, in which case the grep stops matching it entirely.
+#
+# COUNTING, NOT SET MEMBERSHIP: several files legitimately contain
+# byte-identical repeated lines (e.g. dashboard.service.ts has the literal
+# line "prisma.binCycle.count({" at four call sites, all org-scoped via a
+# `cycleFilter` spread a few lines below). A plain set-diff (sort -u +
+# comm -23) would collapse those four hits into one string, so ONE
+# allowlist entry would silently cover a THIRD-PARTY, brand-new, genuinely
+# unscoped call added later with the same line text — the audit would pass
+# with zero new entries. To close that hole, CURRENT keeps one line per
+# actual grep hit (no dedup) and ALLOWLIST lists a legitimately-repeated
+# line exactly as many times as it legitimately occurs. The comparison
+# below is a per-key occurrence count: a key fails only when CURRENT's
+# count for it exceeds ALLOWLIST's count for it, which is exactly "there
+# are more of this exact line than we've reviewed."
 #
 # Known limitation: this is a textual tripwire, not a semantic checker. It
 # cannot see a regression introduced by changing a shared filter variable's
@@ -44,18 +59,34 @@ SERVICES_DIR="apps/api/src/services"
 
 RAW_HITS=$(grep -rn "prisma\.\(facility\|binType\|bin\|binCycle\|employee\|shipment\|formTemplate\|animalRegistration\|settings\|payrollRun\)\." "$SERVICES_DIR" | grep -v organizationId || true)
 
-CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sort -u)
+# NOTE: sort (not sort -u) — duplicates are kept so occurrence counts are
+# preserved. See "COUNTING, NOT SET MEMBERSHIP" above.
+CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sort)
 
 # Written to a temp file (rather than a command-substituted heredoc) because
 # bash 3.2 — the default /bin/bash on macOS — mishandles a heredoc nested
 # inside $(...).
+#
+# Lines that legitimately occur more than once in the codebase with
+# byte-identical (file, content) text are listed here that many times —
+# the count of an entry here IS the reviewed-safe occurrence count, not
+# just a membership flag. See "COUNTING, NOT SET MEMBERSHIP" above. As of
+# this writing the repeated entries are:
+#   dashboard.service.ts  prisma.binCycle.count({                    x4
+#   dashboard.service.ts  prisma.binCycle.findMany({                 x2
+#   dashboard.service.ts  prisma.binCycle.count({ where }),          x2
+#   cycle.service.ts      prisma.binCycle.findMany({                 x2
+#   bin.service.ts        const binType = await prisma.binType.findUnique({  x2
+#   bin.service.ts        const activeBins = await prisma.bin.findMany({     x2
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
 apps/api/src/services/attendance.service.ts	const employee = await prisma.employee.findUnique({
 apps/api/src/services/attendance.service.ts	const employees = await prisma.employee.findMany({
 apps/api/src/services/bin.service.ts	const activeBins = await prisma.bin.findMany({
+apps/api/src/services/bin.service.ts	const activeBins = await prisma.bin.findMany({
 apps/api/src/services/bin.service.ts	const bin = await prisma.bin.findFirst({
+apps/api/src/services/bin.service.ts	const binType = await prisma.binType.findUnique({
 apps/api/src/services/bin.service.ts	const binType = await prisma.binType.findUnique({
 apps/api/src/services/bin.service.ts	const exactBin = await prisma.bin.findUnique({
 apps/api/src/services/bin.service.ts	let bin = await prisma.bin.findUnique({
@@ -67,9 +98,15 @@ apps/api/src/services/cycle.service.ts	const bin = await prisma.bin.findFirst({
 apps/api/src/services/cycle.service.ts	const cycle = await prisma.binCycle.findUnique({
 apps/api/src/services/cycle.service.ts	prisma.binCycle.count({ where }),
 apps/api/src/services/cycle.service.ts	prisma.binCycle.findMany({
+apps/api/src/services/cycle.service.ts	prisma.binCycle.findMany({
 apps/api/src/services/dashboard.service.ts	const overdueByFacility = await prisma.binCycle.groupBy({
 apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({
+apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({
+apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({
+apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({
 apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({ where }),
+apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({ where }),
+apps/api/src/services/dashboard.service.ts	prisma.binCycle.findMany({
 apps/api/src/services/dashboard.service.ts	prisma.binCycle.findMany({
 apps/api/src/services/dashboard.service.ts	prisma.facility.findMany({
 apps/api/src/services/employee.service.ts	const employee = await prisma.employee.findUnique({ where: { id } });
@@ -94,7 +131,22 @@ apps/api/src/services/shipment.service.ts	const rows = await prisma.shipment.fin
 apps/api/src/services/shipment.service.ts	return prisma.facility.findMany({
 EOF
 
-UNEXPLAINED=$(comm -23 <(echo "$CURRENT") <(sort -u "$ALLOWLIST_FILE") || true)
+# Occurrence-count comparison (not set membership): for each (file, content)
+# key, awk's associative arrays (native to awk, unlike bash 3.2, so no
+# bash-4 dependency) tally how many times it appears in CURRENT vs.
+# ALLOWLIST_FILE. A key is unexplained only for the amount by which
+# CURRENT's count exceeds ALLOWLIST's count — i.e. a new, additional
+# occurrence of an already-allowlisted line, not just a brand-new string.
+UNEXPLAINED=$(awk -F'\t' '
+    NR==FNR { cur[$0]++; next }
+    { allow[$0]++ }
+    END {
+        for (key in cur) {
+            excess = cur[key] - allow[key]
+            for (i = 0; i < excess; i++) print key
+        }
+    }
+' <(echo "$CURRENT") "$ALLOWLIST_FILE" | sort || true)
 
 if [ -n "$UNEXPLAINED" ]; then
     echo "TENANCY AUDIT FAILED"
