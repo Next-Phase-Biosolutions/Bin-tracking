@@ -1,10 +1,11 @@
-import { router, orgOpsProcedure } from '../trpc/trpc.js';
+import { router, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
 import { payrollPeriodSchema, payrollListSchema } from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
 
 export const payrollRouter = router({
     /** Build or rebuild a month's payroll from recorded work sessions */
     computeRun: orgOpsProcedure
+        .use(requireModule('PAYROLL'))
         .input(payrollPeriodSchema)
         .mutation(async ({ ctx, input }) => {
             return payrollService.computeRun(ctx.orgId, input);
@@ -12,6 +13,7 @@ export const payrollRouter = router({
 
     /** Fetch a single run with line items + exceptions */
     getRun: orgOpsProcedure
+        .use(requireModule('PAYROLL'))
         .input(payrollPeriodSchema)
         .query(async ({ ctx, input }) => {
             return payrollService.getRun(ctx.orgId, input);
@@ -19,6 +21,7 @@ export const payrollRouter = router({
 
     /** List recent runs (newest first) */
     listRuns: orgOpsProcedure
+        .use(requireModule('PAYROLL'))
         .input(payrollListSchema)
         .query(async ({ ctx, input }) => {
             return payrollService.listRuns(ctx.orgId, input);

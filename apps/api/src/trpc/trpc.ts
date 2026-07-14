@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
+import type { ModuleKey } from '@bin-tracker/types';
 import type { Context } from './context.js';
 import { requireRole, requireFacilityAccess, requireAssignedDriver } from './middleware.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
@@ -99,3 +100,30 @@ export const orgAdminProcedure = t.procedure.use(requireRole('ADMIN')).use(hasOr
 export const orgOpsProcedure = t.procedure.use(requireRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
 export const stationOrgProcedure = stationProcedure.use(hasOrg);
 export const orgAssignedDriverProcedure = assignedDriverProcedure.use(hasOrg);
+
+/**
+ * Module-gating middleware — denies access unless the calling org has an
+ * enabled OrganizationModule row for the given module key. Reflects the
+ * org's actual assigned modules (Task 12), not just its plan tier, so a
+ * manually-granted module (Task 16) is honored exactly like a plan-default
+ * one.
+ */
+export function requireModule(module: ModuleKey) {
+    return middleware(async ({ ctx, next }) => {
+        if (!ctx.orgId) throw new TRPCError({ code: 'FORBIDDEN', message: 'No organization' });
+        const row = await ctx.prisma.organizationModule.findUnique({
+            where: { orgId_module: { orgId: ctx.orgId, module } },
+        });
+        // No row = never provisioned for this org (shouldn't happen after Task 12's
+        // provisioning/backfill) → deny, never default to enabled.
+        if (!row?.enabled) {
+            throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: `This feature (${module}) is not enabled for your organization. Contact your account manager to enable it.`,
+            });
+        }
+        // Rebuild (not just pass through) so ctx.orgId's non-null narrowing
+        // survives into downstream procedures — same pattern as hasOrg below.
+        return next({ ctx: { ...ctx, orgId: ctx.orgId } });
+    });
+}

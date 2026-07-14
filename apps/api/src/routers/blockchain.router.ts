@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, orgAdminProcedure } from '../trpc/trpc.js';
+import { router, orgAdminProcedure, requireModule } from '../trpc/trpc.js';
 import { blockchainService } from '../services/blockchain.service.js';
 
 export const blockchainRouter = router({
@@ -9,6 +9,7 @@ export const blockchainRouter = router({
      * Admin-only — built using orgAdminProcedure which enforces ADMIN role + org resolution.
      */
     getDailySummary: orgAdminProcedure
+        .use(requireModule('BLOCKCHAIN_ANCHOR'))
         .input(
             z.object({
                 fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
@@ -24,6 +25,7 @@ export const blockchainRouter = router({
      * Admin-only.
      */
     confirmAnchor: orgAdminProcedure
+        .use(requireModule('BLOCKCHAIN_ANCHOR'))
         .input(
             z.object({
                 cycleIds: z.array(z.string().cuid()).min(1, 'At least one cycle ID is required'),

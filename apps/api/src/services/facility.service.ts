@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput } from '@bin-tracker/validators';
 import { handlePrismaError } from '../lib/errors.js';
 
@@ -61,6 +62,21 @@ export const facilityService = {
     },
 
     async create(orgId: string, input: CreateFacilityInput) {
+        // Every org gets a Subscription row at provisioning time (org-provision.ts),
+        // so this should always resolve — if it's ever missing, skip the quantity
+        // check rather than block facility creation on an unrelated invariant break.
+        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+        const maxFacilities = subscription ? PLAN_LIMITS[subscription.plan].maxFacilities : -1;
+        if (maxFacilities !== -1) {
+            const count = await prisma.facility.count({ where: { organizationId: orgId, deletedAt: null } });
+            if (count >= maxFacilities) {
+                throw new TRPCError({
+                    code: 'FORBIDDEN',
+                    message: `Your plan allows up to ${maxFacilities} facilities. Upgrade your plan to add more.`,
+                });
+            }
+        }
+
         try {
             return await prisma.facility.create({ data: { ...input, organizationId: orgId } });
         } catch (error) {

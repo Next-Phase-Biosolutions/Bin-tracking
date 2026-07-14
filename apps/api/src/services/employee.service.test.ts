@@ -19,7 +19,10 @@ interface FakeEmployee {
 }
 
 const store = vi.hoisted(() => {
-    return { employees: [] as FakeEmployee[] };
+    return {
+        employees: [] as FakeEmployee[],
+        subscription: null as { plan: 'STARTER' | 'PRO' | 'ENTERPRISE' } | null,
+    };
 });
 
 vi.mock('@bin-tracker/db', () => {
@@ -32,9 +35,23 @@ vi.mock('@bin-tracker/db', () => {
             ),
         findUnique: ({ where }: { where: { id: string } }) =>
             Promise.resolve(store.employees.find((e) => e.id === where.id) ?? null),
+        count: ({ where }: { where: { organizationId: string; status?: string } }) =>
+            Promise.resolve(
+                store.employees.filter(
+                    (e) => e.organizationId === where.organizationId && (!where.status || e.status === where.status),
+                ).length,
+            ),
+        create: ({ data }: { data: Omit<FakeEmployee, 'createdAt'> }) => {
+            const created = makeEmployee(data);
+            store.employees.push(created);
+            return Promise.resolve(created);
+        },
+    };
+    const subscription = {
+        findUnique: () => Promise.resolve(store.subscription),
     };
 
-    return { prisma: { employee } };
+    return { prisma: { employee, subscription } };
 });
 
 const { employeeService } = await import('./employee.service.js');
@@ -53,6 +70,7 @@ function makeEmployee(overrides: Partial<FakeEmployee>): FakeEmployee {
 
 beforeEach(() => {
     store.employees = [];
+    store.subscription = null;
 });
 
 describe('employeeService.list', () => {
@@ -81,5 +99,38 @@ describe('employeeService.getById', () => {
         const result = await employeeService.getById('org-a', 'emp-a');
 
         expect(result.id).toBe('emp-a');
+    });
+});
+
+describe('employeeService.register — plan quantity limit', () => {
+    it('rejects with FORBIDDEN once the org is at its plan maxEmployees', async () => {
+        store.subscription = { plan: 'STARTER' }; // maxEmployees: 25
+        for (let i = 0; i < 25; i += 1) {
+            store.employees.push(makeEmployee({ id: `emp-${i}`, organizationId: 'org-a' }));
+        }
+
+        await expect(
+            employeeService.register({ fullName: 'New Hire' }, 'org-a'),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('allows registering under the limit', async () => {
+        store.subscription = { plan: 'STARTER' };
+        store.employees.push(makeEmployee({ id: 'emp-0', organizationId: 'org-a' }));
+
+        const result = await employeeService.register({ fullName: 'New Hire' }, 'org-a');
+
+        expect(result.organizationId).toBe('org-a');
+    });
+
+    it('treats maxEmployees: -1 (ENTERPRISE) as unlimited', async () => {
+        store.subscription = { plan: 'ENTERPRISE' };
+        for (let i = 0; i < 500; i += 1) {
+            store.employees.push(makeEmployee({ id: `emp-${i}`, organizationId: 'org-a' }));
+        }
+
+        const result = await employeeService.register({ fullName: 'New Hire' }, 'org-a');
+
+        expect(result.organizationId).toBe('org-a');
     });
 });

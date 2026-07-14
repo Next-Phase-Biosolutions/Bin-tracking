@@ -1,4 +1,4 @@
-import { router, orgProcedure, stationOrgProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure, requireModule } from '../trpc/trpc.js';
 import {
     shipmentRegisterSchema,
     shipmentGetByIdSchema,
@@ -9,6 +9,7 @@ import { shipmentService } from '../services/shipment.service.js';
 export const shipmentRouter = router({
     /** Record a new inbound supplier shipment on arrival */
     register: stationOrgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentRegisterSchema)
         .mutation(async ({ input, ctx }) => {
             return shipmentService.register(input, ctx.orgId);
@@ -16,6 +17,7 @@ export const shipmentRouter = router({
 
     /** List shipments (optionally filtered by condition) */
     list: orgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentListSchema)
         .query(async ({ input, ctx }) => {
             return shipmentService.list(ctx.orgId, input);
@@ -23,13 +25,16 @@ export const shipmentRouter = router({
 
     /** Fetch a single shipment by id */
     getById: orgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentGetByIdSchema)
         .query(async ({ input, ctx }) => {
             return shipmentService.getById(ctx.orgId, input.id);
         }),
 
     /** Id/name list of facilities for the arrival form dropdown (station-scoped to the station's org) */
-    facilityOptions: stationOrgProcedure.query(async ({ ctx }) => {
-        return shipmentService.facilityOptions(ctx.orgId);
-    }),
+    facilityOptions: stationOrgProcedure
+        .use(requireModule('SHIPMENTS'))
+        .query(async ({ ctx }) => {
+            return shipmentService.facilityOptions(ctx.orgId);
+        }),
 });

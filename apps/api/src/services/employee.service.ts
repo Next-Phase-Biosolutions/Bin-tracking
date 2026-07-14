@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import type { Employee } from '@bin-tracker/db';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type {
     EmployeeRegisterInput,
     EmployeeListInput,
@@ -30,6 +31,21 @@ export const employeeService = {
      * Retries on the rare code/token collision.
      */
     async register(input: EmployeeRegisterInput, organizationId: string): Promise<Employee> {
+        // Every org gets a Subscription row at provisioning time (org-provision.ts),
+        // so this should always resolve — if it's ever missing, skip the quantity
+        // check rather than block employee registration on an unrelated invariant break.
+        const subscription = await prisma.subscription.findUnique({ where: { orgId: organizationId } });
+        const maxEmployees = subscription ? PLAN_LIMITS[subscription.plan].maxEmployees : -1;
+        if (maxEmployees !== -1) {
+            const count = await prisma.employee.count({ where: { organizationId, status: 'ACTIVE' } });
+            if (count >= maxEmployees) {
+                throw new TRPCError({
+                    code: 'FORBIDDEN',
+                    message: `Your plan allows up to ${maxEmployees} employees. Upgrade your plan to add more.`,
+                });
+            }
+        }
+
         const MAX_ATTEMPTS = 5;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {

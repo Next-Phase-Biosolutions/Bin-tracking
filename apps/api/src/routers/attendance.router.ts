@@ -1,4 +1,4 @@
-import { router, orgProcedure, stationOrgProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure, requireModule } from '../trpc/trpc.js';
 import {
     attendanceScanSchema,
     attendanceSummarySchema,
@@ -9,6 +9,7 @@ import { attendanceService } from '../services/attendance.service.js';
 export const attendanceRouter = router({
     /** Guard scan — toggles check-in / check-out for the scanned badge */
     scan: stationOrgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceScanSchema)
         .mutation(async ({ input, ctx }) => {
             return attendanceService.scan(ctx.orgId, input);
@@ -16,6 +17,7 @@ export const attendanceRouter = router({
 
     /** Per-employee total hours for the timesheet dashboard */
     summary: orgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceSummarySchema)
         .query(async ({ input, ctx }) => {
             return attendanceService.summary(ctx.orgId, input);
@@ -23,6 +25,7 @@ export const attendanceRouter = router({
 
     /** Recent scan feed */
     recent: orgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceRecentSchema)
         .query(async ({ input, ctx }) => {
             return attendanceService.recent(ctx.orgId, input);
