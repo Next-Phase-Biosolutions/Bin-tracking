@@ -102,6 +102,22 @@ export const stationOrgProcedure = stationProcedure.use(hasOrg);
 export const orgAssignedDriverProcedure = assignedDriverProcedure.use(hasOrg);
 
 /**
+ * Platform-admin procedure — for the SaaS operator's internal tooling only
+ * (e.g. Task 16's per-org module toggle panel). `isPlatformAdmin` is an
+ * orthogonal, org-independent flag on `User`, deliberately separate from the
+ * org-scoped `ADMIN` role: an org's ADMIN must never see or modify another
+ * org's data, but the platform admin operates across all orgs. There is no
+ * self-serve way to set this flag — it's set manually via psql/Prisma Studio.
+ */
+const isPlatformAdmin = middleware(async ({ ctx, next }) => {
+    if (!ctx.user?.isPlatformAdmin) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Platform admin access required' });
+    }
+    return next({ ctx });
+});
+export const platformAdminProcedure = protectedProcedure.use(isPlatformAdmin);
+
+/**
  * Module-gating middleware — denies access unless the calling org has an
  * enabled OrganizationModule row for the given module key. Reflects the
  * org's actual assigned modules (Task 12), not just its plan tier, so a

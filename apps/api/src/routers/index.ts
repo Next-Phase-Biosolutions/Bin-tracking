@@ -11,6 +11,7 @@ import { attendanceRouter } from './attendance.router.js';
 import { shipmentRouter } from './shipment.router.js';
 import { payrollRouter } from './payroll.router.js';
 import { billingRouter } from './billing.router.js';
+import { adminRouter } from './admin.router.js';
 
 export const appRouter = router({
     bin: binRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
     shipment: shipmentRouter,
     payroll: payrollRouter,
     billing: billingRouter,
+    admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

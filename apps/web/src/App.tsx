@@ -22,6 +22,7 @@ import ReceivingZonePage from './features/dashboard/ReceivingZonePage';
 import KillFloorPage from './features/dashboard/KillFloorPage';
 import WetAgingPage from './features/dashboard/WetAgingPage';
 import ValueAddPage from './features/dashboard/ValueAddPage';
+import OrgModulesPage from './features/admin/OrgModulesPage';
 
 export function App() {
     return (
@@ -43,6 +44,7 @@ export function App() {
             <Route path="/app/forms" element={<FormListPage />} />
             <Route path="/app/forms/new" element={<FormBuilderPage />} />
             <Route path="/app/forms/import" element={<FormImportPage />} />
+            <Route path="/admin/orgs" element={<OrgModulesPage />} />
             <Route path="/app/facility" element={<FacilityLayout />}>
                 <Route index element={<FacilityDashboardPage />} />
                 <Route path="receiving" element={<ReceivingZonePage />} />

@@ -222,12 +222,13 @@ model UsageCounter {
 // ─── Models ───────────────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      UserRole
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  role            UserRole
+  isPlatformAdmin Boolean  @default(false) // SaaS operator flag, org-independent — set manually via psql/Prisma Studio only, never self-serve
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   facilities   UserFacility[]
   driverCycles BinCycle[]
