@@ -150,6 +150,7 @@ model Station {
   facilityId String
   token      String   @unique
   label      String   @default("Tablet")
+  revokedAt  DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

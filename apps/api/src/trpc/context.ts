@@ -65,10 +65,9 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         if (token) {
             station = await prisma.station.findUnique({
                 where: { token },
-                include: {
-                    facility: { select: { id: true, name: true } },
-                },
+                include: { facility: { select: { id: true, name: true } } },
             });
+            if (station?.revokedAt) station = null; // revoked tokens are dead tokens
         }
     }
 
