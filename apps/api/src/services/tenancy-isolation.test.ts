@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
 
 // ─── Cross-service tenancy isolation suite ────────────────────
 // Batches 1-3 org-scoped every tenant-owned service (bin, cycle, facility,
@@ -83,6 +84,33 @@ interface FakeCycle {
     complianceResult: string | null;
 }
 
+interface FakeShipment {
+    id: string;
+    organizationId: string;
+    shipmentCode: string;
+    supplier: string;
+    condition: 'GOOD' | 'DAMAGED';
+    receivedAt: Date;
+}
+
+interface FakeFormTemplate {
+    id: string;
+    organizationId: string;
+    title: string;
+    description: string | null;
+    stage: string;
+    formType: string;
+    schema: unknown;
+    sourceImageUrl: string | null;
+    triggerType: string | null;
+    triggerConfig: unknown;
+    fillFrequency: string | null;
+    isActive: boolean;
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 const store = vi.hoisted(() => {
     return {
         employees: [] as FakeEmployee[],
@@ -91,6 +119,8 @@ const store = vi.hoisted(() => {
         bins: [] as FakeBin[],
         facilities: [] as FakeFacility[],
         cycles: [] as FakeCycle[],
+        shipments: [] as FakeShipment[],
+        formTemplates: [] as FakeFormTemplate[],
         seq: 0,
     };
 });
@@ -196,6 +226,46 @@ vi.mock('@bin-tracker/db', () => {
                         (!where.type || f.type === where.type),
                 ),
             ),
+        count: ({ where }: { where: { organizationId: string; type?: string; deletedAt: null } }) =>
+            Promise.resolve(
+                store.facilities.filter(
+                    (f) =>
+                        f.organizationId === where.organizationId &&
+                        f.deletedAt === null &&
+                        (!where.type || f.type === where.type),
+                ).length,
+            ),
+    };
+
+    const shipment = {
+        findMany: ({ where }: { where: { organizationId: string; condition?: string } }) =>
+            Promise.resolve(
+                store.shipments
+                    .filter(
+                        (s) => s.organizationId === where.organizationId && (!where.condition || s.condition === where.condition),
+                    )
+                    .map((s) => ({ ...s, facility: null })),
+            ),
+        findUnique: ({ where }: { where: { id: string } }) => {
+            const found = store.shipments.find((s) => s.id === where.id);
+            return Promise.resolve(found ? { ...found, facility: null } : null);
+        },
+    };
+
+    const formTemplate = {
+        findMany: ({ where }: { where: { organizationId: string; stage?: string; isActive?: boolean } }) =>
+            Promise.resolve(
+                store.formTemplates.filter(
+                    (f) =>
+                        f.organizationId === where.organizationId &&
+                        (!where.stage || f.stage === where.stage) &&
+                        (where.isActive === undefined || f.isActive === where.isActive),
+                ),
+            ),
+        findUnique: ({ where }: { where: { id: string } }) => {
+            const found = store.formTemplates.find((f) => f.id === where.id);
+            return Promise.resolve(found ? { ...found } : null);
+        },
     };
 
     const userFacility = {
@@ -236,6 +306,8 @@ vi.mock('@bin-tracker/db', () => {
         facility,
         userFacility,
         binCycle,
+        shipment,
+        formTemplate,
         eventLog,
         $queryRaw: () => Promise.resolve([]),
         $transaction: (cb: (tx: unknown) => unknown) => Promise.resolve(cb(fakePrisma)),
@@ -250,6 +322,9 @@ const { payrollService } = await import('./payroll.service.js');
 const { binService } = await import('./bin.service.js');
 const { cycleService } = await import('./cycle.service.js');
 const { dashboardService } = await import('./dashboard.service.js');
+const { facilityService } = await import('./facility.service.js');
+const { shipmentService } = await import('./shipment.service.js');
+const { formService } = await import('./form.service.js');
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -353,6 +428,43 @@ function seedCycle(overrides: Partial<FakeCycle> = {}): FakeCycle {
     return cycle;
 }
 
+function seedShipment(overrides: Partial<FakeShipment> = {}): FakeShipment {
+    const shipment: FakeShipment = {
+        id: nextId('shp'),
+        organizationId: ORG_A,
+        shipmentCode: 'SHP-TEST',
+        supplier: 'Test Supplier',
+        condition: 'GOOD',
+        receivedAt: new Date(),
+        ...overrides,
+    };
+    store.shipments.push(shipment);
+    return shipment;
+}
+
+function seedFormTemplate(overrides: Partial<FakeFormTemplate> = {}): FakeFormTemplate {
+    const formTemplate: FakeFormTemplate = {
+        id: nextId('form'),
+        organizationId: ORG_A,
+        title: 'Test Form',
+        description: null,
+        stage: 'INTAKE',
+        formType: 'STANDARD',
+        schema: { fields: [] },
+        sourceImageUrl: null,
+        triggerType: null,
+        triggerConfig: null,
+        fillFrequency: null,
+        isActive: true,
+        sortOrder: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...overrides,
+    };
+    store.formTemplates.push(formTemplate);
+    return formTemplate;
+}
+
 beforeEach(() => {
     store.employees.length = 0;
     store.payrollRuns.length = 0;
@@ -360,6 +472,8 @@ beforeEach(() => {
     store.bins.length = 0;
     store.facilities.length = 0;
     store.cycles.length = 0;
+    store.shipments.length = 0;
+    store.formTemplates.length = 0;
     store.seq = 0;
 });
 
@@ -453,6 +567,93 @@ describe('cross-organization tenancy isolation', () => {
             const result = await dashboardService.getStats(ORG_A, [], 'ADMIN');
 
             expect(result.totalActiveBins).toBe(1);
+        });
+    });
+
+    describe('facilityService.list', () => {
+        it('never includes a facility created under a different org', async () => {
+            seedFacility({ id: 'fac-a', organizationId: ORG_A });
+            seedFacility({ id: 'fac-b', organizationId: ORG_B });
+
+            const result = await facilityService.list(ORG_A, { limit: 20 }, [], 'ADMIN');
+
+            expect(result.items.map((f) => f.id)).toEqual(['fac-a']);
+        });
+    });
+
+    describe('facilityService.getById', () => {
+        it('rejects with NOT_FOUND (never FORBIDDEN) for a foreign-org facility', async () => {
+            const facility = seedFacility({ organizationId: ORG_B });
+
+            await expect(facilityService.getById(ORG_A, facility.id, 'user-1', 'ADMIN')).rejects.toMatchObject({
+                code: 'NOT_FOUND',
+            });
+        });
+
+        it('resolves the facility when it belongs to the requesting org', async () => {
+            const facility = seedFacility({ organizationId: ORG_A });
+
+            const result = await facilityService.getById(ORG_A, facility.id, 'user-1', 'ADMIN');
+
+            expect(result.id).toBe(facility.id);
+        });
+    });
+
+    describe('shipmentService.list', () => {
+        it('never includes a shipment registered under a different org', async () => {
+            seedShipment({ id: 'shp-a', organizationId: ORG_A });
+            seedShipment({ id: 'shp-b', organizationId: ORG_B });
+
+            const result = await shipmentService.list(ORG_A, { limit: 100 });
+
+            expect(result.map((s) => s.id)).toEqual(['shp-a']);
+        });
+    });
+
+    describe('shipmentService.getById', () => {
+        it('rejects with NOT_FOUND (never FORBIDDEN) for a foreign-org shipment', async () => {
+            const shipment = seedShipment({ organizationId: ORG_B });
+
+            await expect(shipmentService.getById(ORG_A, shipment.id)).rejects.toMatchObject({
+                code: 'NOT_FOUND',
+            });
+        });
+
+        it('resolves the shipment when it belongs to the requesting org', async () => {
+            const shipment = seedShipment({ organizationId: ORG_A });
+
+            const result = await shipmentService.getById(ORG_A, shipment.id);
+
+            expect(result.id).toBe(shipment.id);
+        });
+    });
+
+    describe('formService.listByStage', () => {
+        it('never includes a form template created under a different org', async () => {
+            seedFormTemplate({ id: 'form-a', organizationId: ORG_A });
+            seedFormTemplate({ id: 'form-b', organizationId: ORG_B });
+
+            const result = await formService.listByStage(fakePrisma as unknown as PrismaClient, ORG_A, 'ALL');
+
+            expect(result.map((f) => f.id)).toEqual(['form-a']);
+        });
+    });
+
+    describe('formService.getById', () => {
+        it('returns null (never another org\'s form) for a foreign-org form template', async () => {
+            const formTemplate = seedFormTemplate({ organizationId: ORG_B });
+
+            const result = await formService.getById(fakePrisma as unknown as PrismaClient, ORG_A, formTemplate.id);
+
+            expect(result).toBeNull();
+        });
+
+        it('resolves the form template when it belongs to the requesting org', async () => {
+            const formTemplate = seedFormTemplate({ organizationId: ORG_A });
+
+            const result = await formService.getById(fakePrisma as unknown as PrismaClient, ORG_A, formTemplate.id);
+
+            expect(result?.id).toBe(formTemplate.id);
         });
     });
 });
