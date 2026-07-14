@@ -1,4 +1,6 @@
 export { prisma } from './client.js';
+export { provisionOrganization, DEFAULT_BIN_TYPES } from './org-provision.js';
+export type { ProvisionOrganizationInput, ProvisionOrganizationResult } from './org-provision.js';
 export type {
     Facility,
     Station,
