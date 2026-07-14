@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../trpc/trpc.js';
+import { router, protectedProcedure, stationProcedure, opsManagerProcedure } from '../trpc/trpc.js';
 import {
     formListByStageSchema,
     formGetByIdSchema,
@@ -11,11 +11,11 @@ import {
 import { formService } from '../services/form.service.js';
 
 export const formRouter = router({
-    listByStage: publicProcedure.input(formListByStageSchema).query(async ({ input, ctx }) => {
+    listByStage: stationProcedure.input(formListByStageSchema).query(async ({ input, ctx }) => {
         return formService.listByStage(ctx.prisma, input.stage);
     }),
 
-    getById: publicProcedure.input(formGetByIdSchema).query(async ({ input, ctx }) => {
+    getById: stationProcedure.input(formGetByIdSchema).query(async ({ input, ctx }) => {
         const form = await formService.getById(ctx.prisma, input.id);
         if (!form) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Form not found' });
@@ -29,13 +29,13 @@ export const formRouter = router({
         });
     }),
 
-    digitizeFromPhoto: publicProcedure
+    digitizeFromPhoto: opsManagerProcedure
         .input(formDigitizeFromPhotoSchema)
         .mutation(async ({ input }) => {
             return formService.digitizeFromPhoto(input.imageBase64, input.mimeType);
         }),
 
-    refineFromRegion: publicProcedure
+    refineFromRegion: opsManagerProcedure
         .input(formRefineFromRegionSchema)
         .mutation(async ({ input }) => {
             const draft = {
@@ -50,11 +50,11 @@ export const formRouter = router({
             );
         }),
 
-    create: publicProcedure.input(formCreateSchema).mutation(async ({ input, ctx }) => {
+    create: opsManagerProcedure.input(formCreateSchema).mutation(async ({ input, ctx }) => {
         return formService.create(ctx.prisma, input);
     }),
 
-    transcribeField: publicProcedure
+    transcribeField: stationProcedure
         .input(formTranscribeFieldSchema)
         .mutation(async ({ input }) => {
             return formService.transcribeField(input);

@@ -1,4 +1,4 @@
-import { router, publicProcedure } from '../trpc/trpc.js';
+import { router, protectedProcedure, opsManagerProcedure } from '../trpc/trpc.js';
 import {
     employeeRegisterSchema,
     employeeGetByIdSchema,
@@ -8,21 +8,21 @@ import { employeeService } from '../services/employee.service.js';
 
 export const employeeRouter = router({
     /** Register a new employee and mint their permanent QR token */
-    register: publicProcedure
+    register: opsManagerProcedure
         .input(employeeRegisterSchema)
         .mutation(async ({ input }) => {
             return employeeService.register(input);
         }),
 
     /** List employees (optionally filtered by status) */
-    list: publicProcedure
+    list: protectedProcedure
         .input(employeeListSchema)
         .query(async ({ input }) => {
             return employeeService.list(input);
         }),
 
     /** Fetch a single employee by id */
-    getById: publicProcedure
+    getById: protectedProcedure
         .input(employeeGetByIdSchema)
         .query(async ({ input }) => {
             return employeeService.getById(input.id);
