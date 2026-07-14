@@ -64,16 +64,19 @@ export const employeeService = {
         });
     },
 
-    async list(input: EmployeeListInput): Promise<Employee[]> {
+    async list(orgId: string, input: EmployeeListInput): Promise<Employee[]> {
         return prisma.employee.findMany({
-            where: input.status ? { status: input.status } : undefined,
+            where: { organizationId: orgId, ...(input.status ? { status: input.status } : {}) },
             orderBy: { createdAt: 'desc' },
         });
     },
 
-    async getById(id: string): Promise<Employee> {
+    async getById(orgId: string, id: string): Promise<Employee> {
         const employee = await prisma.employee.findUnique({ where: { id } });
-        if (!employee) {
+        // Cross-org mismatch reports as NOT_FOUND (never FORBIDDEN) — same
+        // discipline as cycle.service.ts — so a caller can't distinguish
+        // "doesn't exist" from "exists but isn't yours".
+        if (!employee || employee.organizationId !== orgId) {
             throw new TRPCError({
                 code: 'NOT_FOUND',
                 message: 'Employee not found',

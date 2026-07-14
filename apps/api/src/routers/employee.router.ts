@@ -1,31 +1,30 @@
-import { router, protectedProcedure, opsManagerProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, orgOpsProcedure } from '../trpc/trpc.js';
 import {
     employeeRegisterSchema,
     employeeGetByIdSchema,
     employeeListSchema,
 } from '@bin-tracker/validators';
 import { employeeService } from '../services/employee.service.js';
-import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const employeeRouter = router({
     /** Register a new employee and mint their permanent QR token */
-    register: opsManagerProcedure
+    register: orgOpsProcedure
         .input(employeeRegisterSchema)
-        .mutation(async ({ input }) => {
-            return employeeService.register(input, await getDefaultOrganizationId());
+        .mutation(async ({ input, ctx }) => {
+            return employeeService.register(input, ctx.orgId);
         }),
 
     /** List employees (optionally filtered by status) */
-    list: protectedProcedure
+    list: orgProcedure
         .input(employeeListSchema)
-        .query(async ({ input }) => {
-            return employeeService.list(input);
+        .query(async ({ input, ctx }) => {
+            return employeeService.list(ctx.orgId, input);
         }),
 
     /** Fetch a single employee by id */
-    getById: protectedProcedure
+    getById: orgProcedure
         .input(employeeGetByIdSchema)
-        .query(async ({ input }) => {
-            return employeeService.getById(input.id);
+        .query(async ({ input, ctx }) => {
+            return employeeService.getById(ctx.orgId, input.id);
         }),
 });
