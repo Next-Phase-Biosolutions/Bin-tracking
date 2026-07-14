@@ -51,17 +51,21 @@ function toFormTemplate(raw: {
 }
 
 export const formService = {
-    async listByStage(prisma: PrismaClient, stage: string): Promise<FormTemplate[]> {
+    async listByStage(prisma: PrismaClient, orgId: string, stage: string): Promise<FormTemplate[]> {
         const rows = await prisma.formTemplate.findMany({
-            where: stage && stage !== 'ALL' ? { stage, isActive: true } : { isActive: true },
+            where: {
+                organizationId: orgId,
+                ...(stage && stage !== 'ALL' ? { stage, isActive: true } : { isActive: true }),
+            },
             orderBy: [{ stage: 'asc' }, { sortOrder: 'asc' }],
         });
         return rows.map(toFormTemplate);
     },
 
-    async getById(prisma: PrismaClient, id: string): Promise<FormTemplate | null> {
+    async getById(prisma: PrismaClient, orgId: string, id: string): Promise<FormTemplate | null> {
         const row = await prisma.formTemplate.findUnique({ where: { id } });
-        if (!row) return null;
+        // Cross-org mismatch reads as "not found" — same discipline as cycle.service.ts.
+        if (!row || row.organizationId !== orgId) return null;
         return toFormTemplate(row);
     },
 
@@ -91,7 +95,7 @@ export const formService = {
         schema = applyVoiceEnabledToSchema(schema);
 
         const maxSort = await prisma.formTemplate.aggregate({
-            where: { stage: input.stage },
+            where: { organizationId, stage: input.stage },
             _max: { sortOrder: true },
         });
 

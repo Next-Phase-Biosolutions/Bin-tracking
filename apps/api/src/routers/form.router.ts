@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure, stationProcedure, opsManagerProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure, stationProcedure, orgOpsProcedure } from '../trpc/trpc.js';
 import {
     formListByStageSchema,
     formGetByIdSchema,
@@ -9,34 +9,34 @@ import {
     formTranscribeFieldSchema,
 } from '@bin-tracker/validators';
 import { formService } from '../services/form.service.js';
-import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const formRouter = router({
-    listByStage: stationProcedure.input(formListByStageSchema).query(async ({ input, ctx }) => {
-        return formService.listByStage(ctx.prisma, input.stage);
+    listByStage: stationOrgProcedure.input(formListByStageSchema).query(async ({ input, ctx }) => {
+        return formService.listByStage(ctx.prisma, ctx.orgId, input.stage);
     }),
 
-    getById: stationProcedure.input(formGetByIdSchema).query(async ({ input, ctx }) => {
-        const form = await formService.getById(ctx.prisma, input.id);
+    getById: stationOrgProcedure.input(formGetByIdSchema).query(async ({ input, ctx }) => {
+        const form = await formService.getById(ctx.prisma, ctx.orgId, input.id);
         if (!form) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Form not found' });
         }
         return form;
     }),
 
-    adminList: protectedProcedure.query(async ({ ctx }) => {
+    adminList: orgProcedure.query(async ({ ctx }) => {
         return ctx.prisma.formTemplate.findMany({
+            where: { organizationId: ctx.orgId },
             orderBy: [{ stage: 'asc' }, { sortOrder: 'asc' }],
         });
     }),
 
-    digitizeFromPhoto: opsManagerProcedure
+    digitizeFromPhoto: orgOpsProcedure
         .input(formDigitizeFromPhotoSchema)
         .mutation(async ({ input }) => {
             return formService.digitizeFromPhoto(input.imageBase64, input.mimeType);
         }),
 
-    refineFromRegion: opsManagerProcedure
+    refineFromRegion: orgOpsProcedure
         .input(formRefineFromRegionSchema)
         .mutation(async ({ input }) => {
             const draft = {
@@ -51,8 +51,8 @@ export const formRouter = router({
             );
         }),
 
-    create: opsManagerProcedure.input(formCreateSchema).mutation(async ({ input, ctx }) => {
-        return formService.create(ctx.prisma, input, await getDefaultOrganizationId());
+    create: orgOpsProcedure.input(formCreateSchema).mutation(async ({ input, ctx }) => {
+        return formService.create(ctx.prisma, input, ctx.orgId);
     }),
 
     transcribeField: stationProcedure
