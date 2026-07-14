@@ -29,11 +29,7 @@ export const formRouter = router({
             return form;
         }),
 
-    // Not in the brief's explicit FORMS list, but it's the form-template admin
-    // screen for the same feature area — leaving it ungated would let an org
-    // without FORMS still manage form templates.
     adminList: orgProcedure
-        .use(requireModule('FORMS'))
         .query(async ({ ctx }) => {
             return ctx.prisma.formTemplate.findMany({
                 where: { organizationId: ctx.orgId },
