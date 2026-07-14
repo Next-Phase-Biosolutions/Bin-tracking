@@ -45,7 +45,7 @@ const fakePrisma = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 vi.mock('@bin-tracker/db', () => {
     const employee = {
-        findUnique: ({ where }: { where: { qrCode?: string } }) =>
+        findFirst: ({ where }: { where: { qrCode?: string } }) =>
             Promise.resolve(store.employees.find((e) => e.qrCode === where.qrCode) ?? null),
     };
     const workSession = {

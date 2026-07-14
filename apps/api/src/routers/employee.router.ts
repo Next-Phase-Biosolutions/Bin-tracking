@@ -5,13 +5,14 @@ import {
     employeeListSchema,
 } from '@bin-tracker/validators';
 import { employeeService } from '../services/employee.service.js';
+import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const employeeRouter = router({
     /** Register a new employee and mint their permanent QR token */
     register: opsManagerProcedure
         .input(employeeRegisterSchema)
         .mutation(async ({ input }) => {
-            return employeeService.register(input);
+            return employeeService.register(input, await getDefaultOrganizationId());
         }),
 
     /** List employees (optionally filtered by status) */

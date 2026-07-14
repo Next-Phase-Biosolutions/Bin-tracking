@@ -1,6 +1,7 @@
 import { router, stationProcedure } from '../trpc/trpc.js';
 import { transcribeAudioSchema, animalRegistrationSchema } from '@bin-tracker/validators';
 import { farmerService } from '../services/farmer.service.js';
+import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const farmerRouter = router({
     /** Transcribe audio and extract animal fields */
@@ -14,6 +15,6 @@ export const farmerRouter = router({
     register: stationProcedure
         .input(animalRegistrationSchema)
         .mutation(async ({ input }) => {
-            return farmerService.register(input);
+            return farmerService.register(input, await getDefaultOrganizationId());
         }),
 });

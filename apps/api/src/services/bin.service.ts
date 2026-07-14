@@ -16,7 +16,9 @@ export const binService = {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find bin by QR code (with bin type for DK hours)
-                const bin = await tx.bin.findUnique({
+                // qrCode is now unique per-organization (not globally) — findFirst until
+                // Task 8 adds real org scoping to this lookup.
+                const bin = await tx.bin.findFirst({
                     where: { qrCode: input.qrCode },
                     include: { binType: true },
                 });
@@ -53,6 +55,7 @@ export const binService = {
                         facilityId: bin.currentFacilityId,
                         startedAt: now,
                         deadline,
+                        organizationId: bin.organizationId,
                     },
                 });
 
@@ -102,7 +105,9 @@ export const binService = {
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find the parent BinType by the scanned Master QR code (normailze case/spaces for fuzzy matching)
                 const normalizedQr = input.masterQrCode.trim().toUpperCase().replace(/\s+/g, '-');
-                const binType = await tx.binType.findUnique({
+                // masterQrCode is now unique per-organization (not globally) — findFirst
+                // until Task 8 adds real org scoping to this lookup.
+                const binType = await tx.binType.findFirst({
                     where: { masterQrCode: normalizedQr },
                 });
 
@@ -141,16 +146,18 @@ export const binService = {
                         binTypeId: binType.id,
                         currentFacilityId: station.facilityId,
                         status: 'ACTIVE',
+                        organizationId: binType.organizationId,
                     }
                 });
 
-                // 4. Create cycle 
+                // 4. Create cycle
                 const cycle = await tx.binCycle.create({
                     data: {
                         binId: bin.id,
                         facilityId: bin.currentFacilityId,
                         startedAt: now,
                         deadline,
+                        organizationId: bin.organizationId,
                     },
                 });
 
@@ -223,7 +230,9 @@ export const binService = {
 
     /** Get bin by QR code */
     async getByQrCode(qrCode: string, userId: string, userRole: string) {
-        let bin = await prisma.bin.findUnique({
+        // qrCode is now unique per-organization (not globally) — findFirst until
+        // Task 8 adds real org scoping to this lookup.
+        let bin = await prisma.bin.findFirst({
             where: { qrCode },
             include: {
                 binType: true,
@@ -239,7 +248,9 @@ export const binService = {
         // MVP Fallback: if scanning a Master QR code (e.g. TYPE-HEART), find the oldest active dynamic bin of that type
         if (!bin) {
             const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
-            const binType = await prisma.binType.findUnique({
+            // masterQrCode is now unique per-organization (not globally) — findFirst
+            // until Task 8 adds real org scoping to this lookup.
+            const binType = await prisma.binType.findFirst({
                 where: { masterQrCode: normalizedQr },
             });
 
@@ -308,7 +319,9 @@ export const binService = {
         const facilityFilter = permittedFacilityIds ? { currentFacilityId: { in: permittedFacilityIds } } : {};
 
         // 2. Check if the QR code is an exact physical Bin match
-        const exactBin = await prisma.bin.findUnique({
+        // qrCode is now unique per-organization (not globally) — findFirst until
+        // Task 8 adds real org scoping to this lookup.
+        const exactBin = await prisma.bin.findFirst({
             where: { qrCode },
             include: {
                 binType: true,
@@ -336,7 +349,9 @@ export const binService = {
 
         // 3. Fallback: Check if it's a Master QR code to find dynamic bins
         const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
-        const binType = await prisma.binType.findUnique({
+        // masterQrCode is now unique per-organization (not globally) — findFirst
+        // until Task 8 adds real org scoping to this lookup.
+        const binType = await prisma.binType.findFirst({
             where: { masterQrCode: normalizedQr }
         });
 

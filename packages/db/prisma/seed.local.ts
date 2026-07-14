@@ -67,6 +67,13 @@ async function main(): Promise<void> {
     await prisma.user.deleteMany();
     await prisma.facility.deleteMany();
 
+    // ─── Default org for all seeded tenant data (same pattern as backfill-org.ts) ───
+    const org = await prisma.organization.upsert({
+        where: { slug: 'default' },
+        update: {},
+        create: { name: 'Default Organization', slug: 'default' },
+    });
+
     // ─── 2. Create users (Prisma generates cuid IDs) ──────────────
     console.log('👤 Creating local users (no Supabase, cuid IDs)...');
     const dbUsers = await Promise.all(
@@ -82,11 +89,11 @@ async function main(): Promise<void> {
     // ─── 3. Facilities ────────────────────────────────────────────
     console.log('🏭 Creating facilities...');
     const facilities = await Promise.all([
-        prisma.facility.create({ data: { name: 'Chicago Processing',   type: FacilityType.PROCESSING, address: '123 Industrial Blvd, Chicago, IL 60601',       lat: 41.8781, lng: -87.6298 } }),
-        prisma.facility.create({ data: { name: 'Detroit Processing',   type: FacilityType.PROCESSING, address: '456 Factory Ave, Detroit, MI 48201',             lat: 42.3314, lng: -83.0458 } }),
-        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd, Milwaukee, WI 53202',              lat: 43.0389, lng: -87.9065 } }),
-        prisma.facility.create({ data: { name: 'Midwest Rendering',    type: FacilityType.RENDERING,  address: '321 Render Lane, Indianapolis, IN 46201',        lat: 39.7684, lng: -86.1581 } }),
-        prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way, Columbus, OH 43215',            lat: 39.9612, lng: -82.9988 } }),
+        prisma.facility.create({ data: { name: 'Chicago Processing',   type: FacilityType.PROCESSING, address: '123 Industrial Blvd, Chicago, IL 60601',       lat: 41.8781, lng: -87.6298, organizationId: org.id } }),
+        prisma.facility.create({ data: { name: 'Detroit Processing',   type: FacilityType.PROCESSING, address: '456 Factory Ave, Detroit, MI 48201',             lat: 42.3314, lng: -83.0458, organizationId: org.id } }),
+        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd, Milwaukee, WI 53202',              lat: 43.0389, lng: -87.9065, organizationId: org.id } }),
+        prisma.facility.create({ data: { name: 'Midwest Rendering',    type: FacilityType.RENDERING,  address: '321 Render Lane, Indianapolis, IN 46201',        lat: 39.7684, lng: -86.1581, organizationId: org.id } }),
+        prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way, Columbus, OH 43215',            lat: 39.9612, lng: -82.9988, organizationId: org.id } }),
     ]);
     const [chicago, detroit, milwaukee] = facilities;
 
@@ -116,12 +123,12 @@ async function main(): Promise<void> {
     // ─── 6. Bin Types ─────────────────────────────────────────────
     console.log('📦 Creating bin types...');
     const binTypes = await Promise.all([
-        prisma.binType.create({ data: { organType: 'heart',  dkHours: 4,  urgency: Urgency.CRITICAL, prefix: 'BIN-HEART',  masterQrCode: 'TYPE-HEART' } }),
-        prisma.binType.create({ data: { organType: 'liver',  dkHours: 6,  urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER',  masterQrCode: 'TYPE-LIVER' } }),
-        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM,   prefix: 'BIN-KIDNEY', masterQrCode: 'TYPE-KIDNEY' } }),
-        prisma.binType.create({ data: { organType: 'skin',   dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN',   masterQrCode: 'TYPE-SKIN' } }),
-        prisma.binType.create({ data: { organType: 'fat',    dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT',    masterQrCode: 'TYPE-FAT' } }),
-        prisma.binType.create({ data: { organType: 'bone',   dkHours: 48, urgency: Urgency.LOW,      prefix: 'BIN-BONE',   masterQrCode: 'TYPE-BONE' } }),
+        prisma.binType.create({ data: { organType: 'heart',  dkHours: 4,  urgency: Urgency.CRITICAL, prefix: 'BIN-HEART',  masterQrCode: 'TYPE-HEART', organizationId: org.id } }),
+        prisma.binType.create({ data: { organType: 'liver',  dkHours: 6,  urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER',  masterQrCode: 'TYPE-LIVER', organizationId: org.id } }),
+        prisma.binType.create({ data: { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM,   prefix: 'BIN-KIDNEY', masterQrCode: 'TYPE-KIDNEY', organizationId: org.id } }),
+        prisma.binType.create({ data: { organType: 'skin',   dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN',   masterQrCode: 'TYPE-SKIN', organizationId: org.id } }),
+        prisma.binType.create({ data: { organType: 'fat',    dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT',    masterQrCode: 'TYPE-FAT', organizationId: org.id } }),
+        prisma.binType.create({ data: { organType: 'bone',   dkHours: 48, urgency: Urgency.LOW,      prefix: 'BIN-BONE',   masterQrCode: 'TYPE-BONE', organizationId: org.id } }),
     ]);
 
     // ─── 7. Bins ──────────────────────────────────────────────────
@@ -144,6 +151,7 @@ async function main(): Promise<void> {
                     binTypeId: binTypes[t]!.id,
                     currentFacilityId: facilities[f]!.id,
                     status: BinStatus.IDLE,
+                    organizationId: org.id,
                 },
             }),
         ),

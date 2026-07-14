@@ -72,7 +72,9 @@ function toView(run: RunWithRelations): PayrollRunView {
 }
 
 async function loadRunView(period: string): Promise<PayrollRunView> {
-    const run = await prisma.payrollRun.findUnique({
+    // period is now unique per-organization (not globally) — findFirst until
+    // Task 8 adds real org scoping to this lookup.
+    const run = await prisma.payrollRun.findFirst({
         where: { period },
         include: {
             lineItems: {
@@ -110,7 +112,7 @@ export const payrollService = {
      * - The flat rate is snapshotted onto the run so later rate changes never
      *   rewrite history.
      */
-    async computeRun(input: PayrollPeriodInput): Promise<PayrollRunView> {
+    async computeRun(input: PayrollPeriodInput, organizationId: string): Promise<PayrollRunView> {
         const { period } = input;
 
         const settings = await prisma.settings.findFirst();
@@ -126,7 +128,9 @@ export const payrollService = {
         const currency = settings.currency;
         const { start, end } = periodBounds(period);
 
-        const existing = await prisma.payrollRun.findUnique({ where: { period } });
+        // period is now unique per-organization (not globally) — findFirst until
+        // Task 8 adds real org scoping to this lookup.
+        const existing = await prisma.payrollRun.findFirst({ where: { period } });
         if (existing && existing.status !== 'DRAFT') {
             throw new TRPCError({
                 code: 'FORBIDDEN',
@@ -135,11 +139,11 @@ export const payrollService = {
         }
 
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            const run = await tx.payrollRun.upsert({
-                where: { period },
-                create: { period, rateCents, currency },
-                update: {},
-            });
+            // Manual find-or-create (rather than upsert) since `period` alone is no
+            // longer a valid unique `where` — upsert needs organizationId_period.
+            const run = existing
+                ? await tx.payrollRun.update({ where: { id: existing.id }, data: {} })
+                : await tx.payrollRun.create({ data: { period, rateCents, currency, organizationId } });
 
             // Idempotent recompute: clear prior results for this run.
             await tx.payrollLineItem.deleteMany({ where: { runId: run.id } });

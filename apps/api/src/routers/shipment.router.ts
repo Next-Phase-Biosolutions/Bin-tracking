@@ -5,13 +5,14 @@ import {
     shipmentListSchema,
 } from '@bin-tracker/validators';
 import { shipmentService } from '../services/shipment.service.js';
+import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const shipmentRouter = router({
     /** Record a new inbound supplier shipment on arrival */
     register: stationProcedure
         .input(shipmentRegisterSchema)
         .mutation(async ({ input }) => {
-            return shipmentService.register(input);
+            return shipmentService.register(input, await getDefaultOrganizationId());
         }),
 
     /** List shipments (optionally filtered by condition) */

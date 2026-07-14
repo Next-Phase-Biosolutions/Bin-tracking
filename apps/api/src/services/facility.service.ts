@@ -59,9 +59,9 @@ export const facilityService = {
         return facility;
     },
 
-    async create(input: CreateFacilityInput) {
+    async create(input: CreateFacilityInput, organizationId: string) {
         try {
-            return await prisma.facility.create({ data: input });
+            return await prisma.facility.create({ data: { ...input, organizationId } });
         } catch (error) {
             handlePrismaError(error);
         }

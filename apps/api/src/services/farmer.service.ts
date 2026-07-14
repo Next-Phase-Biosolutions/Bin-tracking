@@ -118,7 +118,7 @@ Transcript: "${transcript}"`;
     },
 
     /** Saves the reviewed animal registration to the database */
-    async register(input: AnimalRegistrationInput): Promise<{ id: string }> {
+    async register(input: AnimalRegistrationInput, organizationId: string): Promise<{ id: string }> {
         const record = await prisma.animalRegistration.create({
             data: {
                 animalType: input.animalType,
@@ -128,6 +128,7 @@ Transcript: "${transcript}"`;
                 ownerName: input.ownerName,
                 healthCondition: input.healthCondition,
                 rawTranscript: input.rawTranscript,
+                organizationId,
             },
         });
 

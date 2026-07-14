@@ -7,6 +7,7 @@ import {
 } from '@bin-tracker/validators';
 import { facilityService } from '../services/facility.service.js';
 import { getUserFacilityIds } from '../trpc/middleware.js';
+import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const facilityRouter = router({
     /** List facilities user has access to */
@@ -22,7 +23,7 @@ export const facilityRouter = router({
 
     /** Create facility (ADMIN only) */
     create: adminProcedure.input(createFacilitySchema).mutation(async ({ input }) => {
-        return facilityService.create(input);
+        return facilityService.create(input, await getDefaultOrganizationId());
     }),
 
     /** Update facility */

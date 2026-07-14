@@ -33,7 +33,7 @@ export const shipmentService = {
      * Record an inbound supplier shipment on arrival and mint a unique code.
      * Retries on the rare code collision.
      */
-    async register(input: ShipmentRegisterInput): Promise<ShipmentWithFacility> {
+    async register(input: ShipmentRegisterInput, organizationId: string): Promise<ShipmentWithFacility> {
         const MAX_ATTEMPTS = 5;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -52,6 +52,7 @@ export const shipmentService = {
                         expectedAt: input.expectedAt ? new Date(input.expectedAt) : null,
                         receivedAt: input.receivedAt ? new Date(input.receivedAt) : new Date(),
                         facilityId: input.facilityId ?? null,
+                        organizationId,
                     },
                     include: { facility: { select: { name: true } } },
                 });

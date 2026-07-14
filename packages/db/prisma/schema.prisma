@@ -118,6 +118,17 @@ model Organization {
   invitations  Invitation[]
   subscription Subscription?
 
+  facilities          Facility[]
+  binTypes            BinType[]
+  bins                Bin[]
+  binCycles           BinCycle[]
+  employees           Employee[]
+  shipments           Shipment[]
+  formTemplates       FormTemplate[]
+  animalRegistrations AnimalRegistration[]
+  settings            Settings?
+  payrollRuns         PayrollRun[]
+
   @@map("organizations")
 }
 
@@ -208,16 +219,17 @@ model Facility {
   lat            Float
   lng            Float
   deletedAt      DateTime?
-  organizationId String?
+  organizationId String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  users      UserFacility[]
-  stations   Station[]
-  bins       Bin[]          @relation("CurrentFacility")
-  cycles     BinCycle[]     @relation("CycleFacility")
-  deliveries BinCycle[]     @relation("CycleDestination")
-  shipments  Shipment[]     @relation("FacilityShipments")
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  users        UserFacility[]
+  stations     Station[]
+  bins         Bin[]          @relation("CurrentFacility")
+  cycles       BinCycle[]     @relation("CycleFacility")
+  deliveries   BinCycle[]     @relation("CycleDestination")
+  shipments    Shipment[]     @relation("FacilityShipments")
 
   @@index([organizationId])
   @@map("facilities")
@@ -241,35 +253,40 @@ model Station {
 
 model BinType {
   id             String   @id @default(cuid())
-  organType      String   @unique
+  organType      String
   dkHours        Int
   urgency        Urgency
   prefix         String
-  masterQrCode   String?  @unique
-  organizationId String?
+  masterQrCode   String?
+  organizationId String
   createdAt      DateTime @default(now())
 
-  bins Bin[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bins         Bin[]
 
+  @@unique([organizationId, organType])
+  @@unique([organizationId, masterQrCode])
   @@index([organizationId])
   @@map("bin_types")
 }
 
 model Bin {
   id                String    @id @default(cuid())
-  qrCode            String    @unique
+  qrCode            String
   binTypeId         String
   currentFacilityId String
   status            BinStatus @default(IDLE)
   deletedAt         DateTime?
-  organizationId    String?
+  organizationId    String
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  binType         BinType    @relation(fields: [binTypeId], references: [id])
-  currentFacility Facility   @relation("CurrentFacility", fields: [currentFacilityId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  binType         BinType      @relation(fields: [binTypeId], references: [id])
+  currentFacility Facility     @relation("CurrentFacility", fields: [currentFacilityId], references: [id])
   cycles          BinCycle[]
 
+  @@unique([organizationId, qrCode])
   @@index([status])
   @@index([currentFacilityId])
   @@index([binTypeId])
@@ -292,15 +309,16 @@ model BinCycle {
   complianceResult ComplianceResult?
   anchored         Boolean           @default(false)
   anchorTxHash     String?
-  organizationId   String?
+  organizationId   String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  bin         Bin        @relation(fields: [binId], references: [id])
-  facility    Facility   @relation("CycleFacility", fields: [facilityId], references: [id])
-  destination Facility?  @relation("CycleDestination", fields: [destinationId], references: [id])
-  driver      User?      @relation(fields: [driverId], references: [id])
-  events      EventLog[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bin          Bin          @relation(fields: [binId], references: [id])
+  facility     Facility     @relation("CycleFacility", fields: [facilityId], references: [id])
+  destination  Facility?    @relation("CycleDestination", fields: [destinationId], references: [id])
+  driver       User?        @relation(fields: [driverId], references: [id])
+  events       EventLog[]
 
   // Note: We use application-level validation (serializable transactions) to prevent
   // duplicate ACTIVE/IN_TRANSIT cycles. A DB constraint would incorrectly prevent
@@ -345,8 +363,10 @@ model AnimalRegistration {
   ownerName       String
   healthCondition String?
   rawTranscript   String?
-  organizationId  String?
+  organizationId  String
   createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
   @@map("animal_registrations")
@@ -356,24 +376,27 @@ model AnimalRegistration {
 
 model Employee {
   id             String         @id @default(cuid())
-  employeeCode   String         @unique
+  employeeCode   String
   fullName       String
   email          String?
   phone          String?
   department     String?
   position       String?
   status         EmployeeStatus @default(ACTIVE)
-  qrCode         String         @unique
-  organizationId String?
+  qrCode         String
+  organizationId String
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  sessions WorkSession[]
-  events   AttendanceEvent[]
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  sessions     WorkSession[]
+  events       AttendanceEvent[]
 
   payrollLineItems  PayrollLineItem[]
   payrollExceptions PayrollException[]
 
+  @@unique([organizationId, employeeCode])
+  @@unique([organizationId, qrCode])
   @@index([status])
   @@index([organizationId])
   @@map("employees")
@@ -423,7 +446,7 @@ model AttendanceEvent {
 
 model Shipment {
   id             String            @id @default(cuid())
-  shipmentCode   String            @unique
+  shipmentCode   String
   supplier       String
   reference      String?
   contents       String?
@@ -435,12 +458,14 @@ model Shipment {
   expectedAt     DateTime?
   receivedAt     DateTime          @default(now())
   facilityId     String?
-  organizationId String?
+  organizationId String
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  facility Facility? @relation("FacilityShipments", fields: [facilityId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  facility     Facility?    @relation("FacilityShipments", fields: [facilityId], references: [id])
 
+  @@unique([organizationId, shipmentCode])
   @@index([receivedAt])
   @@index([supplier])
   @@index([facilityId])
@@ -461,9 +486,11 @@ model FormTemplate {
   fillFrequency  FormFillFrequency?
   isActive       Boolean            @default(true)
   sortOrder      Int                @default(0)
-  organizationId String?
+  organizationId String
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([stage, isActive])
   @@index([organizationId])
@@ -493,26 +520,26 @@ enum PayrollExceptionType {
   AUTO_CLOSED
 }
 
-// Company-wide config. Single row enforced by the unique `singleton` flag.
+// Company-wide config. Single row per org enforced by the unique `organizationId`.
 model Settings {
   id                  String   @id @default(cuid())
-  singleton           Boolean  @unique @default(true)
   flatHourlyRateCents Int
   currency            String   @default("CAD")
   companyTimezone     String   @default("America/Toronto")
   managerEmail        String?
-  organizationId      String?
+  organizationId      String   @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  @@index([organizationId])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
   @@map("settings")
 }
 
 // One payroll per month. UNIQUE(period) prevents paying a month twice.
 model PayrollRun {
   id                String           @id @default(cuid())
-  period            String           @unique // 'YYYY-MM'
+  period            String // 'YYYY-MM'
   status            PayrollRunStatus @default(DRAFT)
   rateCents         Int // flat rate snapshot used for this run
   currency          String           @default("CAD")
@@ -526,13 +553,15 @@ model PayrollRun {
   approvalCodeHash  String? // hashed one-time 2FA approval code
   approvalExpiresAt DateTime? // expiry for the approval code
   paidAt            DateTime?
-  organizationId    String?
+  organizationId    String
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
-  lineItems  PayrollLineItem[]
-  exceptions PayrollException[]
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  lineItems    PayrollLineItem[]
+  exceptions   PayrollException[]
 
+  @@unique([organizationId, period])
   @@index([status])
   @@index([organizationId])
   @@map("payroll_runs")

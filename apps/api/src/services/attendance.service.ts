@@ -31,7 +31,9 @@ export const attendanceService = {
      * Runs Serializable to prevent a double-tap from opening two sessions.
      */
     async scan(input: AttendanceScanInput): Promise<AttendanceScanResult> {
-        const employee = await prisma.employee.findUnique({
+        // qrCode is now unique per-organization (not globally) — findFirst until
+        // Task 8 adds real org scoping to this lookup.
+        const employee = await prisma.employee.findFirst({
             where: { qrCode: input.qrCode },
         });
 

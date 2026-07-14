@@ -9,6 +9,7 @@ import {
     formTranscribeFieldSchema,
 } from '@bin-tracker/validators';
 import { formService } from '../services/form.service.js';
+import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const formRouter = router({
     listByStage: stationProcedure.input(formListByStageSchema).query(async ({ input, ctx }) => {
@@ -51,7 +52,7 @@ export const formRouter = router({
         }),
 
     create: opsManagerProcedure.input(formCreateSchema).mutation(async ({ input, ctx }) => {
-        return formService.create(ctx.prisma, input);
+        return formService.create(ctx.prisma, input, await getDefaultOrganizationId());
     }),
 
     transcribeField: stationProcedure

@@ -29,7 +29,7 @@ export const employeeService = {
      * Register an employee (one-time) and mint a unique, permanent QR token.
      * Retries on the rare code/token collision.
      */
-    async register(input: EmployeeRegisterInput): Promise<Employee> {
+    async register(input: EmployeeRegisterInput, organizationId: string): Promise<Employee> {
         const MAX_ATTEMPTS = 5;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -43,6 +43,7 @@ export const employeeService = {
                         phone: input.phone ?? null,
                         department: input.department ?? null,
                         position: input.position ?? null,
+                        organizationId,
                     },
                 });
             } catch (error: unknown) {

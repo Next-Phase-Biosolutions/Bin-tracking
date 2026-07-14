@@ -78,7 +78,7 @@ export const formService = {
         return formDigitizeService.refineFromRegion(imageBase64, draft, mimeType, userNote);
     },
 
-    async create(prisma: PrismaClient, input: FormCreateInput): Promise<FormTemplate> {
+    async create(prisma: PrismaClient, input: FormCreateInput, organizationId: string): Promise<FormTemplate> {
         const parsed = formSchemaSchema.safeParse(input.schema);
         if (!parsed.success) {
             throw new TRPCError({
@@ -107,6 +107,7 @@ export const formService = {
                 fillFrequency: input.fillFrequency,
                 triggerConfig: (input.triggerConfig ?? undefined) as Prisma.InputJsonValue | undefined,
                 sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+                organizationId,
             },
         });
 
