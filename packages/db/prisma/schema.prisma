@@ -205,6 +205,20 @@ model OrganizationModule {
   @@map("organization_modules")
 }
 
+// Monthly per-org AI usage counters (Gemini digitize, AssemblyAI/Claude
+// transcribe) — metered separately from OrganizationModule's on/off gate.
+model UsageCounter {
+  id        String   @id @default(cuid())
+  orgId     String
+  metric    String   // 'form_digitize' | 'voice_transcribe'
+  period    String   // 'YYYY-MM'
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, metric, period])
+  @@map("usage_counters")
+}
+
 // ─── Models ───────────────────────────────────────────────────────
 
 model User {

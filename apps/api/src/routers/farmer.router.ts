@@ -3,12 +3,12 @@ import { transcribeAudioSchema, animalRegistrationSchema } from '@bin-tracker/va
 import { farmerService } from '../services/farmer.service.js';
 
 export const farmerRouter = router({
-    /** Transcribe audio and extract animal fields (no DB access — org resolution not required) */
+    /** Transcribe audio and extract animal fields (requireModule guarantees ctx.orgId is set) */
     transcribe: stationProcedure
         .use(requireModule('ANIMAL_INTAKE'))
         .input(transcribeAudioSchema)
-        .mutation(async ({ input }) => {
-            return farmerService.transcribeAndExtract(input);
+        .mutation(async ({ input, ctx }) => {
+            return farmerService.transcribeAndExtract(input, ctx.orgId);
         }),
 
     /** Save the reviewed animal registration */

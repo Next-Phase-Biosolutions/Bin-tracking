@@ -40,14 +40,14 @@ export const formRouter = router({
     digitizeFromPhoto: orgOpsProcedure
         .use(requireModule('FORMS_AI_DIGITIZE'))
         .input(formDigitizeFromPhotoSchema)
-        .mutation(async ({ input }) => {
-            return formService.digitizeFromPhoto(input.imageBase64, input.mimeType);
+        .mutation(async ({ input, ctx }) => {
+            return formService.digitizeFromPhoto(input.imageBase64, ctx.orgId, input.mimeType);
         }),
 
     refineFromRegion: orgOpsProcedure
         .use(requireModule('FORMS_AI_DIGITIZE'))
         .input(formRefineFromRegionSchema)
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input, ctx }) => {
             const draft = {
                 ...input.currentDraft,
                 description: input.currentDraft.description ?? null,
@@ -55,6 +55,7 @@ export const formRouter = router({
             return formService.refineFromRegion(
                 input.imageBase64,
                 draft,
+                ctx.orgId,
                 input.mimeType,
                 input.userNote,
             );
@@ -70,7 +71,7 @@ export const formRouter = router({
     transcribeField: stationProcedure
         .use(requireModule('FORMS'))
         .input(formTranscribeFieldSchema)
-        .mutation(async ({ input }) => {
-            return formService.transcribeField(input);
+        .mutation(async ({ input, ctx }) => {
+            return formService.transcribeField(input, ctx.orgId);
         }),
 });

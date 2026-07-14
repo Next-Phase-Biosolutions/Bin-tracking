@@ -2,11 +2,14 @@ import { AssemblyAI } from 'assemblyai';
 import Anthropic from '@anthropic-ai/sdk';
 import { TRPCError } from '@trpc/server';
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { prisma } from '@bin-tracker/db';
 import type { FormTemplate, FormDigitizeDraft } from '@bin-tracker/types';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { FormCreateInput, FormTranscribeFieldInput } from '@bin-tracker/validators';
 import { formSchemaSchema } from '@bin-tracker/validators';
 import { applyVoiceEnabledToSchema, generateFieldIds } from '../lib/form-schema-utils.js';
 import { formDigitizeService } from './form-digitize.service.js';
+import { usageService } from './usage.service.js';
 
 const assemblyai = new AssemblyAI({
     apiKey: process.env['ASSEMBLYAI_API_KEY'] ?? '',
@@ -69,17 +72,18 @@ export const formService = {
         return toFormTemplate(row);
     },
 
-    async digitizeFromPhoto(imageBase64: string, mimeType: string): Promise<FormDigitizeDraft> {
-        return formDigitizeService.digitizeFromPhoto(imageBase64, mimeType);
+    async digitizeFromPhoto(imageBase64: string, orgId: string, mimeType: string): Promise<FormDigitizeDraft> {
+        return formDigitizeService.digitizeFromPhoto(imageBase64, orgId, mimeType);
     },
 
     async refineFromRegion(
         imageBase64: string,
         draft: FormDigitizeDraft,
+        orgId: string,
         mimeType: string,
         userNote?: string,
     ): Promise<FormDigitizeDraft> {
-        return formDigitizeService.refineFromRegion(imageBase64, draft, mimeType, userNote);
+        return formDigitizeService.refineFromRegion(imageBase64, draft, orgId, mimeType, userNote);
     },
 
     async create(prisma: PrismaClient, input: FormCreateInput, organizationId: string): Promise<FormTemplate> {
@@ -118,7 +122,14 @@ export const formService = {
         return toFormTemplate(row);
     },
 
-    async transcribeField(input: FormTranscribeFieldInput): Promise<{ value: string | null }> {
+    async transcribeField(input: FormTranscribeFieldInput, orgId: string): Promise<{ value: string | null }> {
+        // Second, independent check after requireModule('FORMS') has already gated
+        // access — "how much have they used this month" (voice_transcribe covers
+        // both this AssemblyAI+Claude call and farmer.service.ts's).
+        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+        const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyTranscribe : -1;
+        await usageService.checkAndIncrement(orgId, 'voice_transcribe', limit);
+
         const audioBuffer = Buffer.from(input.audioBase64, 'base64');
 
         let transcript: string;

@@ -2,7 +2,9 @@ import { AssemblyAI } from 'assemblyai';
 import Anthropic from '@anthropic-ai/sdk';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { TranscribeAudioInput, AnimalRegistrationInput, ExtractedAnimalFields } from '@bin-tracker/validators';
+import { usageService } from './usage.service.js';
 
 const assemblyai = new AssemblyAI({
     apiKey: process.env['ASSEMBLYAI_API_KEY'] ?? '',
@@ -17,10 +19,17 @@ export const farmerService = {
      * Transcribes audio with AssemblyAI, then extracts animal fields with Claude.
      * If targetField is set, only that field is returned (per-question mode).
      */
-    async transcribeAndExtract(input: TranscribeAudioInput): Promise<{
+    async transcribeAndExtract(input: TranscribeAudioInput, orgId: string): Promise<{
         transcript: string;
         fields: Partial<ExtractedAnimalFields>;
     }> {
+        // Second, independent check after requireModule('ANIMAL_INTAKE') has already
+        // gated access — "how much have they used this month". Same
+        // Subscription.plan lookup pattern as facility.service.ts / employee.service.ts.
+        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+        const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyTranscribe : -1;
+        await usageService.checkAndIncrement(orgId, 'voice_transcribe', limit);
+
         // 1. Decode base64 audio to buffer
         const audioBuffer = Buffer.from(input.audioBase64, 'base64');
 
