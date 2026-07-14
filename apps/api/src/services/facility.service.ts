@@ -4,11 +4,12 @@ import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput } fr
 import { handlePrismaError } from '../lib/errors.js';
 
 export const facilityService = {
-    async list(input: ListFacilitiesInput, facilityIds: string[], userRole: string) {
+    async list(orgId: string, input: ListFacilitiesInput, facilityIds: string[], userRole: string) {
         const facilityFilter = userRole === 'ADMIN' ? {} : { id: { in: facilityIds } };
 
         const where = {
             deletedAt: null,
+            organizationId: orgId,
             ...(input.type && { type: input.type }),
             ...facilityFilter,
         };
@@ -34,9 +35,9 @@ export const facilityService = {
         };
     },
 
-    async getById(id: string, userId: string, userRole: string) {
-        const facility = await prisma.facility.findUnique({
-            where: { id },
+    async getById(orgId: string, id: string, userId: string, userRole: string) {
+        const facility = await prisma.facility.findFirst({
+            where: { id, organizationId: orgId },
             include: {
                 stations: { select: { id: true, label: true } },
                 _count: { select: { bins: true, cycles: true } },
@@ -59,18 +60,18 @@ export const facilityService = {
         return facility;
     },
 
-    async create(input: CreateFacilityInput, organizationId: string) {
+    async create(orgId: string, input: CreateFacilityInput) {
         try {
-            return await prisma.facility.create({ data: { ...input, organizationId } });
+            return await prisma.facility.create({ data: { ...input, organizationId: orgId } });
         } catch (error) {
             handlePrismaError(error);
         }
     },
 
-    async update(input: UpdateFacilityInput, userId: string, userRole: string) {
+    async update(orgId: string, input: UpdateFacilityInput, userId: string, userRole: string) {
         const { id, ...data } = input;
 
-        const existing = await prisma.facility.findUnique({ where: { id } });
+        const existing = await prisma.facility.findFirst({ where: { id, organizationId: orgId } });
         if (!existing || existing.deletedAt) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Facility not found' });
         }
@@ -92,8 +93,8 @@ export const facilityService = {
     },
 
     /** Soft delete — sets deletedAt timestamp */
-    async remove(id: string, userId: string, userRole: string) {
-        const existing = await prisma.facility.findUnique({ where: { id } });
+    async remove(orgId: string, id: string, userId: string, userRole: string) {
+        const existing = await prisma.facility.findFirst({ where: { id, organizationId: orgId } });
         if (!existing || existing.deletedAt) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Facility not found' });
         }
