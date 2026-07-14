@@ -27,6 +27,14 @@ vi.mock('@bin-tracker/db', () => ({
             findUnique: () => Promise.resolve(null),
             findFirst: () => Promise.resolve(null),
         },
+        // Org resolution runs at the end of createContext for every request;
+        // these are exercised (station branch) but resolve to "no org" here.
+        organizationMember: {
+            findFirst: () => Promise.resolve(null),
+        },
+        facility: {
+            findUnique: () => Promise.resolve(null),
+        },
     },
 }));
 

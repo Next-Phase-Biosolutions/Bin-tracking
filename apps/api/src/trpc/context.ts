@@ -3,11 +3,13 @@ import { prisma } from '@bin-tracker/db';
 import type { User, Station } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
+import { resolveOrgId } from './org-context.js';
 
 export interface Context {
     prisma: typeof prisma;
     user: User | null;
     station: (Station & { facility: { id: string; name: string } }) | null;
+    orgId: string | null;
     req: FastifyRequest;
 }
 
@@ -35,7 +37,11 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
             // stationProcedure and protectedProcedure will still pass
             // because DISABLE_AUTH=true bypasses the null checks in their middleware.
         }
-        return { prisma, user, station, req };
+        const bypassOrgId = await resolveOrgId(prisma, {
+            userId: user?.id ?? null,
+            facilityId: station?.facility.id ?? null,
+        });
+        return { prisma, user, station, orgId: bypassOrgId, req };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -71,10 +77,16 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         }
     }
 
+    const orgId = await resolveOrgId(prisma, {
+        userId: user?.id ?? null,
+        facilityId: station?.facility.id ?? null,
+    });
+
     return {
         prisma,
         user,
         station,
+        orgId,
         req,
     };
 }

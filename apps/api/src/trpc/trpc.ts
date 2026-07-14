@@ -82,3 +82,19 @@ export const facilityProcedure = t.procedure.use(isAuthenticated).use(requireFac
  * Verifies the user is the assigned driver for the cycle
  */
 export const assignedDriverProcedure = t.procedure.use(requireAssignedDriver());
+
+/**
+ * Organization-scoped procedures
+ * Ensures the request resolved to a tenant (ctx.orgId) before proceeding.
+ */
+const hasOrg = middleware(async ({ ctx, next }) => {
+    if (!ctx.orgId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'No organization for this account' });
+    }
+    return next({ ctx: { ...ctx, orgId: ctx.orgId } });
+});
+
+export const orgProcedure = protectedProcedure.use(hasOrg);
+export const orgAdminProcedure = t.procedure.use(requireRole('ADMIN')).use(hasOrg);
+export const orgOpsProcedure = t.procedure.use(requireRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
+export const stationOrgProcedure = stationProcedure.use(hasOrg);
