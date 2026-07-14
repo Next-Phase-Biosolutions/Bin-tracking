@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
 import { QRScanner } from '../../components/QRScanner';
-import { trpc, type RouterOutputs } from '../../lib/trpc';
-import { useStationAuth } from '../../lib/useStationAuth';
+import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+
+// attendance.scan requires stationProcedure — scoped to this one call so it
+// doesn't collide with any bearer-gated call elsewhere on the page.
+const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 type ScanMode = 'handheld' | 'camera';
 
@@ -18,7 +22,6 @@ function formatDuration(minutes: number | null): string {
 }
 
 export default function GuardScannerPage() {
-    useStationAuth();
     const [scanMode, setScanMode] = useState<ScanMode>('handheld');
     const [scannerActive, setScannerActive] = useState(true);
     const [result, setResult] = useState<ScanResult | null>(null);
@@ -28,7 +31,10 @@ export default function GuardScannerPage() {
     const [lastScanned, setLastScanned] = useState<string | null>(null);
     const handheldRef = useRef<HTMLInputElement | null>(null);
 
-    const scanMutation = trpc.attendance.scan.useMutation();
+    const scanMutation = useMutation({
+        mutationFn: (input: Parameters<typeof stationClient.attendance.scan.mutate>[0]) =>
+            stationClient.attendance.scan.mutate(input),
+    });
 
     const submitScan = (qrCode: string) => {
         if (!qrCode || qrCode === lastScanned) return;

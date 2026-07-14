@@ -16,17 +16,7 @@ export function setAuthToken(token: string | null): void {
     _authToken = token;
 }
 
-// Written by kiosk-style pages (guard scanner, shipment intake, farmer
-// registration, tablet form-fill) whose endpoints require stationProcedure.
-// Takes precedence over the bearer token when set — mirrors the backend's
-// own Station-vs-Bearer discrimination in trpc/context.ts.
-let _stationToken: string | null = null;
-
-export function setStationToken(token: string | null): void {
-    _stationToken = token;
-}
-
-// ─── User tRPC client (JWT auth, station-token aware) ──────────────────────
+// ─── User tRPC client (JWT auth) ───────────────────────────────────────────
 export function createUserTRPCClient() {
     return trpc.createClient({
         links: [
@@ -36,13 +26,17 @@ export function createUserTRPCClient() {
                 headers: () => {
                     // When auth is disabled, send no header — backend injects admin user automatically
                     if (import.meta.env.VITE_DISABLE_AUTH === 'true') return {};
-                    if (_stationToken) return { Authorization: `Station ${_stationToken}` };
                     return _authToken ? { Authorization: `Bearer ${_authToken}` } : {};
                 },
             }),
         ],
     });
 }
+
+// Test-station-token convention shared by every kiosk-style page/component
+// that needs a per-call station-authenticated client (see createStationTRPCClient
+// below). Real per-device station provisioning is Phase 4.
+export const STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
 
 // ─── Station tRPC client (station token auth) ──────────────────────────────
 // Used for bin.start which requires "Authorization: Station <token>"

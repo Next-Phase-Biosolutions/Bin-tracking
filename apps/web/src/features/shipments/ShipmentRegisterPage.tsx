@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { PackagePlus, CheckCircle2, PackageCheck, LayoutDashboard } from 'lucide-react';
-import { trpc, type RouterOutputs } from '../../lib/trpc';
-import { useStationAuth } from '../../lib/useStationAuth';
+import { trpc, createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+
+// shipment.register requires stationProcedure — scoped to this one call.
+// facilityOptions below stays on the normal bearer-gated trpc hook since it's
+// protectedProcedure, not stationProcedure — the two auth modes coexist
+// because each call carries its own client instead of a shared page flag.
+const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 type Shipment = RouterOutputs['shipment']['register'];
 
@@ -46,13 +52,14 @@ function emptyForm(): FormState {
 }
 
 export default function ShipmentRegisterPage() {
-    useStationAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState<FormState>(emptyForm);
     const [registered, setRegistered] = useState<Shipment | null>(null);
 
     const facilityQuery = trpc.shipment.facilityOptions.useQuery(undefined, { staleTime: 60_000 });
-    const registerMutation = trpc.shipment.register.useMutation({
+    const registerMutation = useMutation({
+        mutationFn: (input: Parameters<typeof stationClient.shipment.register.mutate>[0]) =>
+            stationClient.shipment.register.mutate(input),
         onSuccess: (shipment) => setRegistered(shipment),
     });
 
