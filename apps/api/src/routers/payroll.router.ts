@@ -1,27 +1,26 @@
-import { router, opsManagerProcedure } from '../trpc/trpc.js';
+import { router, orgOpsProcedure } from '../trpc/trpc.js';
 import { payrollPeriodSchema, payrollListSchema } from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
-import { getDefaultOrganizationId } from '../lib/default-org.js';
 
 export const payrollRouter = router({
     /** Build or rebuild a month's payroll from recorded work sessions */
-    computeRun: opsManagerProcedure
+    computeRun: orgOpsProcedure
         .input(payrollPeriodSchema)
-        .mutation(async ({ input }) => {
-            return payrollService.computeRun(input, await getDefaultOrganizationId());
+        .mutation(async ({ ctx, input }) => {
+            return payrollService.computeRun(ctx.orgId, input);
         }),
 
     /** Fetch a single run with line items + exceptions */
-    getRun: opsManagerProcedure
+    getRun: orgOpsProcedure
         .input(payrollPeriodSchema)
-        .query(async ({ input }) => {
-            return payrollService.getRun(input);
+        .query(async ({ ctx, input }) => {
+            return payrollService.getRun(ctx.orgId, input);
         }),
 
     /** List recent runs (newest first) */
-    listRuns: opsManagerProcedure
+    listRuns: orgOpsProcedure
         .input(payrollListSchema)
-        .query(async ({ input }) => {
-            return payrollService.listRuns(input);
+        .query(async ({ ctx, input }) => {
+            return payrollService.listRuns(ctx.orgId, input);
         }),
 });

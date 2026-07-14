@@ -71,11 +71,9 @@ function toView(run: RunWithRelations): PayrollRunView {
     };
 }
 
-async function loadRunView(period: string): Promise<PayrollRunView> {
-    // period is now unique per-organization (not globally) — findFirst until
-    // Task 8 adds real org scoping to this lookup.
-    const run = await prisma.payrollRun.findFirst({
-        where: { period },
+async function loadRunView(orgId: string, period: string): Promise<PayrollRunView> {
+    const run = await prisma.payrollRun.findUnique({
+        where: { organizationId_period: { organizationId: orgId, period } },
         include: {
             lineItems: {
                 include: { employee: true },
@@ -112,10 +110,10 @@ export const payrollService = {
      * - The flat rate is snapshotted onto the run so later rate changes never
      *   rewrite history.
      */
-    async computeRun(input: PayrollPeriodInput, organizationId: string): Promise<PayrollRunView> {
+    async computeRun(orgId: string, input: PayrollPeriodInput): Promise<PayrollRunView> {
         const { period } = input;
 
-        const settings = await prisma.settings.findFirst();
+        const settings = await prisma.settings.findUnique({ where: { organizationId: orgId } });
         if (!settings) {
             throw new TRPCError({
                 code: 'PRECONDITION_FAILED',
@@ -128,9 +126,9 @@ export const payrollService = {
         const currency = settings.currency;
         const { start, end } = periodBounds(period);
 
-        // period is now unique per-organization (not globally) — findFirst until
-        // Task 8 adds real org scoping to this lookup.
-        const existing = await prisma.payrollRun.findFirst({ where: { period } });
+        const existing = await prisma.payrollRun.findUnique({
+            where: { organizationId_period: { organizationId: orgId, period } },
+        });
         if (existing && existing.status !== 'DRAFT') {
             throw new TRPCError({
                 code: 'FORBIDDEN',
@@ -139,27 +137,33 @@ export const payrollService = {
         }
 
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            // Manual find-or-create (rather than upsert) since `period` alone is no
-            // longer a valid unique `where` — upsert needs organizationId_period.
-            const run = existing
-                ? await tx.payrollRun.update({ where: { id: existing.id }, data: {} })
-                : await tx.payrollRun.create({ data: { period, rateCents, currency, organizationId } });
+            // Atomic create-or-update on the compound key — avoids the
+            // find-then-create race where two concurrent calls for the same
+            // org+period both see "not found" and the second throws P2002.
+            const run = await tx.payrollRun.upsert({
+                where: { organizationId_period: { organizationId: orgId, period } },
+                create: { period, rateCents, currency, organizationId: orgId },
+                update: {},
+            });
 
             // Idempotent recompute: clear prior results for this run.
             await tx.payrollLineItem.deleteMany({ where: { runId: run.id } });
             await tx.payrollException.deleteMany({ where: { runId: run.id } });
 
             // Payable sessions: checked out and not auto-closed, bucketed by
-            // local check-in month.
+            // local check-in month. WorkSession has no organizationId column of
+            // its own, so the org boundary is enforced by joining employees.
             const cleanRows = await tx.$queryRaw<Array<{ employeeId: string; minutes: number }>>(
                 Prisma.sql`
-                    SELECT "employeeId", COALESCE(SUM("durationMin"), 0)::int AS minutes
-                    FROM "work_sessions"
-                    WHERE "checkOutAt" IS NOT NULL
-                      AND "autoClosed" = false
-                      AND ("checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
-                      AND ("checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
-                    GROUP BY "employeeId"
+                    SELECT ws."employeeId", COALESCE(SUM(ws."durationMin"), 0)::int AS minutes
+                    FROM "work_sessions" ws
+                    JOIN "employees" e ON e."id" = ws."employeeId"
+                    WHERE e."organizationId" = ${orgId}
+                      AND ws."checkOutAt" IS NOT NULL
+                      AND ws."autoClosed" = false
+                      AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
+                      AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
+                    GROUP BY ws."employeeId"
                 `,
             );
 
@@ -181,11 +185,13 @@ export const payrollService = {
                 Array<{ id: string; employeeId: string; checkOutAt: Date | null }>
             >(
                 Prisma.sql`
-                    SELECT "id", "employeeId", "checkOutAt"
-                    FROM "work_sessions"
-                    WHERE ("checkOutAt" IS NULL OR "autoClosed" = true)
-                      AND ("checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
-                      AND ("checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
+                    SELECT ws."id", ws."employeeId", ws."checkOutAt"
+                    FROM "work_sessions" ws
+                    JOIN "employees" e ON e."id" = ws."employeeId"
+                    WHERE e."organizationId" = ${orgId}
+                      AND (ws."checkOutAt" IS NULL OR ws."autoClosed" = true)
+                      AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
+                      AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
                 `,
             );
 
@@ -213,17 +219,18 @@ export const payrollService = {
             });
         });
 
-        return loadRunView(period);
+        return loadRunView(orgId, period);
     },
 
     /** Fetch a single run with its line items and exceptions. */
-    async getRun(input: PayrollPeriodInput): Promise<PayrollRunView> {
-        return loadRunView(input.period);
+    async getRun(orgId: string, input: PayrollPeriodInput): Promise<PayrollRunView> {
+        return loadRunView(orgId, input.period);
     },
 
     /** List recent runs, newest period first. */
-    async listRuns(input: PayrollListInput): Promise<PayrollRunSummary[]> {
+    async listRuns(orgId: string, input: PayrollListInput): Promise<PayrollRunSummary[]> {
         const runs = await prisma.payrollRun.findMany({
+            where: { organizationId: orgId },
             orderBy: { period: 'desc' },
             take: input.limit,
         });
