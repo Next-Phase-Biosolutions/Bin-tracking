@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
 import { QRScanner } from '../../components/QRScanner';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
+import { useStationAuth } from '../../lib/useStationAuth';
 
 type ScanMode = 'handheld' | 'camera';
 
@@ -17,6 +18,7 @@ function formatDuration(minutes: number | null): string {
 }
 
 export default function GuardScannerPage() {
+    useStationAuth();
     const [scanMode, setScanMode] = useState<ScanMode>('handheld');
     const [scannerActive, setScannerActive] = useState(true);
     const [result, setResult] = useState<ScanResult | null>(null);

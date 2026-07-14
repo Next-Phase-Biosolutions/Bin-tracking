@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { trpc } from '../../lib/trpc';
+import { useStationAuth } from '../../lib/useStationAuth';
 import { AnimalForm } from './AnimalForm';
 import { VoiceRecorder } from './VoiceRecorder';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
@@ -14,6 +15,7 @@ const EMPTY_FIELDS: ExtractedAnimalFields = {
 };
 
 export default function FarmerRegistrationPage() {
+    useStationAuth();
     const [formFields, setFormFields] = useState<ExtractedAnimalFields>({ ...EMPTY_FIELDS });
     const [transcriptLog, setTranscriptLog] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);

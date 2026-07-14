@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2, PlusCircle, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { trpc } from '../../lib/trpc';
+import { useStationAuth } from '../../lib/useStationAuth';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
 import { FormRenderer } from './FormRenderer';
 import { FormBuilder } from './FormBuilder';
@@ -45,6 +46,7 @@ function FormCard({ form, onOpen }: { form: FormTemplate; onOpen: () => void }) 
 }
 
 export function FormListPage() {
+    useStationAuth();
     const [openForm, setOpenForm] = useState<FormTemplate | null>(null);
     const [showBuilder, setShowBuilder] = useState(false);
 

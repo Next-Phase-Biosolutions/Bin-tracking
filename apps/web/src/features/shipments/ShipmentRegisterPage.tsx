@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PackagePlus, CheckCircle2, PackageCheck, LayoutDashboard } from 'lucide-react';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
+import { useStationAuth } from '../../lib/useStationAuth';
 
 type Shipment = RouterOutputs['shipment']['register'];
 
@@ -45,6 +46,7 @@ function emptyForm(): FormState {
 }
 
 export default function ShipmentRegisterPage() {
+    useStationAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState<FormState>(emptyForm);
     const [registered, setRegistered] = useState<Shipment | null>(null);

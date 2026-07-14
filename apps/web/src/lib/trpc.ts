@@ -16,7 +16,17 @@ export function setAuthToken(token: string | null): void {
     _authToken = token;
 }
 
-// ─── User tRPC client (JWT auth) ───────────────────────────────────────────
+// Written by kiosk-style pages (guard scanner, shipment intake, farmer
+// registration, tablet form-fill) whose endpoints require stationProcedure.
+// Takes precedence over the bearer token when set — mirrors the backend's
+// own Station-vs-Bearer discrimination in trpc/context.ts.
+let _stationToken: string | null = null;
+
+export function setStationToken(token: string | null): void {
+    _stationToken = token;
+}
+
+// ─── User tRPC client (JWT auth, station-token aware) ──────────────────────
 export function createUserTRPCClient() {
     return trpc.createClient({
         links: [
@@ -26,6 +36,7 @@ export function createUserTRPCClient() {
                 headers: () => {
                     // When auth is disabled, send no header — backend injects admin user automatically
                     if (import.meta.env.VITE_DISABLE_AUTH === 'true') return {};
+                    if (_stationToken) return { Authorization: `Station ${_stationToken}` };
                     return _authToken ? { Authorization: `Bearer ${_authToken}` } : {};
                 },
             }),
