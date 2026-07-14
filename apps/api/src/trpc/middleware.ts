@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { middleware } from './trpc.js';
 import type { UserRole } from '@prisma/client';
+import { isAuthDisabled } from '../lib/auth-flags.js';
 
 /**
  * Role-based access control middleware
@@ -8,7 +9,7 @@ import type { UserRole } from '@prisma/client';
  */
 export function requireRole(...allowedRoles: UserRole[]) {
     return middleware(async ({ ctx, next }) => {
-        if (process.env['DISABLE_AUTH'] === 'true') return next({ ctx });
+        if (isAuthDisabled()) return next({ ctx });
         if (!ctx.user) {
             throw new TRPCError({
                 code: 'UNAUTHORIZED',
@@ -33,7 +34,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
  */
 export function requireFacilityAccess() {
     return middleware(async ({ ctx, next }) => {
-        if (process.env['DISABLE_AUTH'] === 'true') return next({ ctx });
+        if (isAuthDisabled()) return next({ ctx });
         if (!ctx.user) {
             throw new TRPCError({
                 code: 'UNAUTHORIZED',
@@ -52,7 +53,7 @@ export function requireFacilityAccess() {
  */
 export function requireAssignedDriver() {
     return middleware(async ({ ctx, next }) => {
-        if (process.env['DISABLE_AUTH'] === 'true') return next({ ctx });
+        if (isAuthDisabled()) return next({ ctx });
         if (!ctx.user) {
             throw new TRPCError({
                 code: 'UNAUTHORIZED',

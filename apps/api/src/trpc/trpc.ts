@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import type { Context } from './context.js';
 import { requireRole, requireFacilityAccess, requireAssignedDriver } from './middleware.js';
+import { isAuthDisabled } from '../lib/auth-flags.js';
 
 const t = initTRPC.context<Context>().create({
     transformer: superjson,
@@ -26,7 +27,7 @@ export const middleware = t.middleware;
  */
 const isAuthenticated = middleware(async ({ ctx, next }) => {
     // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
-    if (process.env['DISABLE_AUTH'] === 'true') {
+    if (isAuthDisabled()) {
         return next({ ctx });
     }
     if (!ctx.user) {
@@ -47,7 +48,7 @@ export const protectedProcedure = t.procedure.use(isAuthenticated);
  */
 const isStation = middleware(async ({ ctx, next }) => {
     // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
-    if (process.env['DISABLE_AUTH'] === 'true') {
+    if (isAuthDisabled()) {
         return next({ ctx });
     }
     if (!ctx.station) {

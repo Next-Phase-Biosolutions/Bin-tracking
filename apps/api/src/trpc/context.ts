@@ -2,6 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { prisma } from '@bin-tracker/db';
 import type { User, Station } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
+import { isAuthDisabled } from '../lib/auth-flags.js';
 
 export interface Context {
     prisma: typeof prisma;
@@ -21,7 +22,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
     // ─── AUTH BYPASS (DISABLE_AUTH=true) ─────────────────────────────────────
     // Set DISABLE_AUTH=true in your environment to skip all token checks.
     // This is useful for demos / development. Remove or set to false to re-enable.
-    if (process.env['DISABLE_AUTH'] === 'true') {
+    if (isAuthDisabled()) {
         try {
             // Inject the first ADMIN user as the acting user
             user = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
