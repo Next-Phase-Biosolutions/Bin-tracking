@@ -14,16 +14,19 @@ export type ModuleKey =
     | 'BLOCKCHAIN_ANCHOR'  // Cardano CIP-25 anchoring — blockchain.router
     | 'PAYROLL';           // requires WORKFORCE — payroll.router
 
+/** Compile-time exhaustiveness check: every ModuleKey must appear exactly once. */
+const MODULE_KEY_SET: Record<ModuleKey, true> = {
+    ANIMAL_INTAKE: true,
+    WORKFORCE: true,
+    SHIPMENTS: true,
+    FORMS: true,
+    FORMS_AI_DIGITIZE: true,
+    BLOCKCHAIN_ANCHOR: true,
+    PAYROLL: true,
+};
+
 /** Every gateable module key, in display order — used by the platform-admin panel (Task 16) to render one checkbox column per module. */
-export const ALL_MODULE_KEYS: ModuleKey[] = [
-    'ANIMAL_INTAKE',
-    'WORKFORCE',
-    'SHIPMENTS',
-    'FORMS',
-    'FORMS_AI_DIGITIZE',
-    'BLOCKCHAIN_ANCHOR',
-    'PAYROLL',
-];
+export const ALL_MODULE_KEYS: ModuleKey[] = Object.keys(MODULE_KEY_SET) as ModuleKey[];
 
 export interface PlanLimits {
     maxFacilities: number;    // -1 = unlimited
