@@ -31,7 +31,7 @@ export const binRouter = router({
 
     /** List bins with filters and pagination */
     list: orgProcedure.input(binListSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
         return binService.list(ctx.orgId, input, facilityIds, ctx.user!.role);
     }),
 });

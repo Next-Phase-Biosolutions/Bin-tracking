@@ -1,24 +1,24 @@
-import { router, protectedProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure } from '../trpc/trpc.js';
 import { paginationSchema } from '@bin-tracker/validators';
 import { dashboardService } from '../services/dashboard.service.js';
 import { getUserFacilityIds } from '../trpc/middleware.js';
 
 export const dashboardRouter = router({
     /** Aggregate dashboard stats */
-    stats: protectedProcedure.query(async ({ ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
-        return dashboardService.getStats(facilityIds, ctx.user!.role);
+    stats: orgProcedure.query(async ({ ctx }) => {
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
+        return dashboardService.getStats(ctx.orgId, facilityIds, ctx.user!.role);
     }),
 
     /** Priority queue — most urgent cycles first */
-    priorityQueue: protectedProcedure.input(paginationSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
-        return dashboardService.getPriorityQueue(input, facilityIds, ctx.user!.role);
+    priorityQueue: orgProcedure.input(paginationSchema).query(async ({ input, ctx }) => {
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
+        return dashboardService.getPriorityQueue(ctx.orgId, input, facilityIds, ctx.user!.role);
     }),
 
     /** Overdue cycles */
-    overdue: protectedProcedure.input(paginationSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
-        return dashboardService.getOverdue(input, facilityIds, ctx.user!.role);
+    overdue: orgProcedure.input(paginationSchema).query(async ({ input, ctx }) => {
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
+        return dashboardService.getOverdue(ctx.orgId, input, facilityIds, ctx.user!.role);
     }),
 });

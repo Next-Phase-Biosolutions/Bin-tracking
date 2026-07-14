@@ -112,18 +112,19 @@ export async function userCanAccessBin(
 
 /**
  * Get list of facility IDs user has access to
- * ADMIN users get all facilities, other roles get their assigned facilities
+ * ADMIN users get all facilities in their org, other roles get their assigned facilities
  */
 export async function getUserFacilityIds(
     userId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma: any,
     userRole: UserRole,
+    orgId: string,
 ): Promise<string[]> {
-    // ADMIN has access to all facilities
+    // ADMIN has access to all facilities in their org
     if (userRole === 'ADMIN') {
         const facilities = await prisma.facility.findMany({
-            where: { deletedAt: null },
+            where: { deletedAt: null, organizationId: orgId },
             select: { id: true },
         });
         return facilities.map((f: { id: string }) => f.id);

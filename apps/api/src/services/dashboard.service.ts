@@ -11,14 +11,20 @@ export const dashboardService = {
      * @param facilityIds - List of facility IDs user has access to
      * @param userRole - User's role (ADMIN gets all facilities)
      */
-    async getStats(facilityIds: string[], userRole: UserRole) {
+    async getStats(orgId: string, facilityIds: string[], userRole: UserRole) {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        // Build facility filter
-        const facilityFilter = userRole === 'ADMIN' ? { type: 'PROCESSING' as const } : { type: 'PROCESSING' as const, id: { in: facilityIds } };
+        // Build facility filter. ADMIN sees every facility in their org (not
+        // scoped to facilityIds), so organizationId is filtered explicitly here
+        // — getUserFacilityIds' ADMIN branch is already org-scoped too, but this
+        // is the query that actually enforces the boundary for ADMIN reads.
+        const facilityFilter =
+            userRole === 'ADMIN'
+                ? { type: 'PROCESSING' as const, organizationId: orgId }
+                : { type: 'PROCESSING' as const, id: { in: facilityIds } };
 
-        const cycleFilter = userRole === 'ADMIN' ? {} : { facilityId: { in: facilityIds } };
+        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
 
         const [totalActiveBins, totalOverdue, totalCompletedToday, totalCompletedOnTime, byFacility, byUrgency] =
             await Promise.all([
@@ -76,6 +82,7 @@ export const dashboardService = {
                     INNER JOIN bins b ON bc."binId" = b.id
                     INNER JOIN bin_types bt ON b."binTypeId" = bt.id
                     WHERE bc.status IN ('ACTIVE', 'IN_TRANSIT')
+                    AND bc."organizationId" = ${orgId}
                     ${userRole !== 'ADMIN' ? Prisma.sql`AND bc."facilityId" IN (${Prisma.join(facilityIds)})` : Prisma.empty}
                     GROUP BY bt.urgency
                 `,
@@ -116,8 +123,8 @@ export const dashboardService = {
     },
 
     /** Priority queue — active cycles sorted by deadline (most urgent first) */
-    async getPriorityQueue(input: PaginationInput, facilityIds: string[], userRole: UserRole) {
-        const cycleFilter = userRole === 'ADMIN' ? {} : { facilityId: { in: facilityIds } };
+    async getPriorityQueue(orgId: string, input: PaginationInput, facilityIds: string[], userRole: UserRole) {
+        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
 
         const where = {
             ...cycleFilter,
@@ -160,10 +167,10 @@ export const dashboardService = {
     },
 
     /** Overdue cycles — past deadline and still active */
-    async getOverdue(input: PaginationInput, facilityIds: string[], userRole: UserRole) {
+    async getOverdue(orgId: string, input: PaginationInput, facilityIds: string[], userRole: UserRole) {
         const now = new Date();
 
-        const cycleFilter = userRole === 'ADMIN' ? {} : { facilityId: { in: facilityIds } };
+        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
 
         const where = {
             status: { in: ['ACTIVE' as const, 'IN_TRANSIT' as const] },

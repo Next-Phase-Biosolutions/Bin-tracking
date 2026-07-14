@@ -27,7 +27,7 @@ export const cycleRouter = router({
 
     /** List active cycles */
     listActive: orgProcedure.input(cycleListSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
         return cycleService.listActive(ctx.orgId, input, facilityIds, ctx.user!.role);
     }),
 

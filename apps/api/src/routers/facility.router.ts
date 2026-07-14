@@ -11,7 +11,7 @@ import { getUserFacilityIds } from '../trpc/middleware.js';
 export const facilityRouter = router({
     /** List facilities user has access to */
     list: orgProcedure.input(listFacilitiesSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role);
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
         return facilityService.list(ctx.orgId, input, facilityIds, ctx.user!.role);
     }),
 
