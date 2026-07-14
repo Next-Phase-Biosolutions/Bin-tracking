@@ -1,0 +1,26 @@
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Serve the facility app at nextphasebiosolutions.com/app by proxying to its own
+# Netlify site (built with basePath "/app"). status=200 = rewrite, so the URL stays /app.
+[[redirects]]
+  from = "/app/*"
+  to = "https://nextphase-biosolutions-app.netlify.app/app/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/app"
+  to = "https://nextphase-biosolutions-app.netlify.app/app"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

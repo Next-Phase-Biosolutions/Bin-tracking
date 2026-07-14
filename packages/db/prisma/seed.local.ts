@@ -8,9 +8,10 @@
  * Usage: pnpm db:seed:local
  */
 
-import { PrismaClient, FacilityType, Urgency, UserRole, BinStatus } from '@prisma/client';
+import { PrismaClient, FacilityType, Urgency, UserRole, BinStatus, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes } from 'crypto';
+import { FORM_TEMPLATES } from './form-templates';
 
 function generateToken(): string {
     return randomBytes(32).toString('hex');
@@ -138,6 +139,14 @@ async function main(): Promise<void> {
             }),
         ),
     );
+
+    // ─── 8. Form Templates (the 4 digitized forms) ────────────────
+    console.log('📋 Seeding form templates...');
+    await prisma.formTemplate.deleteMany();
+    await prisma.formTemplate.createMany({
+        data: FORM_TEMPLATES as unknown as Prisma.FormTemplateCreateManyInput[],
+    });
+    console.log(`  ✓ ${FORM_TEMPLATES.length} form templates seeded`);
 
     // ─── Done ─────────────────────────────────────────────────────
     console.log('\n✅ Local seed complete!\n');

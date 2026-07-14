@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Netlify form detection</title>
+  </head>
+  <body>
+    <!--
+      This static form exists so Netlify's build-time bot detects the form for the
+      static export. The visible form is a React component that posts to this name.
+    -->
+    <form name="walkthrough" data-netlify="true" netlify-honeypot="company-website" hidden>
+      <input type="text" name="name" />
+      <input type="text" name="company" />
+      <input type="email" name="email" />
+      <input type="text" name="role" />
+      <textarea name="message"></textarea>
+      <input type="text" name="company-website" />
+    </form>
+  </body>
+</html>

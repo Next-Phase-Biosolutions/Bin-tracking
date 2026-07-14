@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  # With base directory = nextphase-app, publish must differ from it; point at the Next output.
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Netlify auto-installs @netlify/plugin-nextjs for Next.js apps (SSR / API routes supported).
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
