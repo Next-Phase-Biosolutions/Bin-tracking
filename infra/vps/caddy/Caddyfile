@@ -1,0 +1,9 @@
+# deploy.sh rewrites the `to` line to point at whichever color is live and
+# runs `caddy reload` — see kvmplan.md §6/§8. upstream.txt tracks the current color.
+api.<your-domain> {
+    reverse_proxy {
+        to localhost:3001
+        health_uri /health
+        health_interval 10s
+    }
+}

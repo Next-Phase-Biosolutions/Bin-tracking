@@ -1,0 +1,38 @@
+name: Deploy to VPS
+
+# Zero-downtime blue-green deploy of the bin-tracker API to the Hostinger KVM4
+# VPS. See kvmplan.md for the full runbook (§7-10). Runs after deploy-production.yml's
+# migration job so the DB schema is always ahead of or equal to the code being deployed.
+#
+# Required GitHub environment: production (same gated-approval Environment as deploy-production.yml)
+# Required environment secrets:
+#   VPS_HOST            — VPS public IP or hostname
+#   VPS_DEPLOY_SSH_KEY   — dedicated deploy-only key pair (not a personal key),
+#                          public half added to the `deploy` user's authorized_keys on the box
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Blue-green deploy to VPS
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/bin-tracker
+            git pull origin main
+            cd infra/vps/bintracker-api
+            ./deploy.sh

@@ -1,0 +1,49 @@
+# Runs from within a full repo checkout on the VPS (e.g. /opt/bin-tracker/infra/vps/bintracker-api).
+# See kvmplan.md §5. Blue/green: only one color is live at a time — deploy.sh
+# builds+starts the idle color, health-checks it, then flips Caddy's upstream.
+services:
+  api_blue:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: api_blue
+    restart: unless-stopped
+    env_file: .env
+    networks: [api_net]
+    ports: ['3001:3001']
+    mem_limit: 2g
+    cpus: 1.5
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+  api_green:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: api_green
+    restart: 'no' # only started explicitly by deploy.sh during a deploy
+    env_file: .env
+    networks: [api_net]
+    ports: ['3002:3001']
+    mem_limit: 2g
+    cpus: 1.5
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+networks:
+  api_net:
+    name: api_net
