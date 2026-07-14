@@ -81,11 +81,18 @@ export async function provisionOrganization(
             data: { organizationId: org.id, flatHourlyRateCents: DEFAULT_HOURLY_RATE_CENTS },
         });
 
+        const plan = defaultPlanForNewOrg();
+
         await tx.subscription.create({
-            data: { orgId: org.id, plan: 'STARTER', status: 'TRIALING', stripeCustomerId: null },
+            data: {
+                orgId: org.id,
+                plan,
+                status: process.env['BILLING_ENABLED'] === 'true' ? 'TRIALING' : 'ACTIVE',
+                stripeCustomerId: null,
+            },
         });
 
-        await reconcileModulesForPlan(tx, org.id, defaultPlanForNewOrg());
+        await reconcileModulesForPlan(tx, org.id, plan);
 
         return { orgId: org.id };
     });
