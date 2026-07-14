@@ -1,21 +1,21 @@
 import { z } from 'zod';
-import { router, adminProcedure } from '../trpc/trpc.js';
+import { router, orgAdminProcedure } from '../trpc/trpc.js';
 import { blockchainService } from '../services/blockchain.service.js';
 
 export const blockchainRouter = router({
     /**
      * Fetch daily summary for blockchain anchoring.
      * Returns Merkle root, stats, and the CIP-25 metadata payload.
-     * Admin-only — built using adminProcedure which enforces ADMIN role at middleware level.
+     * Admin-only — built using orgAdminProcedure which enforces ADMIN role + org resolution.
      */
-    getDailySummary: adminProcedure
+    getDailySummary: orgAdminProcedure
         .input(
             z.object({
                 fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
                 toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
             }),
         )
-        .query(({ input }) => blockchainService.getDailySummary(input.fromDate, input.toDate)),
+        .query(({ input, ctx }) => blockchainService.getDailySummary(ctx.orgId, input.fromDate, input.toDate)),
 
     /**
      * Confirm that the NFT transaction was successfully submitted to Cardano.
@@ -23,7 +23,7 @@ export const blockchainRouter = router({
      * Idempotent — safe to retry on network error.
      * Admin-only.
      */
-    confirmAnchor: adminProcedure
+    confirmAnchor: orgAdminProcedure
         .input(
             z.object({
                 cycleIds: z.array(z.string().cuid()).min(1, 'At least one cycle ID is required'),
@@ -33,5 +33,5 @@ export const blockchainRouter = router({
                     .regex(/^[0-9a-f]+$/i, 'TX hash must be a hex string'),
             }),
         )
-        .mutation(({ input }) => blockchainService.confirmAnchor(input.cycleIds, input.txHash)),
+        .mutation(({ input, ctx }) => blockchainService.confirmAnchor(ctx.orgId, input.cycleIds, input.txHash)),
 });
