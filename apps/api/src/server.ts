@@ -2,12 +2,14 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import fastifyRawBody from 'fastify-raw-body';
 import {
     fastifyTRPCPlugin,
     type FastifyTRPCPluginOptions,
 } from '@trpc/server/adapters/fastify';
 import { appRouter, type AppRouter } from './routers/index.js';
 import { createContext } from './trpc/context.js';
+import { registerStripeWebhook } from './routes/stripe-webhook.js';
 
 const PORT = Number(process.env['PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -48,6 +50,14 @@ async function buildServer() {
             uptime: process.uptime(),
         });
     });
+
+    // ─── Stripe webhook (raw body, registered before tRPC) ───
+    await server.register(fastifyRawBody, {
+        field: 'rawBody',
+        global: false,
+        runFirst: true,
+    });
+    await registerStripeWebhook(server);
 
     // ─── tRPC ────────────────────────────────────────────────
     await server.register(fastifyTRPCPlugin, {

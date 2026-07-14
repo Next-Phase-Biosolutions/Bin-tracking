@@ -1014,7 +1014,7 @@ Self-hosting was a deliberate choice (see `kvmplan.md`), made because there are 
 
 - [ ] `DISABLE_AUTH` cannot activate in prod (Task 1 test proves it) AND the env var is not set in any VPS `.env` file at all.
 - [ ] UFW/Caddy on the VPS only accepts inbound traffic from Cloudflare's published IP ranges (see `kvmplan.md`) — prevents bypassing Cloudflare's DDoS protection by hitting the origin IP directly.
-- [ ] `grep -rn "publicProcedure" apps/api/src/routers/` → only `auth.router.ts`.
+- [ ] `grep -rn "publicProcedure" apps/api/src/routers/` → only `auth.router.ts` and `billing.router.ts`'s `status` procedure (returns just the global `BILLING_ENABLED` flag, no tenant data — needed pre-auth for the signup/marketing flow). Any other hit is a regression.
 - [ ] Tenancy audit script (Task 8) wired into CI and green.
 - [ ] Stripe webhook signature verification tested with a bogus signature → 400.
 - [ ] Supabase JWT verification (`lib/jwt.ts`) checks issuer + audience, not just signature.

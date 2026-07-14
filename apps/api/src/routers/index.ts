@@ -10,6 +10,7 @@ import { employeeRouter } from './employee.router.js';
 import { attendanceRouter } from './attendance.router.js';
 import { shipmentRouter } from './shipment.router.js';
 import { payrollRouter } from './payroll.router.js';
+import { billingRouter } from './billing.router.js';
 
 export const appRouter = router({
     bin: binRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
     attendance: attendanceRouter,
     shipment: shipmentRouter,
     payroll: payrollRouter,
+    billing: billingRouter,
 });
 
 export type AppRouter = typeof appRouter;
