@@ -29,7 +29,7 @@ export const shipmentRouter = router({
         }),
 
     /** Public id/name list of facilities for the arrival form dropdown */
-    facilityOptions: protectedProcedure.query(async () => {
+    facilityOptions: stationProcedure.query(async () => {
         return shipmentService.facilityOptions();
     }),
 });

@@ -115,8 +115,8 @@ export function isAuthDisabled(): boolean {
 | employee | list, getById | `protectedProcedure` |
 | attendance | scan | `stationProcedure` (guard kiosk is a station) |
 | attendance | summary, recent | `protectedProcedure` |
-| shipment | register | `stationProcedure` |
-| shipment | list, getById, facilityOptions | `protectedProcedure` |
+| shipment | register, facilityOptions | `stationProcedure` |
+| shipment | list, getById | `protectedProcedure` |
 | farmer | transcribe, register | `stationProcedure` |
 | form | listByStage, getById | `stationProcedure` (tablet fill flow) |
 | form | digitizeFromPhoto, refineFromRegion, create | `opsManagerProcedure` |
