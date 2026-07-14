@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { Urgency } from '@prisma/client';
+import type { Plan } from '@bin-tracker/types';
+import { reconcileModulesForPlan } from './module-service.js';
 
 /**
  * Default bin-type set every new organization gets on creation.
@@ -26,6 +28,22 @@ export const DEFAULT_BIN_TYPES = [
 // the Settings row must exist (payroll checks for its presence), but the rate
 // itself is just a placeholder the org is expected to configure.
 const DEFAULT_HOURLY_RATE_CENTS = 1500; // $15.00/hr
+
+/**
+ * Re-exported from apps/api/src/services/billing.service.ts, where the
+ * conventional entry point lives (Task 13 extends that file with the rest
+ * of the Stripe billing logic — checkout sessions, webhook sync — which
+ * belongs in apps/api, not here). This one function has to live in
+ * packages/db for the same reason as the rest of this file: provisionOrganization()
+ * needs it inside its transaction, and provisionOrganization must stay
+ * callable from prisma/seed.ts without a reverse dependency on apps/api.
+ */
+export function defaultPlanForNewOrg(): Plan {
+    // Free launch period: every new org gets the full module bundle at no charge.
+    // Flip BILLING_ENABLED=true once you're ready to actually charge — new
+    // signups will then default to STARTER and go through real Stripe checkout.
+    return process.env['BILLING_ENABLED'] === 'true' ? 'STARTER' : 'ENTERPRISE';
+}
 
 export interface ProvisionOrganizationInput {
     name: string;
@@ -66,6 +84,8 @@ export async function provisionOrganization(
         await tx.subscription.create({
             data: { orgId: org.id, plan: 'STARTER', status: 'TRIALING', stripeCustomerId: null },
         });
+
+        await reconcileModulesForPlan(tx, org.id, defaultPlanForNewOrg());
 
         return { orgId: org.id };
     });

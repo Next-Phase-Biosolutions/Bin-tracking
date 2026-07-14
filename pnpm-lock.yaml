@@ -190,6 +190,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@bin-tracker/types':
+        specifier: workspace:*
+        version: link:../types
       '@prisma/adapter-pg':
         specifier: ^7.4.0
         version: 7.4.0

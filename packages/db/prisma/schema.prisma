@@ -128,6 +128,7 @@ model Organization {
   animalRegistrations AnimalRegistration[]
   settings            Settings?
   payrollRuns         PayrollRun[]
+  modules             OrganizationModule[]
 
   @@map("organizations")
 }
@@ -176,6 +177,32 @@ model Subscription {
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
+}
+
+enum ModuleKey {
+  ANIMAL_INTAKE
+  WORKFORCE
+  SHIPMENTS
+  FORMS
+  FORMS_AI_DIGITIZE
+  BLOCKCHAIN_ANCHOR
+  PAYROLL
+}
+
+model OrganizationModule {
+  id        String    @id @default(cuid())
+  orgId     String
+  module    ModuleKey
+  enabled   Boolean   @default(true)
+  source    String    @default("plan") // 'plan' | 'manual' — manual survives plan changes
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   // platform admin's user id, set only when source = 'manual'
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, module])
+  @@index([orgId])
+  @@map("organization_modules")
 }
 
 // ─── Models ───────────────────────────────────────────────────────
