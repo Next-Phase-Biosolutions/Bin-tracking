@@ -22,9 +22,12 @@ export const dashboardService = {
         const facilityFilter =
             userRole === 'ADMIN'
                 ? { type: 'PROCESSING' as const, organizationId: orgId }
-                : { type: 'PROCESSING' as const, id: { in: facilityIds } };
+                : { type: 'PROCESSING' as const, id: { in: facilityIds }, organizationId: orgId };
 
-        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
+        const cycleFilter =
+            userRole === 'ADMIN'
+                ? { organizationId: orgId }
+                : { facilityId: { in: facilityIds }, organizationId: orgId };
 
         const [totalActiveBins, totalOverdue, totalCompletedToday, totalCompletedOnTime, byFacility, byUrgency] =
             await Promise.all([
@@ -124,7 +127,10 @@ export const dashboardService = {
 
     /** Priority queue — active cycles sorted by deadline (most urgent first) */
     async getPriorityQueue(orgId: string, input: PaginationInput, facilityIds: string[], userRole: UserRole) {
-        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
+        const cycleFilter =
+            userRole === 'ADMIN'
+                ? { organizationId: orgId }
+                : { facilityId: { in: facilityIds }, organizationId: orgId };
 
         const where = {
             ...cycleFilter,
@@ -170,7 +176,10 @@ export const dashboardService = {
     async getOverdue(orgId: string, input: PaginationInput, facilityIds: string[], userRole: UserRole) {
         const now = new Date();
 
-        const cycleFilter = userRole === 'ADMIN' ? { organizationId: orgId } : { facilityId: { in: facilityIds } };
+        const cycleFilter =
+            userRole === 'ADMIN'
+                ? { organizationId: orgId }
+                : { facilityId: { in: facilityIds }, organizationId: orgId };
 
         const where = {
             status: { in: ['ACTIVE' as const, 'IN_TRANSIT' as const] },
