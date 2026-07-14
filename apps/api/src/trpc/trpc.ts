@@ -98,3 +98,4 @@ export const orgProcedure = protectedProcedure.use(hasOrg);
 export const orgAdminProcedure = t.procedure.use(requireRole('ADMIN')).use(hasOrg);
 export const orgOpsProcedure = t.procedure.use(requireRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
 export const stationOrgProcedure = stationProcedure.use(hasOrg);
+export const orgAssignedDriverProcedure = assignedDriverProcedure.use(hasOrg);
