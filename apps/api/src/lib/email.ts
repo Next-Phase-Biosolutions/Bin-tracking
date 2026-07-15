@@ -17,6 +17,20 @@ function getResend(): Resend {
 }
 
 /**
+ * Escapes HTML-significant characters. org.name is admin-controlled
+ * (max 200 chars, see auth.schema.ts) but not sanitized on input, so it must
+ * be escaped here before interpolation into email HTML.
+ */
+export function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * Sends the team-invitation email. Failures propagate to the caller
  * (invitation.service.ts) rather than being swallowed here — the caller
  * decides whether a failed send should roll back the created Invitation row.
@@ -25,10 +39,12 @@ export async function sendInvitationEmail(to: string, inviteUrl: string, orgName
     const from = process.env['EMAIL_FROM'];
     if (!from) throw new Error('EMAIL_FROM not configured — set it before sending invitation emails');
 
+    const safeOrgName = escapeHtml(orgName);
+
     await getResend().emails.send({
         from,
         to,
         subject: `You've been invited to join ${orgName} on Bin Tracker`,
-        html: `<p>You've been invited to join <strong>${orgName}</strong> on Bin Tracker.</p><p><a href="${inviteUrl}">Accept invitation</a></p><p>This link expires in 7 days.</p>`,
+        html: `<p>You've been invited to join <strong>${safeOrgName}</strong> on Bin Tracker.</p><p><a href="${inviteUrl}">Accept invitation</a></p><p>This link expires in 7 days.</p>`,
     });
 }
