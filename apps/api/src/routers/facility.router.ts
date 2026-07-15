@@ -12,13 +12,13 @@ import { getUserFacilityIds } from '../trpc/middleware.js';
 export const facilityRouter = router({
     /** List facilities user has access to */
     list: orgProcedure.input(listFacilitiesSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
-        return facilityService.list(ctx.orgId, input, facilityIds, ctx.user!.role);
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.orgRole!, ctx.orgId);
+        return facilityService.list(ctx.orgId, input, facilityIds, ctx.orgRole!);
     }),
 
     /** Get facility by ID */
     getById: orgProcedure.input(getFacilitySchema).query(async ({ input, ctx }) => {
-        return facilityService.getById(ctx.orgId, input.id, ctx.user!.id, ctx.user!.role);
+        return facilityService.getById(ctx.orgId, input.id, ctx.user!.id, ctx.orgRole!);
     }),
 
     /** Create facility (ADMIN only) */
@@ -33,11 +33,11 @@ export const facilityRouter = router({
 
     /** Update facility */
     update: orgProcedure.input(updateFacilitySchema).mutation(async ({ input, ctx }) => {
-        return facilityService.update(ctx.orgId, input, ctx.user!.id, ctx.user!.role);
+        return facilityService.update(ctx.orgId, input, ctx.user!.id, ctx.orgRole!);
     }),
 
     /** Soft delete facility */
     remove: orgProcedure.input(getFacilitySchema).mutation(async ({ input, ctx }) => {
-        return facilityService.remove(ctx.orgId, input.id, ctx.user!.id, ctx.user!.role);
+        return facilityService.remove(ctx.orgId, input.id, ctx.user!.id, ctx.orgRole!);
     }),
 });

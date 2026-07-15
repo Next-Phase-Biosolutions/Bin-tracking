@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import type { ModuleKey } from '@bin-tracker/types';
 import type { Context } from './context.js';
-import { requireRole, requireFacilityAccess, requireAssignedDriver } from './middleware.js';
+import { requireRole, requireOrgRole, requireFacilityAccess, requireAssignedDriver } from './middleware.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 
 const t = initTRPC.context<Context>().create({
@@ -96,6 +96,11 @@ export const stationProcedure = t.procedure.use(isStation);
 
 /**
  * Role-based procedures
+ *
+ * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25) — see the doc comment on
+ * `requireRole` in middleware.ts. None of these are currently wired into
+ * any org-scoped router; use the `org*Procedure` variants below for
+ * anything that acts on org-scoped data.
  */
 export const adminProcedure = t.procedure.use(requireRole('ADMIN'));
 export const opsManagerProcedure = t.procedure.use(requireRole('ADMIN', 'OPS_MANAGER'));
@@ -104,12 +109,18 @@ export const driverProcedure = t.procedure.use(requireRole('ADMIN', 'DRIVER'));
 /**
  * Facility-scoped procedure
  * Requires user to have access to the facility specified in the input
+ *
+ * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25) — see requireFacilityAccess in
+ * middleware.ts. Not currently wired into any router.
  */
 export const facilityProcedure = t.procedure.use(isAuthenticated).use(requireFacilityAccess());
 
 /**
  * Driver assignment procedure (for pickup/deliver)
  * Verifies the user is the assigned driver for the cycle
+ *
+ * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25) — see requireAssignedDriver in
+ * middleware.ts.
  */
 export const assignedDriverProcedure = t.procedure.use(requireAssignedDriver());
 
@@ -125,9 +136,26 @@ const hasOrg = middleware(async ({ ctx, next }) => {
 });
 
 export const orgProcedure = protectedProcedure.use(hasOrg);
-export const orgAdminProcedure = t.procedure.use(requireRole('ADMIN')).use(hasOrg);
-export const orgOpsProcedure = t.procedure.use(requireRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
+/**
+ * Task 25: gated by `requireOrgRole`, which checks the caller's
+ * OrganizationMember.role for the resolved org (ctx.orgRole) — NOT the
+ * global ctx.user.role that the bare `requireRole`-based procedures above
+ * check. This is what closes the invitation privilege-escalation hole: an
+ * account's global role no longer determines org-admin access.
+ */
+export const orgAdminProcedure = t.procedure.use(requireOrgRole('ADMIN')).use(hasOrg);
+export const orgOpsProcedure = t.procedure.use(requireOrgRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
 export const stationOrgProcedure = stationProcedure.use(hasOrg);
+/**
+ * NOTE (Task 25): still backed by `requireAssignedDriver()`, which checks
+ * the GLOBAL ctx.user.role (DRIVER or ADMIN) to decide whether the caller
+ * may even attempt a pickup/deliver — not ctx.orgRole. The task-25 brief
+ * asserted assignedDriverProcedure was unused by any router and therefore
+ * out of scope to change; that's true of the bare name, but this composed
+ * variant (built on top of it) IS wired into cycle.router.ts's pickup/
+ * deliver. Left unchanged here because fixing it is a bigger call than this
+ * task authorized (see task-25-report.md) — flagged for explicit follow-up.
+ */
 export const orgAssignedDriverProcedure = assignedDriverProcedure.use(hasOrg);
 
 /**

@@ -6,6 +6,16 @@ import { isAuthDisabled } from '../lib/auth-flags.js';
 /**
  * Role-based access control middleware
  * Ensures the authenticated user has one of the specified roles
+ *
+ * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25): this checks `ctx.user.role`,
+ * the single account-wide role on User — it has no idea which organization
+ * the request is acting on, so a user's role in one org (or no org at all)
+ * is indistinguishable from their role in any other. It backs
+ * adminProcedure/opsManagerProcedure/driverProcedure below, none of which
+ * are currently wired into any org-scoped router. Do NOT use this (or those
+ * procedures) to gate access to anything org-scoped — use `requireOrgRole`
+ * and the `org*Procedure` variants instead, which check the caller's
+ * per-membership OrganizationMember.role.
  */
 export function requireRole(...allowedRoles: UserRole[]) {
     return middleware(async ({ ctx, next }) => {
@@ -29,8 +39,36 @@ export function requireRole(...allowedRoles: UserRole[]) {
 }
 
 /**
+ * Org-scoped role-based access control middleware (Task 25). Checks the
+ * caller's MEMBERSHIP role in the resolved organization (`ctx.orgRole`),
+ * never the global `ctx.user.role` — a user's global role and their role
+ * within any specific org can legitimately differ (e.g. an existing account
+ * with global ADMIN from having signed up before, invited into a different
+ * org as DRIVER: only `ctx.orgRole` reflects what that org's admin actually
+ * granted them). Backs `orgAdminProcedure`/`orgOpsProcedure` — use these for
+ * any org-scoped authorization decision instead of the global-role variants.
+ */
+export function requireOrgRole(...allowedRoles: UserRole[]) {
+    return middleware(async ({ ctx, next }) => {
+        if (isAuthDisabled()) return next({ ctx });
+        if (!ctx.orgRole || !allowedRoles.includes(ctx.orgRole)) {
+            throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: `This action requires one of the following roles: ${allowedRoles.join(', ')}`,
+            });
+        }
+
+        return next({ ctx: { ...ctx, orgRole: ctx.orgRole } });
+    });
+}
+
+/**
  * Facility access middleware
  * Ensures user is authenticated. Specific facility checks are enforced in the service layer.
+ *
+ * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25): backs `facilityProcedure`,
+ * which is not currently wired into any router. See the note on
+ * `requireRole` above — do not use for org-scoped resources.
  */
 export function requireFacilityAccess() {
     return middleware(async ({ ctx, next }) => {

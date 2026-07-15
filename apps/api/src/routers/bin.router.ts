@@ -16,22 +16,22 @@ export const binRouter = router({
 
     /** Get bin details by ID */
     getById: orgProcedure.input(binGetByIdSchema).query(async ({ input, ctx }) => {
-        return binService.getById(ctx.orgId, input.id, ctx.user!.id, ctx.user!.role);
+        return binService.getById(ctx.orgId, input.id, ctx.user!.id, ctx.orgRole!);
     }),
 
     /** Get bin details by QR code */
     getByQrCode: orgProcedure.input(binGetByQrCodeSchema).query(async ({ input, ctx }) => {
-        return binService.getByQrCode(ctx.orgId, input.qrCode, ctx.user!.id, ctx.user!.role);
+        return binService.getByQrCode(ctx.orgId, input.qrCode, ctx.user!.id, ctx.orgRole!);
     }),
 
     /** Get active dynamic bin cycles by QR or Master QR code */
     getActiveDynamicMatches: orgProcedure.input(binGetActiveDynamicSchema).query(async ({ input, ctx }) => {
-        return binService.getActiveDynamicMatches(ctx.orgId, input.qrCode, ctx.user!.id, ctx.user!.role);
+        return binService.getActiveDynamicMatches(ctx.orgId, input.qrCode, ctx.user!.id, ctx.orgRole!);
     }),
 
     /** List bins with filters and pagination */
     list: orgProcedure.input(binListSchema).query(async ({ input, ctx }) => {
-        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.user!.role, ctx.orgId);
-        return binService.list(ctx.orgId, input, facilityIds, ctx.user!.role);
+        const facilityIds = await getUserFacilityIds(ctx.user!.id, ctx.prisma, ctx.orgRole!, ctx.orgId);
+        return binService.list(ctx.orgId, input, facilityIds, ctx.orgRole!);
     }),
 });

@@ -1,6 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import { prisma } from '@bin-tracker/db';
-import type { User, Station } from '@prisma/client';
+import type { User, Station, UserRole } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 import { resolveOrgId } from './org-context.js';
@@ -10,6 +10,14 @@ export interface Context {
     user: User | null;
     station: (Station & { facility: { id: string; name: string } }) | null;
     orgId: string | null;
+    /**
+     * The caller's ORG-SCOPED role in `orgId` — their OrganizationMember.role,
+     * resolved by the same query as orgId (see org-context.ts). NOT the
+     * global `user.role`; those can differ (Task 25). `null` whenever orgId
+     * is station-resolved (no ctx.user) or unresolved, exactly like orgId
+     * itself follows `user`/`station` resolution.
+     */
+    orgRole: UserRole | null;
     /**
      * The Supabase JWT's own claims, set whenever `verifySupabaseToken`
      * succeeds — regardless of whether a local `User` row exists yet. Needed
@@ -46,7 +54,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
             // stationProcedure and protectedProcedure will still pass
             // because DISABLE_AUTH=true bypasses the null checks in their middleware.
         }
-        const bypassOrgId = await resolveOrgId(prisma, {
+        const { orgId: bypassOrgId, orgRole: bypassOrgRole } = await resolveOrgId(prisma, {
             userId: user?.id ?? null,
             facilityId: station?.facility.id ?? null,
         });
@@ -54,7 +62,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         // (including Fastify's own request-completion log) carries orgId —
         // per-tenant log filtering without threading orgId through every call site.
         if (bypassOrgId) req.log = req.log.child({ orgId: bypassOrgId });
-        return { prisma, user, station, orgId: bypassOrgId, jwtPayload: null, req };
+        return { prisma, user, station, orgId: bypassOrgId, orgRole: bypassOrgRole, jwtPayload: null, req };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -95,7 +103,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         }
     }
 
-    const orgId = await resolveOrgId(prisma, {
+    const { orgId, orgRole } = await resolveOrgId(prisma, {
         userId: user?.id ?? null,
         facilityId: station?.facility.id ?? null,
     });
@@ -108,6 +116,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         user,
         station,
         orgId,
+        orgRole,
         jwtPayload,
         req,
     };
