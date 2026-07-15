@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -72,13 +72,44 @@ export default function FormImportPage() {
     const [stage, setStage] = useState<string>('RECEIVING');
     const [triggerType, setTriggerType] = useState<FormTriggerTypeValue>('manual');
     const [fillFrequency, setFillFrequency] = useState<FormFillFrequencyValue>('as_needed');
+    const [digitizeJobId, setDigitizeJobId] = useState<string | null>(null);
 
+    // digitizeFromPhoto enqueues a job (Gemini's vision call runs 15-30s) and
+    // returns a jobId; digitizeJobStatus polls it every 1.5s while the job is
+    // waiting/active, and stops (refetchInterval returns false) once it
+    // completes or fails. The effect below advances the wizard step once a
+    // result lands, mirroring the old onSuccess handler.
     const digitize = trpc.form.digitizeFromPhoto.useMutation({
         onSuccess: (data) => {
-            setDraft(data);
-            setStep('verify');
+            setDigitizeJobId(data.jobId);
         },
     });
+
+    const digitizeStatus = trpc.form.digitizeJobStatus.useQuery(
+        { jobId: digitizeJobId ?? '' },
+        {
+            enabled: digitizeJobId !== null,
+            refetchInterval: (query) => {
+                const state = query.state.data?.state;
+                return state === 'completed' || state === 'failed' ? false : 1500;
+            },
+        },
+    );
+
+    useEffect(() => {
+        const data = digitizeStatus.data;
+        if (!data || data.state !== 'completed') return;
+        setDraft(data.result);
+        setStep('verify');
+        setDigitizeJobId(null);
+    }, [digitizeStatus.data]);
+
+    const digitizeErrorMessage =
+        digitize.error?.message ??
+        digitizeStatus.error?.message ??
+        (digitizeStatus.data?.state === 'failed'
+            ? digitizeStatus.data.error ?? 'Digitization failed'
+            : undefined);
 
     const refine = trpc.form.refineFromRegion.useMutation({
         onSuccess: (data) => {
@@ -233,14 +264,17 @@ export default function FormImportPage() {
                     <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
                     <p className="font-semibold">Digitizing form with AI…</p>
                     <p className="text-sm mt-1">This may take 15–30 seconds</p>
-                    {digitize.error && (
+                    {digitizeErrorMessage && (
                         <div className="mt-6 max-w-md rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm">
                             <AlertCircle className="w-5 h-5 inline mr-2" />
-                            {digitize.error.message}
+                            {digitizeErrorMessage}
                             <button
                                 type="button"
                                 className="block mt-3 underline"
-                                onClick={() => setStep('capture')}
+                                onClick={() => {
+                                    setDigitizeJobId(null);
+                                    setStep('capture');
+                                }}
                             >
                                 Try another photo
                             </button>

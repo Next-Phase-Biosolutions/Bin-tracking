@@ -139,6 +139,11 @@ export const formDigitizeFromPhotoSchema = z.object({
     mimeType: z.string().default('image/jpeg'),
 });
 
+/** Input for polling the status of an async `form.digitizeFromPhoto` job. */
+export const formDigitizeJobStatusSchema = z.object({
+    jobId: z.string().min(1),
+});
+
 export const formRefineRegionSchema = z.object({
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
@@ -183,6 +188,7 @@ export const formTranscribeFieldSchema = z.object({
 export type FormListByStageInput = z.infer<typeof formListByStageSchema>;
 export type FormGetByIdInput = z.infer<typeof formGetByIdSchema>;
 export type FormDigitizeFromPhotoInput = z.infer<typeof formDigitizeFromPhotoSchema>;
+export type FormDigitizeJobStatusInput = z.infer<typeof formDigitizeJobStatusSchema>;
 export type FormRefineFromRegionInput = z.infer<typeof formRefineFromRegionSchema>;
 export type FormCreateInput = z.infer<typeof formCreateSchema>;
 export type FormTranscribeFieldInput = z.infer<typeof formTranscribeFieldSchema>;

@@ -3,11 +3,16 @@ import { Worker, type Job } from 'bullmq';
 import {
     HEAVY_JOBS_QUEUE,
     PAYROLL_COMPUTE_RUN_JOB,
+    FORM_DIGITIZE_JOB,
     createRedisConnection,
     type PayrollComputeRunJobData,
+    type FormDigitizeJobData,
 } from './lib/queue.js';
 import { payrollService } from './services/payroll.service.js';
+import { formService } from './services/form.service.js';
 import { initSentry, captureError } from './lib/sentry.js';
+
+type HeavyJobData = PayrollComputeRunJobData | FormDigitizeJobData;
 
 const IS_DEV = process.env['NODE_ENV'] !== 'production';
 
@@ -25,16 +30,22 @@ initSentry();
  * main API server, this process's only job is to talk to Redis, so failing
  * loudly at startup here is correct rather than a boot-safety violation.
  */
-async function processJob(job: Job<PayrollComputeRunJobData>) {
+async function processJob(job: Job<HeavyJobData>) {
     switch (job.name) {
-        case PAYROLL_COMPUTE_RUN_JOB:
-            return payrollService.computeRun(job.data.orgId, job.data.input);
+        case PAYROLL_COMPUTE_RUN_JOB: {
+            const data = job.data as PayrollComputeRunJobData;
+            return payrollService.computeRun(data.orgId, data.input);
+        }
+        case FORM_DIGITIZE_JOB: {
+            const data = job.data as FormDigitizeJobData;
+            return formService.digitizeFromPhoto(data.imageBase64, data.orgId, data.mimeType);
+        }
         default:
             throw new Error(`heavy-jobs worker: unknown job name "${job.name}"`);
     }
 }
 
-const worker = new Worker<PayrollComputeRunJobData>(HEAVY_JOBS_QUEUE, processJob, {
+const worker = new Worker<HeavyJobData>(HEAVY_JOBS_QUEUE, processJob, {
     connection: createRedisConnection(),
 });
 

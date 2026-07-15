@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import type { PayrollPeriodInput } from '@bin-tracker/validators';
-import type { PayrollRunView } from '@bin-tracker/types';
+import type { PayrollRunView, FormDigitizeDraft } from '@bin-tracker/types';
 
 // NOTE: package.json pins "ioredis" to the exact version bullmq bundles
 // internally (5.10.1). If they diverge, pnpm keeps two separate `Redis`
@@ -10,7 +10,7 @@ import type { PayrollRunView } from '@bin-tracker/types';
 
 export const HEAVY_JOBS_QUEUE = 'heavy-jobs';
 
-/** Job data for the one job type this batch introduces. */
+/** Job data for payroll.computeRun (Task 22a). */
 export interface PayrollComputeRunJobData {
     orgId: string;
     input: PayrollPeriodInput;
@@ -18,11 +18,21 @@ export interface PayrollComputeRunJobData {
 
 export const PAYROLL_COMPUTE_RUN_JOB = 'payroll.computeRun';
 
-type HeavyJobName = typeof PAYROLL_COMPUTE_RUN_JOB;
-type HeavyJobResult = PayrollRunView;
+/** Job data for form.digitizeFromPhoto (Task 22b) — Gemini's 10-30s vision call. */
+export interface FormDigitizeJobData {
+    orgId: string;
+    imageBase64: string;
+    mimeType: string;
+}
+
+export const FORM_DIGITIZE_JOB = 'form.digitizeFromPhoto';
+
+type HeavyJobData = PayrollComputeRunJobData | FormDigitizeJobData;
+type HeavyJobName = typeof PAYROLL_COMPUTE_RUN_JOB | typeof FORM_DIGITIZE_JOB;
+type HeavyJobResult = PayrollRunView | FormDigitizeDraft;
 
 let _connection: IORedis | null = null;
-let _queue: Queue<PayrollComputeRunJobData, HeavyJobResult, HeavyJobName> | null = null;
+let _queue: Queue<HeavyJobData, HeavyJobResult, HeavyJobName> | null = null;
 
 /**
  * BullMQ persists `job.returnvalue` to Redis via `JSON.stringify` and
@@ -67,7 +77,7 @@ export function createRedisConnection(): IORedis {
  * unset (e.g. local dev). Only throws when a job is actually enqueued or
  * polled.
  */
-export function getHeavyJobsQueue(): Queue<PayrollComputeRunJobData, HeavyJobResult, HeavyJobName> {
+export function getHeavyJobsQueue(): Queue<HeavyJobData, HeavyJobResult, HeavyJobName> {
     if (_queue) return _queue;
     _connection = createRedisConnection();
     _queue = new Queue(HEAVY_JOBS_QUEUE, { connection: _connection });

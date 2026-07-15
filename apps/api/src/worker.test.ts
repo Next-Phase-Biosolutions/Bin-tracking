@@ -11,9 +11,22 @@ vi.mock('./services/payroll.service.js', () => ({
     payrollService: { computeRun: computeRunMock, getRun: vi.fn(), listRuns: vi.fn() },
 }));
 
+const digitizeFromPhotoMock = vi.fn();
+vi.mock('./services/form.service.js', () => ({
+    formService: {
+        digitizeFromPhoto: digitizeFromPhotoMock,
+        refineFromRegion: vi.fn(),
+        listByStage: vi.fn(),
+        getById: vi.fn(),
+        create: vi.fn(),
+        transcribeField: vi.fn(),
+    },
+}));
+
 vi.mock('./lib/queue.js', () => ({
     HEAVY_JOBS_QUEUE: 'heavy-jobs',
     PAYROLL_COMPUTE_RUN_JOB: 'payroll.computeRun',
+    FORM_DIGITIZE_JOB: 'form.digitizeFromPhoto',
     createRedisConnection: () => ({ marker: 'fake-redis-connection' }),
 }));
 
@@ -51,11 +64,36 @@ describe('heavy-jobs worker processor', () => {
         expect(result).toEqual({ id: 'run-1', period: '2026-06' });
     });
 
+    it("invokes formService.digitizeFromPhoto with the job's imageBase64, orgId, and mimeType for a form.digitizeFromPhoto job", async () => {
+        digitizeFromPhotoMock.mockResolvedValue({
+            title: 'Intake Form',
+            description: null,
+            formType: 'standard',
+            schema: { formType: 'standard', sections: [] },
+        });
+        const job = {
+            name: 'form.digitizeFromPhoto',
+            data: { orgId: 'org-a', imageBase64: 'base64==', mimeType: 'image/png' },
+        };
+
+        const result = await capturedProcessor!(job);
+
+        expect(digitizeFromPhotoMock).toHaveBeenCalledWith('base64==', 'org-a', 'image/png');
+        expect(result).toEqual({
+            title: 'Intake Form',
+            description: null,
+            formType: 'standard',
+            schema: { formType: 'standard', sections: [] },
+        });
+    });
+
     it('rejects an unrecognized job name instead of silently doing nothing', async () => {
         computeRunMock.mockClear();
+        digitizeFromPhotoMock.mockClear();
         const job = { name: 'mystery.job', data: {} };
 
         await expect(capturedProcessor!(job)).rejects.toThrow(/unknown job name/i);
         expect(computeRunMock).not.toHaveBeenCalled();
+        expect(digitizeFromPhotoMock).not.toHaveBeenCalled();
     });
 });

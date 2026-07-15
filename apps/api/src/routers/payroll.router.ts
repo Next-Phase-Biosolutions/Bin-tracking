@@ -3,6 +3,7 @@ import { router, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
 import { payrollPeriodSchema, payrollListSchema, payrollJobStatusSchema } from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
 import { getHeavyJobsQueue, PAYROLL_COMPUTE_RUN_JOB, reviveJobResultDates } from '../lib/queue.js';
+import type { PayrollRunView } from '@bin-tracker/types';
 
 export const payrollRouter = router({
     /**
@@ -37,7 +38,10 @@ export const payrollRouter = router({
 
             const state = await job.getState();
             if (state === 'completed') {
-                return { state, result: reviveJobResultDates(job.returnvalue) };
+                // getJob's returnvalue type is the union across all heavy-jobs
+                // job types (Task 22b added a second one); this job name only
+                // ever produces a PayrollRunView.
+                return { state, result: reviveJobResultDates(job.returnvalue as PayrollRunView) };
             }
             if (state === 'failed') {
                 return { state, error: job.failedReason };
