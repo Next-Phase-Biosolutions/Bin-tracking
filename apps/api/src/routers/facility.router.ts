@@ -4,6 +4,7 @@ import {
     updateFacilitySchema,
     getFacilitySchema,
     listFacilitiesSchema,
+    createStationSchema,
 } from '@bin-tracker/validators';
 import { facilityService } from '../services/facility.service.js';
 import { getUserFacilityIds } from '../trpc/middleware.js';
@@ -23,6 +24,11 @@ export const facilityRouter = router({
     /** Create facility (ADMIN only) */
     create: orgAdminProcedure.input(createFacilitySchema).mutation(async ({ input, ctx }) => {
         return facilityService.create(ctx.orgId, input);
+    }),
+
+    /** Provision a station (tablet) token for a facility (ADMIN only) */
+    createStation: orgAdminProcedure.input(createStationSchema).mutation(async ({ input, ctx }) => {
+        return facilityService.createStation(ctx.orgId, input);
     }),
 
     /** Update facility */

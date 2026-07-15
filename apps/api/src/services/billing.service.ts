@@ -139,6 +139,35 @@ export async function createCheckoutSession(orgId: string, plan: Plan): Promise<
     return { url: session.url };
 }
 
+/**
+ * Called right after provisionOrganization() during self-serve signup when
+ * BILLING_ENABLED=true (auth.router.ts's createOrganization, Task 18).
+ * Creates a real Stripe customer + subscription with a 14-day trial, then
+ * syncs it into the local Subscription row via the same syncSubscriptionFromStripe
+ * path Stripe webhooks use — so the org has real stripeCustomerId/
+ * stripeSubscriptionId immediately instead of waiting on the first webhook
+ * delivery. Not reachable in any current deployment (BILLING_ENABLED
+ * defaults to false); correctness is verified via mocked Stripe in tests.
+ */
+export async function createTrialSubscription(orgId: string, ownerEmail: string): Promise<void> {
+    requireBillingEnabled();
+    const priceId = PRICE_BY_PLAN['STARTER'];
+    if (!priceId) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'No Stripe price configured for the STARTER plan' });
+    }
+
+    const stripe = getStripe();
+    const customer = await stripe.customers.create({ email: ownerEmail, metadata: { orgId } });
+    const trialSubscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: priceId }],
+        trial_period_days: 14,
+        metadata: { orgId },
+    });
+
+    await syncSubscriptionFromStripe(orgId, trialSubscription);
+}
+
 export async function createPortalSession(orgId: string): Promise<{ url: string }> {
     requireBillingEnabled();
     const subscription = await prisma.subscription.findUnique({ where: { orgId } });
@@ -173,5 +202,6 @@ export const billingService = {
     handleStripeEvent,
     createCheckoutSession,
     createPortalSession,
+    createTrialSubscription,
     getCurrentSubscription,
 };

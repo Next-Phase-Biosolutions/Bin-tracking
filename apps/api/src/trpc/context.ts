@@ -10,6 +10,15 @@ export interface Context {
     user: User | null;
     station: (Station & { facility: { id: string; name: string } }) | null;
     orgId: string | null;
+    /**
+     * The Supabase JWT's own claims, set whenever `verifySupabaseToken`
+     * succeeds — regardless of whether a local `User` row exists yet. Needed
+     * for `verifiedProcedure` (trpc.ts): a brand-new signup has a valid JWT
+     * but no `User` row, so `user` alone can't gate access to `auth.bootstrap`
+     * (Task 18) or invitation-accept (Task 19). Every other procedure keeps
+     * using `user`/`orgId` exactly as before — this field is purely additive.
+     */
+    jwtPayload: { sub: string; email?: string } | null;
     req: FastifyRequest;
 }
 
@@ -41,11 +50,12 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
             userId: user?.id ?? null,
             facilityId: station?.facility.id ?? null,
         });
-        return { prisma, user, station, orgId: bypassOrgId, req };
+        return { prisma, user, station, orgId: bypassOrgId, jwtPayload: null, req };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
     const authHeader = req.headers.authorization;
+    let jwtPayload: { sub: string; email?: string } | null = null;
 
     if (authHeader?.startsWith('Bearer ')) {
         // JWT auth — verify Supabase token
@@ -54,6 +64,10 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         const payload = await verifySupabaseToken(token);
 
         if (payload?.sub) {
+            // Set regardless of whether a local User row exists yet — see
+            // the jwtPayload doc comment on Context.
+            jwtPayload = { sub: payload.sub, email: payload.email };
+
             // Look up user in our database by Supabase user ID
             user = await prisma.user.findUnique({
                 where: { id: payload.sub },
@@ -87,6 +101,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         user,
         station,
         orgId,
+        jwtPayload,
         req,
     };
 }

@@ -12,6 +12,15 @@ interface AuthContextValue {
     user: AuthUser | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
+    /**
+     * Returns { needsEmailConfirmation: true } when the Supabase project
+     * requires confirming the email before a session is issued — signUp()
+     * still succeeds but data.session is null until the user clicks the
+     * confirmation link. Building that confirmation-link landing flow is out
+     * of scope here; the caller just needs to show a "check your email"
+     * message instead of proceeding into onboarding.
+     */
+    signup: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
     logout: () => Promise<void>;
 }
 
@@ -53,6 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(data.session.access_token);
     }, []);
 
+    const signup = useCallback(async (email: string, password: string) => {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw new Error(error.message);
+        if (!data.session || !data.user) {
+            return { needsEmailConfirmation: true };
+        }
+        setUser({ id: data.user.id, email: data.user.email ?? '' });
+        setAuthToken(data.session.access_token);
+        return { needsEmailConfirmation: false };
+    }, []);
+
     const logout = useCallback(async () => {
         await supabase.auth.signOut();
         setUser(null);
@@ -60,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
             {children}
         </AuthContext.Provider>
     );

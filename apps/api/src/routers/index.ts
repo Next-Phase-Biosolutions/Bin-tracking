@@ -1,4 +1,5 @@
 import { router } from '../trpc/trpc.js';
+import { authRouter } from './auth.router.js';
 import { binRouter } from './bin.router.js';
 import { cycleRouter } from './cycle.router.js';
 import { facilityRouter } from './facility.router.js';
@@ -14,6 +15,7 @@ import { billingRouter } from './billing.router.js';
 import { adminRouter } from './admin.router.js';
 
 export const appRouter = router({
+    auth: authRouter,
     bin: binRouter,
     cycle: cycleRouter,
     facility: facilityRouter,

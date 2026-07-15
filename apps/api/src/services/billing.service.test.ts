@@ -32,15 +32,18 @@ vi.mock('@bin-tracker/db', () => ({
 }));
 
 // ─── Fake Stripe client — deterministic price<->plan map, no network ──
-const { retrieveSubscriptionMock, checkoutCreateMock, portalCreateMock } = vi.hoisted(() => ({
+const { retrieveSubscriptionMock, checkoutCreateMock, portalCreateMock, customersCreateMock, subscriptionsCreateMock } = vi.hoisted(() => ({
     retrieveSubscriptionMock: vi.fn(),
     checkoutCreateMock: vi.fn(),
     portalCreateMock: vi.fn(),
+    customersCreateMock: vi.fn(),
+    subscriptionsCreateMock: vi.fn(),
 }));
 
 vi.mock('../lib/stripe.js', () => ({
     getStripe: vi.fn().mockReturnValue({
-        subscriptions: { retrieve: retrieveSubscriptionMock },
+        subscriptions: { retrieve: retrieveSubscriptionMock, create: subscriptionsCreateMock },
+        customers: { create: customersCreateMock },
         checkout: { sessions: { create: checkoutCreateMock } },
         billingPortal: { sessions: { create: portalCreateMock } },
     }),
@@ -53,6 +56,7 @@ import {
     handleStripeEvent,
     createCheckoutSession,
     createPortalSession,
+    createTrialSubscription,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } from './billing.service.js';
 
@@ -75,6 +79,8 @@ beforeEach(() => {
     retrieveSubscriptionMock.mockReset();
     checkoutCreateMock.mockReset();
     portalCreateMock.mockReset();
+    customersCreateMock.mockReset();
+    subscriptionsCreateMock.mockReset();
     delete process.env['BILLING_ENABLED'];
 });
 
@@ -222,5 +228,50 @@ describe('createCheckoutSession / createPortalSession — BILLING_ENABLED gate',
                 metadata: { orgId: 'org_1' },
             }),
         );
+    });
+});
+
+describe('createTrialSubscription — self-serve signup trial (Task 18)', () => {
+    it('throws NOT_IMPLEMENTED while billing is disabled, without touching Stripe', async () => {
+        await expect(createTrialSubscription('org_1', 'owner@example.com')).rejects.toMatchObject({
+            code: 'NOT_IMPLEMENTED',
+        });
+        expect(customersCreateMock).not.toHaveBeenCalled();
+        expect(subscriptionsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('creates a Stripe customer + 14-day-trial STARTER subscription, then syncs it locally', async () => {
+        process.env['BILLING_ENABLED'] = 'true';
+        customersCreateMock.mockResolvedValue({ id: 'cus_new' });
+        subscriptionsCreateMock.mockResolvedValue(
+            fakeStripeSub({
+                id: 'sub_trial',
+                status: 'trialing',
+                customer: 'cus_new',
+                metadata: { orgId: 'org_1' },
+                items: { data: [{ price: { id: 'price_starter' }, current_period_end: 1_700_000_000 }] },
+            }),
+        );
+
+        await createTrialSubscription('org_1', 'owner@example.com');
+
+        expect(customersCreateMock).toHaveBeenCalledWith(
+            expect.objectContaining({ email: 'owner@example.com', metadata: { orgId: 'org_1' } }),
+        );
+        expect(subscriptionsCreateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                customer: 'cus_new',
+                items: [{ price: 'price_starter' }],
+                trial_period_days: 14,
+                metadata: { orgId: 'org_1' },
+            }),
+        );
+        // Reuses syncSubscriptionFromStripe's own upsert path — proves the
+        // local Subscription row ends up with the real Stripe ids/status.
+        expect(upsertCalls).toHaveLength(1);
+        expect(upsertCalls[0]).toMatchObject({
+            where: { orgId: 'org_1' },
+            update: { plan: 'STARTER', status: 'TRIALING', stripeCustomerId: 'cus_new', stripeSubscriptionId: 'sub_trial' },
+        });
     });
 });

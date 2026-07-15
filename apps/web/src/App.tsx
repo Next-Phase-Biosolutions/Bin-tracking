@@ -24,6 +24,9 @@ import WetAgingPage from './features/dashboard/WetAgingPage';
 import ValueAddPage from './features/dashboard/ValueAddPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
+import SignupPage from './features/onboarding/SignupPage';
+import OnboardingWizard from './features/onboarding/OnboardingWizard';
+import LoginPage from './features/auth/LoginPage';
 
 export function App() {
     return (
@@ -32,6 +35,9 @@ export function App() {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/solutions" element={<SolutionsPage />} />
             <Route path="/process" element={<ProcessPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/onboarding" element={<OnboardingWizard />} />
             <Route path="/app/bin" element={<TabletPage />} />
             <Route path="/app/driver" element={<DriverPage />} />
             <Route path="/app/dashboard" element={<DashboardPage />} />

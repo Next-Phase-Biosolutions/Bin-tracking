@@ -1,8 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import { PLAN_LIMITS } from '@bin-tracker/types';
-import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput } from '@bin-tracker/validators';
+import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput, CreateStationInput } from '@bin-tracker/validators';
 import { handlePrismaError } from '../lib/errors.js';
+
+function generateStationToken(): string {
+    return `STN-${randomUUID()}`;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === 'P2002';
+}
 
 export const facilityService = {
     async list(orgId: string, input: ListFacilitiesInput, facilityIds: string[], userRole: string) {
@@ -106,6 +115,43 @@ export const facilityService = {
         } catch (error) {
             handlePrismaError(error);
         }
+    },
+
+    /**
+     * Provisions a Station (tablet) token for a facility — used by the
+     * onboarding wizard (Task 18) to show a QR code for tablet setup.
+     * Verifies the facility belongs to `orgId` first: a facilityId is
+     * client-supplied input, so this must never trust it as already
+     * org-scoped, the same discipline as getById/update/remove above.
+     */
+    async createStation(orgId: string, input: CreateStationInput) {
+        const facility = await prisma.facility.findFirst({ where: { id: input.facilityId, organizationId: orgId } });
+        if (!facility || facility.deletedAt) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Facility not found' });
+        }
+
+        const MAX_ATTEMPTS = 5;
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+            try {
+                return await prisma.station.create({
+                    data: {
+                        facilityId: input.facilityId,
+                        token: generateStationToken(),
+                        label: input.label ?? 'Tablet',
+                    },
+                });
+            } catch (error: unknown) {
+                // P2002 = unique collision on token (astronomically unlikely
+                // with a UUID) — retry with a freshly generated token.
+                if (isUniqueConstraintError(error) && attempt < MAX_ATTEMPTS - 1) continue;
+                handlePrismaError(error);
+            }
+        }
+
+        throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Could not generate a unique station token. Please retry.',
+        });
     },
 
     /** Soft delete — sets deletedAt timestamp */

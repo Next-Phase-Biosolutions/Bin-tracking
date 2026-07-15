@@ -45,6 +45,35 @@ const isAuthenticated = middleware(async ({ ctx, next }) => {
 export const protectedProcedure = t.procedure.use(isAuthenticated);
 
 /**
+ * Verified procedure — requires a valid Supabase JWT (`ctx.jwtPayload`), but
+ * NOT an existing local `User` row. Distinct from protectedProcedure, whose
+ * `isAuthenticated` middleware throws unless `ctx.user` is already set — a
+ * brand-new signup has a valid JWT but no `User` row yet, so a literal
+ * protectedProcedure would 401 before its handler ever ran.
+ *
+ * Used by `auth.bootstrap` (Task 18), which creates the `User` row on first
+ * call, and reusable as-is by Task 19's invitation-accept for the identical
+ * reason.
+ */
+const isVerified = middleware(async ({ ctx, next }) => {
+    // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
+    if (isAuthDisabled()) {
+        return next({ ctx });
+    }
+    if (!ctx.jwtPayload) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+        });
+    }
+    return next({
+        ctx: { ...ctx, jwtPayload: ctx.jwtPayload },
+    });
+});
+
+export const verifiedProcedure = t.procedure.use(isVerified);
+
+/**
  * Station procedure — requires station token auth (tablets)
  */
 const isStation = middleware(async ({ ctx, next }) => {
