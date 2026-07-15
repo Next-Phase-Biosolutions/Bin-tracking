@@ -524,8 +524,8 @@ export function DashboardPage() {
             </main>
 
             {selectedCycle && <DetailsSlideover cycle={selectedCycle} onClose={() => setSelectedCycle(null)} />}
-            {anchorModalOpen && hasModule('BLOCKCHAIN_ANCHOR') && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
-            {anchorModalOpen && !hasModule('BLOCKCHAIN_ANCHOR') && (
+            {anchorModalOpen && !isSubscriptionLoading && hasModule('BLOCKCHAIN_ANCHOR') && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
+            {anchorModalOpen && !isSubscriptionLoading && !hasModule('BLOCKCHAIN_ANCHOR') && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setAnchorModalOpen(false)}>
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
                     <div className="relative" onClick={(e) => e.stopPropagation()}>
