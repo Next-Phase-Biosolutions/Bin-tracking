@@ -86,8 +86,13 @@ export function requireFacilityAccess() {
 
 /**
  * Driver assignment middleware
- * Ensures the user has the DRIVER or ADMIN role.
+ * Ensures the caller's ORG-SCOPED role (ctx.orgRole) is DRIVER or ADMIN.
  * The specific per-cycle driver assignment check is enforced in the service layer.
+ *
+ * Task 25 follow-up: originally checked the global `ctx.user.role`, which let
+ * a user's account-wide role diverge from their role in the org actually
+ * being acted on (same class of bug Task 25 fixed for requireOrgRole). Now
+ * checks `ctx.orgRole` like the rest of the org-scoped middleware.
  */
 export function requireAssignedDriver() {
     return middleware(async ({ ctx, next }) => {
@@ -99,7 +104,7 @@ export function requireAssignedDriver() {
             });
         }
 
-        if (ctx.user.role !== 'DRIVER' && ctx.user.role !== 'ADMIN') {
+        if (ctx.orgRole !== 'DRIVER' && ctx.orgRole !== 'ADMIN') {
             throw new TRPCError({
                 code: 'FORBIDDEN',
                 message: 'Only drivers can perform this action',

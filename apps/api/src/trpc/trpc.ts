@@ -119,8 +119,13 @@ export const facilityProcedure = t.procedure.use(isAuthenticated).use(requireFac
  * Driver assignment procedure (for pickup/deliver)
  * Verifies the user is the assigned driver for the cycle
  *
- * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25) — see requireAssignedDriver in
- * middleware.ts.
+ * ORG-SCOPED, NOT COMPOSED WITH `hasOrg` (Task 25 follow-up): backed by
+ * `requireAssignedDriver()`, which now checks `ctx.orgRole` (DRIVER or
+ * ADMIN) instead of the global `ctx.user.role`. This bare procedure doesn't
+ * run `hasOrg` first, so if used standalone `ctx.orgRole` would be `null`
+ * for any caller — the check fails closed rather than falling back to a
+ * global role. Use `orgAssignedDriverProcedure` below for anything
+ * org-scoped; this bare name has no live router usage.
  */
 export const assignedDriverProcedure = t.procedure.use(requireAssignedDriver());
 
@@ -147,14 +152,11 @@ export const orgAdminProcedure = t.procedure.use(requireOrgRole('ADMIN')).use(ha
 export const orgOpsProcedure = t.procedure.use(requireOrgRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
 export const stationOrgProcedure = stationProcedure.use(hasOrg);
 /**
- * NOTE (Task 25): still backed by `requireAssignedDriver()`, which checks
- * the GLOBAL ctx.user.role (DRIVER or ADMIN) to decide whether the caller
- * may even attempt a pickup/deliver — not ctx.orgRole. The task-25 brief
- * asserted assignedDriverProcedure was unused by any router and therefore
- * out of scope to change; that's true of the bare name, but this composed
- * variant (built on top of it) IS wired into cycle.router.ts's pickup/
- * deliver. Left unchanged here because fixing it is a bigger call than this
- * task authorized (see task-25-report.md) — flagged for explicit follow-up.
+ * Backed by `requireAssignedDriver()`, which checks the caller's org-scoped
+ * `ctx.orgRole` (DRIVER or ADMIN) — resolved eagerly at context-creation
+ * time (same as ctx.orgId), so it's already correct here regardless of
+ * `hasOrg` running after it in this chain. Wired into cycle.router.ts's
+ * pickup/deliver.
  */
 export const orgAssignedDriverProcedure = assignedDriverProcedure.use(hasOrg);
 
