@@ -1,11 +1,7 @@
-import { Routes, Route } from 'react-router-dom';
-import { HomePage } from './pages/HomePage';
-import { SolutionsPage } from './pages/SolutionsPage';
-import { ProcessPage } from './pages/ProcessPage';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import TabletPage from './features/tablet/TabletPage';
 import DriverPage from './features/driver/DriverPage';
 import DashboardPage from './features/dashboard/DashboardPage';
-import { AboutPage } from './pages/AboutPage';
 import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistrationPage';
 import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
@@ -28,14 +24,24 @@ import SignupPage from './features/onboarding/SignupPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import AcceptInvitePage from './features/onboarding/AcceptInvitePage';
 import LoginPage from './features/auth/LoginPage';
+import { useAuth } from './context/AuthContext';
+
+/**
+ * The marketing pages (home, about, solutions, process) now live in the
+ * separate apps/marketing site. The app's root route just routes an
+ * unauthenticated visitor to /login and an authenticated one to their
+ * dashboard.
+ */
+function RootRedirect() {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    return <Navigate to={user ? '/app/dashboard' : '/login'} replace />;
+}
 
 export function App() {
     return (
         <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/solutions" element={<SolutionsPage />} />
-            <Route path="/process" element={<ProcessPage />} />
+            <Route path="/" element={<RootRedirect />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/onboarding" element={<OnboardingWizard />} />

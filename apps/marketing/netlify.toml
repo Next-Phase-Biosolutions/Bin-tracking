@@ -1,0 +1,15 @@
+[build]
+  # Marketing has no Prisma/tRPC dependency, so no db:generate step is needed.
+  command = "pnpm --filter=@bin-tracker/marketing build"
+
+  # Tell Netlify where the compiled frontend files end up
+  publish = "apps/marketing/dist"
+
+  # Tell Netlify where to run the build command from
+  base = "apps/marketing"
+
+[[redirects]]
+  # This ensures React Router handles all page refreshing correctly
+  from = "/*"
+  to = "/index.html"
+  status = 200
