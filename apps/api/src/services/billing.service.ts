@@ -21,6 +21,18 @@ function isBillingEnabled(): boolean {
     return process.env['BILLING_ENABLED'] === 'true';
 }
 
+/**
+ * A webhook event that can NEVER succeed, no matter how many times Stripe
+ * retries it (unknown price ID, missing orgId metadata). The webhook route
+ * acks these with 200 (after logging) instead of 500 — otherwise Stripe
+ * retries for days and may disable the endpoint over sustained failures.
+ * Transient errors (DB down, Stripe API hiccup) stay ordinary throws → 500 →
+ * retry, which is exactly what we want for them.
+ */
+export class PermanentStripeError extends Error {
+    override readonly name = 'PermanentStripeError';
+}
+
 function requireBillingEnabled(): void {
     if (!isBillingEnabled()) {
         throw new TRPCError({ code: 'NOT_IMPLEMENTED', message: 'Billing is not yet enabled' });
@@ -44,22 +56,55 @@ function customerIdOf(customer: Stripe.Subscription['customer']): string {
  * row, then reconciles the org's module bundle to match the new plan. The
  * webhook only ever trusts `items.data[0].price.id` and `status` off the
  * Stripe object itself — never client input.
+ *
+ * `eventCreated` is the Stripe event's own `created` timestamp. Stripe does
+ * not guarantee delivery order — a retried older `customer.subscription.updated`
+ * (say, status `active`) arriving after a newer `deleted` would otherwise
+ * re-grant the org's full module bundle. Any event older than the last one
+ * applied is skipped outright.
  */
-export async function syncSubscriptionFromStripe(orgId: string, stripeSub: Stripe.Subscription): Promise<void> {
+export async function syncSubscriptionFromStripe(
+    orgId: string,
+    stripeSub: Stripe.Subscription,
+    eventCreated: Date = new Date(),
+): Promise<void> {
     const item = stripeSub.items.data[0];
     const priceId = item?.price.id ?? '';
     const plan = PLAN_BY_PRICE[priceId];
     if (!plan) {
-        throw new Error(`Stripe subscription ${stripeSub.id} has unrecognized price ${priceId}`);
+        throw new PermanentStripeError(`Stripe subscription ${stripeSub.id} has unrecognized price ${priceId}`);
     }
     const status = mapStripeStatus(stripeSub.status);
     const currentPeriodEnd = item ? new Date(item.current_period_end * 1000) : null;
     const stripeCustomerId = customerIdOf(stripeSub.customer);
 
+    const existing = await prisma.subscription.findUnique({
+        where: { orgId },
+        select: { lastStripeEventAt: true },
+    });
+    if (existing?.lastStripeEventAt && eventCreated < existing.lastStripeEventAt) {
+        return; // stale out-of-order event — newer state already applied
+    }
+
     await prisma.subscription.upsert({
         where: { orgId },
-        update: { plan, status, currentPeriodEnd, stripeCustomerId, stripeSubscriptionId: stripeSub.id },
-        create: { orgId, plan, status, currentPeriodEnd, stripeCustomerId, stripeSubscriptionId: stripeSub.id },
+        update: {
+            plan,
+            status,
+            currentPeriodEnd,
+            stripeCustomerId,
+            stripeSubscriptionId: stripeSub.id,
+            lastStripeEventAt: eventCreated,
+        },
+        create: {
+            orgId,
+            plan,
+            status,
+            currentPeriodEnd,
+            stripeCustomerId,
+            stripeSubscriptionId: stripeSub.id,
+            lastStripeEventAt: eventCreated,
+        },
     });
 
     if (isSubscriptionUsable(status)) {
@@ -91,13 +136,13 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
             if (!session.subscription) return; // e.g. one-time payment mode, not applicable here
             const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
             const stripeSub = await getStripe().subscriptions.retrieve(subscriptionId);
-            await syncFromSubscriptionMetadata(stripeSub);
+            await syncFromSubscriptionMetadata(stripeSub, new Date(event.created * 1000));
             break;
         }
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
         case 'customer.subscription.deleted': {
-            await syncFromSubscriptionMetadata(event.data.object);
+            await syncFromSubscriptionMetadata(event.data.object, new Date(event.created * 1000));
             break;
         }
         default:
@@ -105,12 +150,12 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     }
 }
 
-async function syncFromSubscriptionMetadata(stripeSub: Stripe.Subscription): Promise<void> {
+async function syncFromSubscriptionMetadata(stripeSub: Stripe.Subscription, eventCreated: Date): Promise<void> {
     const orgId = stripeSub.metadata['orgId'];
     if (!orgId) {
-        throw new Error(`Stripe subscription ${stripeSub.id} is missing orgId metadata`);
+        throw new PermanentStripeError(`Stripe subscription ${stripeSub.id} is missing orgId metadata`);
     }
-    await syncSubscriptionFromStripe(orgId, stripeSub);
+    await syncSubscriptionFromStripe(orgId, stripeSub, eventCreated);
 }
 
 export async function createCheckoutSession(orgId: string, plan: Plan): Promise<{ url: string }> {

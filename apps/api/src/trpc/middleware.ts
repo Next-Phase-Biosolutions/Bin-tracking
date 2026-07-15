@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { middleware } from './trpc.js';
-import type { UserRole } from '@prisma/client';
+import type { UserRole, PrismaClient } from '@prisma/client';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 
 /**
@@ -121,8 +121,7 @@ export function requireAssignedDriver() {
 export async function userCanAccessBin(
     userId: string,
     binId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    prisma: any,
+    prisma: PrismaClient,
     userRole: UserRole,
 ): Promise<boolean> {
     // ADMIN always has access
@@ -159,8 +158,7 @@ export async function userCanAccessBin(
  */
 export async function getUserFacilityIds(
     userId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    prisma: any,
+    prisma: PrismaClient,
     userRole: UserRole,
     orgId: string,
 ): Promise<string[]> {
@@ -170,14 +168,17 @@ export async function getUserFacilityIds(
             where: { deletedAt: null, organizationId: orgId },
             select: { id: true },
         });
-        return facilities.map((f: { id: string }) => f.id);
+        return facilities.map((f) => f.id);
     }
 
-    // Other roles: get assigned facilities
+    // Other roles: get assigned facilities — scoped to the resolved org.
+    // Every service ANDs organizationId anyway, but a user with assignments
+    // in multiple orgs must not have foreign facility ids handed around
+    // (defense in depth against a future call site forgetting the AND).
     const userFacilities = await prisma.userFacility.findMany({
-        where: { userId },
+        where: { userId, facility: { organizationId: orgId } },
         select: { facilityId: true },
     });
 
-    return userFacilities.map((uf: { facilityId: string }) => uf.facilityId);
+    return userFacilities.map((uf) => uf.facilityId);
 }

@@ -172,6 +172,10 @@ model Subscription {
   plan                 Plan               @default(STARTER)
   status               SubscriptionStatus @default(TRIALING)
   currentPeriodEnd     DateTime?
+  // Stripe `event.created` of the last webhook applied to this row. Stripe
+  // does NOT guarantee delivery order — a retried older event must never
+  // overwrite state written by a newer one (billing.service.ts skips it).
+  lastStripeEventAt    DateTime?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 

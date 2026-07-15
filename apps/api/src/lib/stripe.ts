@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import type { Plan } from '@bin-tracker/types';
 
 let _stripe: Stripe | null = null;
 
@@ -16,13 +17,13 @@ export function getStripe(): Stripe {
     return _stripe;
 }
 
-export const PRICE_BY_PLAN: Record<string, string> = {
+export const PRICE_BY_PLAN: Record<Plan, string> = {
     STARTER: process.env['STRIPE_PRICE_STARTER'] ?? '',
     PRO: process.env['STRIPE_PRICE_PRO'] ?? '',
     ENTERPRISE: process.env['STRIPE_PRICE_ENTERPRISE'] ?? '',
 };
-export const PLAN_BY_PRICE: Record<string, 'STARTER' | 'PRO' | 'ENTERPRISE'> = Object.fromEntries(
-    Object.entries(PRICE_BY_PLAN)
+export const PLAN_BY_PRICE: Partial<Record<string, Plan>> = Object.fromEntries(
+    (Object.entries(PRICE_BY_PLAN) as [Plan, string][])
         .filter(([, id]) => id !== '')
-        .map(([p, id]) => [id, p]),
-) as never;
+        .map(([plan, id]) => [id, plan]),
+);

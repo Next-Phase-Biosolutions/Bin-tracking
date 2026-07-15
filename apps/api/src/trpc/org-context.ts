@@ -3,6 +3,16 @@ import type { PrismaClient, UserRole } from '@prisma/client';
 interface OrgResolutionInput {
     userId: string | null;
     facilityId: string | null; // from station.facility.id
+    /**
+     * Explicit org selection from the `x-org-id` request header. A user with
+     * multiple memberships would otherwise ALWAYS resolve to their oldest
+     * org (the findFirst below) — and silently act in it. Validated against
+     * the caller's own memberships and FAIL-CLOSED: a requested org the user
+     * doesn't belong to resolves to no org at all, never to the default one
+     * (falling back would turn a typo'd/forged header into acting on the
+     * wrong tenant). Ignored for station-resolved requests.
+     */
+    requestedOrgId?: string | null;
 }
 
 export interface OrgResolution {
@@ -23,9 +33,18 @@ export interface OrgResolution {
  * user membership wins, then station's facility. */
 export async function resolveOrgId(
     prisma: PrismaClient,
-    { userId, facilityId }: OrgResolutionInput,
+    { userId, facilityId, requestedOrgId }: OrgResolutionInput,
 ): Promise<OrgResolution> {
     if (userId) {
+        if (requestedOrgId) {
+            const member = await prisma.organizationMember.findUnique({
+                where: { orgId_userId: { orgId: requestedOrgId, userId } },
+                select: { orgId: true, role: true },
+            });
+            // Fail closed: an org the caller doesn't belong to resolves to
+            // nothing — never silently falls back to their default org.
+            return member ? { orgId: member.orgId, orgRole: member.role } : { orgId: null, orgRole: null };
+        }
         const member = await prisma.organizationMember.findFirst({
             where: { userId },
             select: { orgId: true, role: true },

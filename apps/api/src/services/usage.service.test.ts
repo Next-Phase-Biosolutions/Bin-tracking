@@ -43,22 +43,25 @@ vi.mock('@bin-tracker/db', () => {
             existing.count += update.count.increment;
             return Promise.resolve({ ...existing });
         },
-        update: ({
-            where,
-            data,
-        }: {
-            where: { orgId_metric_period: { orgId: string; metric: string; period: string } };
-            data: { count: { decrement: number } };
-        }) => {
-            const { orgId, metric, period } = where.orgId_metric_period;
-            const k = key(orgId, metric, period);
-            const existing = store.counters.get(k);
-            if (!existing) throw new Error('counter not found');
-            existing.count -= data.count.decrement;
-            return Promise.resolve({ ...existing });
+    };
+    // Interactive transaction with real rollback semantics: snapshot the
+    // store before the callback, restore it if the callback throws — that's
+    // exactly the property checkAndIncrement now relies on (a rejected call
+    // must not consume a slot, with no compensating-decrement crash window).
+    const prisma = {
+        usageCounter,
+        $transaction: async <T>(fn: (tx: { usageCounter: typeof usageCounter }) => Promise<T>): Promise<T> => {
+            const snapshot = new Map([...store.counters].map(([k, v]) => [k, { ...v }]));
+            try {
+                return await fn(prisma);
+            } catch (error) {
+                store.counters.clear();
+                for (const [k, v] of snapshot) store.counters.set(k, v);
+                throw error;
+            }
         },
     };
-    return { prisma: { usageCounter } };
+    return { prisma };
 });
 
 const { usageService } = await import('./usage.service.js');

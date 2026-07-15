@@ -42,21 +42,30 @@ vi.mock('@bin-tracker/db', () => {
             existing.count += update.count.increment;
             return Promise.resolve({ ...existing });
         },
-        update: ({
-            where,
-            data,
-        }: {
-            where: { orgId_metric_period: { orgId: string; metric: string; period: string } };
-            data: { count: { decrement: number } };
-        }) => {
-            const { orgId, metric, period } = where.orgId_metric_period;
-            const existing = store.counters.get(key(orgId, metric, period));
-            if (!existing) throw new Error('counter not found');
-            existing.count -= data.count.decrement;
-            return Promise.resolve({ ...existing });
+    };
+    // usage.service.ts runs increment + limit-check in one transaction; model
+    // real rollback so "does not consume a slot when rejected" tests the same
+    // property the DB provides.
+    interface FakePrisma {
+        subscription: typeof subscription;
+        usageCounter: typeof usageCounter;
+        $transaction: <T>(fn: (tx: FakePrisma) => Promise<T>) => Promise<T>;
+    }
+    const prisma: FakePrisma = {
+        subscription,
+        usageCounter,
+        $transaction: async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
+            const snapshot = new Map([...store.counters].map(([k, v]) => [k, { ...v }]));
+            try {
+                return await fn(prisma);
+            } catch (error) {
+                store.counters.clear();
+                for (const [k, v] of snapshot) store.counters.set(k, v);
+                throw error;
+            }
         },
     };
-    return { prisma: { subscription, usageCounter } };
+    return { prisma };
 });
 
 const { farmerService } = await import('./farmer.service.js');

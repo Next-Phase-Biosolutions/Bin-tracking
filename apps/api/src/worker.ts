@@ -58,4 +58,27 @@ worker.on('failed', (job, err) => {
     captureError(err, job?.data.orgId ?? null);
 });
 
+// Graceful shutdown — worker.close() waits for the in-flight job to finish
+// before resolving (BullMQ default), so a redeploy hands off cleanly instead
+// of relying on the stalled-job timeout to recover a severed job.
+// Never under vitest — the runner re-emits signals at teardown and a
+// process.exit() here would kill its worker mid-report.
+let shuttingDown = false;
+if (process.env['NODE_ENV'] !== 'test') {
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+        process.on(signal, () => {
+            if (shuttingDown) return;
+            shuttingDown = true;
+            logger.info(`${signal} received — finishing in-flight job and shutting down`);
+            worker.close().then(
+                () => process.exit(0),
+                (err) => {
+                    logger.error(err, 'error during graceful shutdown');
+                    process.exit(1);
+                },
+            );
+        });
+    }
+}
+
 logger.info(`heavy-jobs worker listening on queue "${HEAVY_JOBS_QUEUE}"`);

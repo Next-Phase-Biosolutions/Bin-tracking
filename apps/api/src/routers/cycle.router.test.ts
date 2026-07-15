@@ -46,7 +46,7 @@ describe('cycle.listActive — facility scoping keys off ctx.orgRole, not ctx.us
         await caller.listActive({ limit: 20 });
 
         expect(ctx.prisma.userFacility.findMany).toHaveBeenCalledWith({
-            where: { userId: 'user-1' },
+            where: { userId: 'user-1', facility: { organizationId: ORG_A } },
             select: { facilityId: true },
         });
         expect(ctx.prisma.facility.findMany).not.toHaveBeenCalled();

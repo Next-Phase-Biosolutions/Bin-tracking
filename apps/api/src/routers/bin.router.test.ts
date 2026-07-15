@@ -40,7 +40,7 @@ describe('bin.list — facility scoping keys off ctx.orgRole, not ctx.user.role'
 
         // The restricted (non-ADMIN) path ran...
         expect(ctx.prisma.userFacility.findMany).toHaveBeenCalledWith({
-            where: { userId: 'user-1' },
+            where: { userId: 'user-1', facility: { organizationId: ORG_A } },
             select: { facilityId: true },
         });
         // ...and the "every facility" ADMIN path did NOT.

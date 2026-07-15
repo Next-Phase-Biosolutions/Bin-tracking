@@ -11,6 +11,11 @@ import { appRouter, type AppRouter } from './routers/index.js';
 import { createContext } from './trpc/context.js';
 import { registerStripeWebhook } from './routes/stripe-webhook.js';
 import { initSentry, captureError } from './lib/sentry.js';
+import { validateEnv } from './lib/env.js';
+
+// Fail fast on a misconfigured production environment — before Sentry init,
+// before the server binds. No-op outside production (lib/env.ts).
+validateEnv();
 
 const PORT = Number(process.env['PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -90,6 +95,32 @@ async function buildServer() {
 
 async function main(): Promise<void> {
     const server = await buildServer();
+
+    // Graceful shutdown — `docker compose stop` (every blue-green flip) sends
+    // SIGTERM; without this, in-flight requests are severed and the process is
+    // SIGKILLed at the compose stop timeout. fastify.close() stops accepting
+    // new connections and drains active ones. Requires the container CMD to
+    // run node/tsx directly (see apps/api/Dockerfile) so the signal actually
+    // reaches this process.
+    // Never under vitest — the runner re-emits signals at teardown and a
+    // process.exit() here would kill its worker mid-report.
+    let shuttingDown = false;
+    if (process.env['NODE_ENV'] !== 'test') {
+        for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+            process.on(signal, () => {
+                if (shuttingDown) return;
+                shuttingDown = true;
+                server.log.info(`${signal} received — draining connections and shutting down`);
+                server.close().then(
+                    () => process.exit(0),
+                    (err) => {
+                        server.log.error(err, 'error during graceful shutdown');
+                        process.exit(1);
+                    },
+                );
+            });
+        }
+    }
 
     try {
         const address = await server.listen({ port: PORT, host: HOST });

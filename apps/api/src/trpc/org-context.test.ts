@@ -38,6 +38,39 @@ describe('resolveOrgId', () => {
         });
     });
 
+    // ─── x-org-id explicit org selection ───────────────────────────────
+    it('resolves the requested org when the user is a member of it', async () => {
+        const prisma = {
+            organizationMember: {
+                findUnique: vi.fn().mockResolvedValue({ orgId: 'org_second', role: 'DRIVER' }),
+                findFirst: vi.fn(),
+            },
+            facility: { findUnique: vi.fn() },
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await resolveOrgId(prisma as any, { userId: 'u1', facilityId: null, requestedOrgId: 'org_second' });
+        expect(result).toEqual({ orgId: 'org_second', orgRole: 'DRIVER' });
+        expect(prisma.organizationMember.findUnique).toHaveBeenCalledWith({
+            where: { orgId_userId: { orgId: 'org_second', userId: 'u1' } },
+            select: { orgId: true, role: true },
+        });
+        expect(prisma.organizationMember.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('fails CLOSED for a requested org the user is not a member of — no fallback to the default org', async () => {
+        const prisma = {
+            organizationMember: {
+                findUnique: vi.fn().mockResolvedValue(null), // not a member of the requested org
+                findFirst: vi.fn().mockResolvedValue({ orgId: 'org_default', role: 'ADMIN' }), // their real org
+            },
+            facility: { findUnique: vi.fn() },
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await resolveOrgId(prisma as any, { userId: 'u1', facilityId: null, requestedOrgId: 'org_other' });
+        expect(result).toEqual({ orgId: null, orgRole: null });
+        expect(prisma.organizationMember.findFirst).not.toHaveBeenCalled(); // never falls back
+    });
+
     // Task 25 regression: a user's membership role must win over anything
     // that could be confused with a global role — the ADMIN string here is
     // deliberately different from what a "global role" fixture would use
