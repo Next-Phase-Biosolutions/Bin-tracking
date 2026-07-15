@@ -80,6 +80,34 @@ export function createRedisConnection(): IORedis {
 export function getHeavyJobsQueue(): Queue<HeavyJobData, HeavyJobResult, HeavyJobName> {
     if (_queue) return _queue;
     _connection = createRedisConnection();
-    _queue = new Queue(HEAVY_JOBS_QUEUE, { connection: _connection });
+    _queue = new Queue(HEAVY_JOBS_QUEUE, {
+        connection: _connection,
+        defaultJobOptions: {
+            // attempts stays at BullMQ's default of 1 (no auto-retry). This
+            // queue is shared by both job types (see HeavyJobName) and
+            // defaultJobOptions applies to all of them uniformly — payroll's
+            // computeRun is safely re-runnable (it's an explicit
+            // delete-then-recompute, see payroll.service.ts), but form's
+            // digitizeFromPhoto calls meterDigitize() -> usageService.
+            // checkAndIncrement() before the Gemini call, which is NOT
+            // idempotent: a retry would double-count the org's monthly
+            // digitize quota for one logical request. Since neither
+            // payroll.router.ts nor form.router.ts may be touched here to
+            // set a per-job override, attempts must stay uniform — so no
+            // retries rather than an unsafe one.
+            //
+            // removeOnComplete/removeOnFail default to `false` in BullMQ,
+            // which keeps every job's data (including the base64 image
+            // payload for digitize jobs) in Redis forever. Age-based
+            // eviction here bounds that: the web client polls jobStatus
+            // every 1.5s and stops polling as soon as it observes
+            // completed/failed (see FormImportPage.tsx's refetchInterval),
+            // so the real read window is under a couple seconds — 1h/1d
+            // leave enormous headroom for slow clients, retries, or a
+            // paused tab without risking eviction before the result is read.
+            removeOnComplete: { age: 3600 }, // 1 hour
+            removeOnFail: { age: 86400 }, // 1 day
+        },
+    });
     return _queue;
 }
