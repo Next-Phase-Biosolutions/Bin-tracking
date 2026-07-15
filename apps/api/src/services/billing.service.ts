@@ -11,7 +11,7 @@
 import { TRPCError } from '@trpc/server';
 import type Stripe from 'stripe';
 import { prisma } from '@bin-tracker/db';
-import type { Plan, SubscriptionStatus } from '@bin-tracker/types';
+import { isSubscriptionUsable, type Plan, type SubscriptionStatus } from '@bin-tracker/types';
 import { getStripe, PRICE_BY_PLAN, PLAN_BY_PRICE } from '../lib/stripe.js';
 import { reconcileModulesForPlan } from './module.service.js';
 
@@ -62,7 +62,18 @@ export async function syncSubscriptionFromStripe(orgId: string, stripeSub: Strip
         create: { orgId, plan, status, currentPeriodEnd, stripeCustomerId, stripeSubscriptionId: stripeSub.id },
     });
 
-    await reconcileModulesForPlan(prisma, orgId, plan);
+    if (isSubscriptionUsable(status)) {
+        await reconcileModulesForPlan(prisma, orgId, plan);
+    } else {
+        // Subscription is PAST_DUE/CANCELED: `plan` here is still whatever
+        // price was last on the Stripe object, so it must NOT be used to
+        // re-grant a module bundle. Disable every plan-sourced module;
+        // manual overrides (source: 'manual') are untouched.
+        await prisma.organizationModule.updateMany({
+            where: { orgId, source: 'plan' },
+            data: { enabled: false },
+        });
+    }
 }
 
 /**

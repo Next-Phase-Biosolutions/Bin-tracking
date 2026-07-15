@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // so this one mock covers both import paths) ──────────────────────────
 const upsertCalls: unknown[] = [];
 const reconcileCalls: Array<{ orgId: string; plan: string }> = [];
+const moduleUpdateManyCalls: unknown[] = [];
 
 const fakeSubscription = { stripeCustomerId: 'cus_existing' as string | null };
 
@@ -16,6 +17,12 @@ vi.mock('@bin-tracker/db', () => ({
                 return Promise.resolve({});
             }),
             findUnique: vi.fn().mockImplementation(() => Promise.resolve(fakeSubscription)),
+        },
+        organizationModule: {
+            updateMany: vi.fn().mockImplementation((args: unknown) => {
+                moduleUpdateManyCalls.push(args);
+                return Promise.resolve({ count: 0 });
+            }),
         },
     },
     reconcileModulesForPlan: vi.fn().mockImplementation((_prisma: unknown, orgId: string, plan: string) => {
@@ -64,6 +71,7 @@ function fakeStripeSub(overrides: Record<string, any> = {}): any {
 beforeEach(() => {
     upsertCalls.length = 0;
     reconcileCalls.length = 0;
+    moduleUpdateManyCalls.length = 0;
     retrieveSubscriptionMock.mockReset();
     checkoutCreateMock.mockReset();
     portalCreateMock.mockReset();
@@ -107,6 +115,33 @@ describe('syncSubscriptionFromStripe', () => {
         await expect(
             syncSubscriptionFromStripe('org_1', fakeStripeSub({ items: { data: [{ price: { id: 'price_unknown' }, current_period_end: 1 }] } })),
         ).rejects.toThrow(/unrecognized price/i);
+    });
+
+    it('a canceled subscription disables plan-sourced modules instead of re-granting the stale plan bundle', async () => {
+        await syncSubscriptionFromStripe('org_1', fakeStripeSub({ status: 'canceled' }));
+
+        // Must NOT re-grant the (still-present-on-the-Stripe-object) plan bundle.
+        expect(reconcileCalls).toEqual([]);
+        // Must disable plan-sourced modules, leaving manual overrides alone.
+        expect(moduleUpdateManyCalls).toEqual([
+            { where: { orgId: 'org_1', source: 'plan' }, data: { enabled: false } },
+        ]);
+    });
+
+    it('a past_due subscription also disables plan-sourced modules rather than reconciling', async () => {
+        await syncSubscriptionFromStripe('org_1', fakeStripeSub({ status: 'past_due' }));
+
+        expect(reconcileCalls).toEqual([]);
+        expect(moduleUpdateManyCalls).toEqual([
+            { where: { orgId: 'org_1', source: 'plan' }, data: { enabled: false } },
+        ]);
+    });
+
+    it('an active/trialing subscription still reconciles modules for the plan (unchanged behavior)', async () => {
+        await syncSubscriptionFromStripe('org_1', fakeStripeSub({ status: 'active' }));
+
+        expect(moduleUpdateManyCalls).toEqual([]);
+        expect(reconcileCalls).toEqual([{ orgId: 'org_1', plan: 'PRO' }]);
     });
 });
 
