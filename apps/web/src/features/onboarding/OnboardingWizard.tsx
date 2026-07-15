@@ -22,8 +22,9 @@ const STEPS: { key: Step; label: string }[] = [
  * account already has an org, this immediately bounces to the dashboard.
  *
  * Steps: create org -> create first facility -> show station token QR for
- * tablet setup -> invite teammates. The invite step is a placeholder here —
- * real invitation sending is Task 19, out of scope for this task.
+ * tablet setup -> invite teammates (invitation.create, Task 19). Sending an
+ * invite is optional — "Skip for now" / "Done" always lets the user finish
+ * onboarding without inviting anyone.
  */
 export default function OnboardingWizard() {
     const navigate = useNavigate();
@@ -253,22 +254,77 @@ function StationStep({ facilityId, onDone }: { facilityId: string; onDone: () =>
     );
 }
 
-// ─── Step 4: Invite teammates (placeholder — real sending is Task 19) ─
+// ─── Step 4: Invite teammates ──────────────────────────────────────────
+
+type InviteRole = 'ADMIN' | 'OPS_MANAGER' | 'DRIVER' | 'WORKER';
+
+const ROLE_OPTIONS: { value: InviteRole; label: string }[] = [
+    { value: 'ADMIN', label: 'Admin' },
+    { value: 'OPS_MANAGER', label: 'Ops Manager' },
+    { value: 'DRIVER', label: 'Driver' },
+    { value: 'WORKER', label: 'Worker' },
+];
 
 function InviteStep({ onDone }: { onDone: () => void }) {
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState<InviteRole>('WORKER');
+    const [sentTo, setSentTo] = useState<string | null>(null);
+
+    const createInvitation = trpc.invitation.create.useMutation({
+        onSuccess: () => {
+            setSentTo(email.trim());
+            setEmail('');
+        },
+    });
+
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!email.trim()) return;
+        createInvitation.mutate({ email: email.trim(), role });
+    };
+
     return (
         <Card>
             <StepHeader icon={<Users className="h-5 w-5" />} title="Invite your team" />
             <p className="mb-6 text-sm text-gray-600">
-                Teammate invitations are coming next — you&apos;ll be able to invite them from your dashboard
-                settings shortly. For now, you&apos;re all set.
+                Send a teammate an invite now, or skip and invite them later from your dashboard.
             </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <TextField
+                    label="Email"
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder="teammate@example.com"
+                />
+                <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-gray-700">Role</span>
+                    <select
+                        value={role}
+                        onChange={(e) => setRole(e.target.value as InviteRole)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                    >
+                        {ROLE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                {createInvitation.isError && <ErrorBanner message={createInvitation.error.message} />}
+                {sentTo && (
+                    <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        Invitation sent to {sentTo}.
+                    </div>
+                )}
+                <SubmitButton pending={createInvitation.isPending} disabled={!email.trim()} label="Send invite" />
+            </form>
             <button
                 type="button"
                 onClick={onDone}
-                className="w-full rounded-xl bg-[#3d5aa8] py-3 text-sm font-bold text-white transition-colors hover:bg-[#2d4898]"
+                className="mt-3 w-full rounded-xl border border-gray-300 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
             >
-                Go to dashboard
+                {sentTo ? 'Done' : 'Skip for now'}
             </button>
         </Card>
     );
@@ -308,17 +364,19 @@ function TextField({
     value,
     onChange,
     placeholder,
+    type = 'text',
 }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    type?: string;
 }) {
     return (
         <label className="block">
             <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
             <input
-                type="text"
+                type={type}
                 value={value}
                 placeholder={placeholder}
                 onChange={(e) => onChange(e.target.value)}
