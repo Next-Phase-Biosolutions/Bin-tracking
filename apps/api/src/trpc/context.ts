@@ -50,6 +50,10 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
             userId: user?.id ?? null,
             facilityId: station?.facility.id ?? null,
         });
+        // Enrich this request's pino logger so every subsequent log line
+        // (including Fastify's own request-completion log) carries orgId —
+        // per-tenant log filtering without threading orgId through every call site.
+        if (bypassOrgId) req.log = req.log.child({ orgId: bypassOrgId });
         return { prisma, user, station, orgId: bypassOrgId, jwtPayload: null, req };
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -95,6 +99,9 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         userId: user?.id ?? null,
         facilityId: station?.facility.id ?? null,
     });
+
+    // See the bypass branch above — same log enrichment for the real-auth path.
+    if (orgId) req.log = req.log.child({ orgId });
 
     return {
         prisma,

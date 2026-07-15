@@ -32,13 +32,15 @@ vi.mock('@bin-tracker/db', () => ({
             findUnique: () => Promise.resolve(userStore.byId),
             findFirst: () => Promise.resolve(null),
         },
-        // Org resolution runs at the end of createContext for every request;
-        // these are exercised (station branch) but resolve to "no org" here.
+        // Org resolution runs at the end of createContext for every request.
+        // facility 'f1' resolves to 'org-1' so the station branch can exercise
+        // both ctx.orgId and the log-enrichment behavior below.
         organizationMember: {
             findFirst: () => Promise.resolve(null),
         },
         facility: {
-            findUnique: () => Promise.resolve(null),
+            findUnique: ({ where }: { where: { id: string } }) =>
+                Promise.resolve(where.id === 'f1' ? { organizationId: 'org-1' } : null),
         },
     },
 }));
@@ -60,9 +62,10 @@ vi.mock('../lib/jwt.js', () => ({ verifySupabaseToken: () => Promise.resolve(jwt
 const { createContext } = await import('./context.js');
 
 function fakeRequest(authorization?: string): FastifyRequest {
+    const childLog = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
     return {
         headers: authorization ? { authorization } : {},
-        log: { warn: vi.fn() },
+        log: { warn: vi.fn(), child: vi.fn(() => childLog) },
     } as unknown as FastifyRequest;
 }
 
@@ -118,5 +121,32 @@ describe('createContext — Bearer JWT: jwtPayload vs. user wiring', () => {
 
         expect(ctx.jwtPayload).toBeNull();
         expect(ctx.user).toBeNull();
+    });
+});
+
+// Task 21: request log context should carry orgId once resolved, so
+// per-tenant log filtering works without threading orgId through every
+// call site. See context.ts's `req.log = req.log.child({ orgId })`.
+describe('createContext — request log enrichment with orgId', () => {
+    it('childs the request logger with orgId once an org resolves (station branch)', async () => {
+        const req = fakeRequest('Station token-active');
+        // createContext reassigns req.log to the child logger it returns, so
+        // the original logger (and its `child` spy) must be captured first.
+        const originalLog = req.log;
+
+        const ctx = await createContext(req);
+
+        expect(ctx.orgId).toBe('org-1');
+        expect(vi.mocked(originalLog.child)).toHaveBeenCalledWith({ orgId: 'org-1' });
+    });
+
+    it('does not child the request logger when no org resolves (revoked station)', async () => {
+        const req = fakeRequest('Station token-revoked');
+        const originalLog = req.log;
+
+        const ctx = await createContext(req);
+
+        expect(ctx.orgId).toBeNull();
+        expect(vi.mocked(originalLog.child)).not.toHaveBeenCalled();
     });
 });

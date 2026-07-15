@@ -10,10 +10,15 @@ import {
 import { appRouter, type AppRouter } from './routers/index.js';
 import { createContext } from './trpc/context.js';
 import { registerStripeWebhook } from './routes/stripe-webhook.js';
+import { initSentry, captureError } from './lib/sentry.js';
 
 const PORT = Number(process.env['PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
 const IS_DEV = process.env['NODE_ENV'] !== 'production';
+
+// Initialized before buildServer() so errors during startup are also
+// reportable. No-ops when SENTRY_DSN is unset — see lib/sentry.ts.
+initSentry();
 
 async function buildServer() {
     const server = Fastify({
@@ -65,6 +70,13 @@ async function buildServer() {
         trpcOptions: {
             router: appRouter,
             createContext: ({ req }) => createContext(req),
+            // Side-effect hook for error reporting — kept separate from
+            // trpc.ts's errorFormatter (which only shapes the client-facing
+            // response). `ctx` is available here (v11 HTTPErrorHandlerOptions),
+            // so every captured event is tagged with the tenant it happened in.
+            onError({ error, ctx }) {
+                captureError(error, ctx?.orgId ?? null);
+            },
         } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
     });
 
