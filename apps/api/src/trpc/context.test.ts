@@ -22,6 +22,13 @@ const stations: FakeStation[] = [
 // without a separate vi.mock per test (vi.mock bodies are hoisted once per file).
 const userStore = vi.hoisted(() => ({ byId: null as { id: string; email: string; role: string } | null }));
 
+// Task 25: mutable per-test-controllable OrganizationMember row, so tests can
+// prove ctx.orgRole is resolved from THIS (the membership row), independently
+// of — and possibly differing from — userStore.byId.role (the global role).
+const membershipStore = vi.hoisted(() => ({
+    byUserId: null as { orgId: string; role: string } | null,
+}));
+
 vi.mock('@bin-tracker/db', () => ({
     prisma: {
         station: {
@@ -36,7 +43,7 @@ vi.mock('@bin-tracker/db', () => ({
         // facility 'f1' resolves to 'org-1' so the station branch can exercise
         // both ctx.orgId and the log-enrichment behavior below.
         organizationMember: {
-            findFirst: () => Promise.resolve(null),
+            findFirst: () => Promise.resolve(membershipStore.byUserId),
         },
         facility: {
             findUnique: ({ where }: { where: { id: string } }) =>
@@ -72,6 +79,7 @@ function fakeRequest(authorization?: string): FastifyRequest {
 beforeEach(() => {
     userStore.byId = null;
     jwtStore.payload = null;
+    membershipStore.byUserId = null;
 });
 
 describe('createContext — station token revocation', () => {
@@ -121,6 +129,45 @@ describe('createContext — Bearer JWT: jwtPayload vs. user wiring', () => {
 
         expect(ctx.jwtPayload).toBeNull();
         expect(ctx.user).toBeNull();
+    });
+});
+
+// Task 25: ctx.orgRole must come from the caller's OrganizationMember row,
+// never from ctx.user.role — this is the wiring that closes the invitation
+// privilege-escalation hole at the context layer.
+describe('createContext — Bearer JWT: ctx.orgRole from membership, not global role', () => {
+    it('resolves ctx.orgRole from the membership row even when it differs from the global user.role', async () => {
+        jwtStore.payload = { sub: 'supabase-user-3', email: 'existing@example.com' };
+        // Global role is ADMIN (e.g. from bootstrap on an unrelated org)...
+        userStore.byId = { id: 'supabase-user-3', email: 'existing@example.com', role: 'ADMIN' };
+        // ...but this account's membership in the org it's actually acting on
+        // is a restricted DRIVER role.
+        membershipStore.byUserId = { orgId: 'org-9', role: 'DRIVER' };
+
+        const ctx = await createContext(fakeRequest('Bearer valid-token'));
+
+        expect(ctx.user?.role).toBe('ADMIN');
+        expect(ctx.orgRole).toBe('DRIVER');
+        expect(ctx.orgRole).not.toBe(ctx.user?.role);
+    });
+
+    it('sets ctx.orgRole to null when the user has no membership', async () => {
+        jwtStore.payload = { sub: 'supabase-user-4', email: 'noorg@example.com' };
+        userStore.byId = { id: 'supabase-user-4', email: 'noorg@example.com', role: 'ADMIN' };
+        membershipStore.byUserId = null;
+
+        const ctx = await createContext(fakeRequest('Bearer valid-token'));
+
+        expect(ctx.orgId).toBeNull();
+        expect(ctx.orgRole).toBeNull();
+    });
+
+    it('sets ctx.orgRole to null for station-resolved orgId (no ctx.user)', async () => {
+        const ctx = await createContext(fakeRequest('Station token-active'));
+
+        expect(ctx.user).toBeNull();
+        expect(ctx.orgId).toBe('org-1');
+        expect(ctx.orgRole).toBeNull();
     });
 });
 

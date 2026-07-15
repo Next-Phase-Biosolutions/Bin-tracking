@@ -40,6 +40,9 @@ function makeCtx(orgId: string): any {
     return {
         orgId,
         user: { role: 'ADMIN' },
+        // Task 25: orgOpsProcedure now gates on ctx.orgRole (the caller's
+        // per-org membership role), not ctx.user.role.
+        orgRole: 'ADMIN',
         prisma: {
             organizationModule: {
                 findUnique: vi.fn().mockResolvedValue({ enabled: true }),

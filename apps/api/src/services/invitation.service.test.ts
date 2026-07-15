@@ -29,6 +29,7 @@ interface FakeUser {
 interface FakeMembership {
     orgId: string;
     userId: string;
+    role: string;
 }
 
 const store = vi.hoisted(() => ({
@@ -88,18 +89,26 @@ vi.mock('@bin-tracker/db', () => {
     };
 
     const organizationMember = {
+        // update is genuinely applied (not just ignored) on the existing-row
+        // branch — Task 25's fix depends on the `update` branch of the real
+        // upsert actually writing `role`, so the fake has to model that or
+        // the regression test below would pass for the wrong reason.
         upsert: ({
             where,
+            update,
             create,
         }: {
             where: { orgId_userId: { orgId: string; userId: string } };
-            update: Record<string, never>;
+            update: Partial<FakeMembership>;
             create: FakeMembership;
         }) => {
             const existing = store.memberships.find(
                 (m) => m.orgId === where.orgId_userId.orgId && m.userId === where.orgId_userId.userId,
             );
-            if (existing) return Promise.resolve(existing);
+            if (existing) {
+                Object.assign(existing, update);
+                return Promise.resolve({ ...existing });
+            }
             store.memberships.push({ ...create });
             return Promise.resolve({ ...create });
         },
@@ -209,7 +218,7 @@ describe('invitationService.acceptInvitation', () => {
 
         expect(result.orgId).toBe('org-2');
         expect(store.memberships).toHaveLength(1);
-        expect(store.memberships[0]).toEqual({ orgId: 'org-2', userId: 'user-1' });
+        expect(store.memberships[0]).toEqual({ orgId: 'org-2', userId: 'user-1', role: 'WORKER' });
         // Never org-1, even though that's the first/only other org in the fixture.
         expect(store.memberships.some((m) => m.orgId === 'org-1')).toBe(false);
     });
@@ -238,7 +247,7 @@ describe('invitationService.acceptInvitation', () => {
         const result = await invitationService.acceptInvitation(invitation.token, null, fallback as never);
 
         expect(result.orgId).toBe('org-1');
-        expect(store.memberships[0]).toEqual({ orgId: 'org-1', userId: 'admin-seed' });
+        expect(store.memberships[0]).toEqual({ orgId: 'org-1', userId: 'admin-seed', role: 'OPS_MANAGER' });
     });
 
     it('rejects when there is no jwtPayload and no fallback user', async () => {
@@ -246,5 +255,52 @@ describe('invitationService.acceptInvitation', () => {
         await expect(invitationService.acceptInvitation(invitation.token, null, null)).rejects.toMatchObject({
             code: 'UNAUTHORIZED',
         });
+    });
+
+    // ─── Task 25 regression: the actual privilege-escalation hole ─────────
+    // An account that already has global role ADMIN (from having bootstrapped
+    // an unrelated org previously) accepts an invitation into a DIFFERENT org
+    // as DRIVER. Before this fix, the membership upsert's `update` branch was
+    // `update: {}` — a no-op — so an existing user's membership role was
+    // never set/reconciled to what the invitation actually granted, and every
+    // org-scoped authorization check read the global (ADMIN) role instead.
+    // The membership for THIS org must end up DRIVER, not ADMIN.
+    it('sets the membership role to the invitation role, not the existing global ADMIN role — first accept', async () => {
+        // Existing account with global role ADMIN, no memberships yet.
+        store.users.push({ id: 'existing-admin', email: 'existing-admin@example.com', name: 'Existing Admin', role: 'ADMIN' });
+        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER' });
+
+        const result = await invitationService.acceptInvitation(
+            invitation.token,
+            { sub: 'existing-admin', email: 'existing-admin@example.com' },
+            null,
+        );
+
+        expect(result.role).toBe('DRIVER');
+        const membership = store.memberships.find((m) => m.userId === 'existing-admin' && m.orgId === 'org-2');
+        expect(membership?.role).toBe('DRIVER');
+        // The global User.role is untouched by this call (update: {} on the
+        // user upsert's existing-row branch is intentional — see the
+        // function's doc comment) — it stays cosmetic/informational once
+        // authorization no longer reads it for org-scoped decisions.
+        expect(store.users.find((u) => u.id === 'existing-admin')?.role).toBe('ADMIN');
+    });
+
+    // Same scenario, but the membership already exists (a re-invite of an
+    // existing member) — the upsert's UPDATE branch must also apply the new
+    // role, not just the CREATE branch.
+    it('updates the membership role to the invitation role on a re-invite of an existing member', async () => {
+        store.users.push({ id: 'existing-admin', email: 'existing-admin@example.com', name: 'Existing Admin', role: 'ADMIN' });
+        store.memberships.push({ orgId: 'org-2', userId: 'existing-admin', role: 'ADMIN' }); // stale/incorrect prior role
+        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER' });
+
+        await invitationService.acceptInvitation(
+            invitation.token,
+            { sub: 'existing-admin', email: 'existing-admin@example.com' },
+            null,
+        );
+
+        expect(store.memberships).toHaveLength(1); // updated in place, not duplicated
+        expect(store.memberships[0]?.role).toBe('DRIVER');
     });
 });
