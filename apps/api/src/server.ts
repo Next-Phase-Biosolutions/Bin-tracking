@@ -74,8 +74,13 @@ async function buildServer() {
             // trpc.ts's errorFormatter (which only shapes the client-facing
             // response). `ctx` is available here (v11 HTTPErrorHandlerOptions),
             // so every captured event is tagged with the tenant it happened in.
+            // Only genuine server bugs go to Sentry — expected client-facing
+            // errors (validation, auth, not-found, etc.) are not bugs and
+            // would otherwise burn Sentry's quota and bury real issues.
             onError({ error, ctx }) {
-                captureError(error, ctx?.orgId ?? null);
+                if (error.code === 'INTERNAL_SERVER_ERROR') {
+                    captureError(error, ctx?.orgId ?? null);
+                }
             },
         } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
     });
