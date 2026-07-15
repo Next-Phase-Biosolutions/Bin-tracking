@@ -64,14 +64,18 @@ export const formRouter = router({
     /**
      * Polls the status of a `digitizeFromPhoto` job. Same cross-org denial
      * discipline as payroll.router.ts's jobStatus: a job that doesn't exist
-     * and a job belonging to another org both report NOT_FOUND.
+     * and a job belonging to another org both report NOT_FOUND. `heavy-jobs`
+     * is shared with payroll.computeRun (Task 22a) and BullMQ job IDs are
+     * queue-scoped, not job-type-scoped, so a same-org jobId belonging to the
+     * *other* job type must be rejected the same way, before job.returnvalue
+     * is ever cast to FormDigitizeDraft.
      */
     digitizeJobStatus: orgOpsProcedure
         .use(requireModule('FORMS_AI_DIGITIZE'))
         .input(formDigitizeJobStatusSchema)
         .query(async ({ ctx, input }) => {
             const job = await getHeavyJobsQueue().getJob(input.jobId);
-            if (!job || job.data.orgId !== ctx.orgId) {
+            if (!job || job.data.orgId !== ctx.orgId || job.name !== FORM_DIGITIZE_JOB) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Job not found' });
             }
 

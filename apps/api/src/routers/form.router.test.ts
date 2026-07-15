@@ -97,6 +97,7 @@ describe('form.digitizeJobStatus', () => {
         const returnvalue = JSON.parse(JSON.stringify(draft));
 
         getJobMock.mockResolvedValue({
+            name: 'form.digitizeFromPhoto',
             data: { orgId: ORG_A },
             getState: vi.fn().mockResolvedValue('completed'),
             returnvalue,
@@ -110,6 +111,7 @@ describe('form.digitizeJobStatus', () => {
 
     it('returns the failure reason once a same-org job has failed', async () => {
         getJobMock.mockResolvedValue({
+            name: 'form.digitizeFromPhoto',
             data: { orgId: ORG_A },
             getState: vi.fn().mockResolvedValue('failed'),
             failedReason: 'GEMINI_API_KEY is not configured',
@@ -122,12 +124,33 @@ describe('form.digitizeJobStatus', () => {
     });
 
     it('reports in-progress states without a result or error', async () => {
-        getJobMock.mockResolvedValue({ data: { orgId: ORG_A }, getState: vi.fn().mockResolvedValue('active') });
+        getJobMock.mockResolvedValue({
+            name: 'form.digitizeFromPhoto',
+            data: { orgId: ORG_A },
+            getState: vi.fn().mockResolvedValue('active'),
+        });
 
         const caller = formRouter.createCaller(makeCtx(ORG_A));
         const result = await caller.digitizeJobStatus({ jobId: 'job-1' });
 
         expect(result).toEqual({ state: 'active' });
+    });
+
+    it('denies with NOT_FOUND when a same-org jobId belongs to a payroll.computeRun job on the shared heavy-jobs queue (job-type confusion, not just org confusion)', async () => {
+        // BullMQ job IDs are queue-scoped, not job-type-scoped: this job
+        // passes the org check but is the wrong job.name, so it must be
+        // denied identically to a nonexistent/foreign-org job — no leaking
+        // "this job exists but is the wrong type" as distinguishable info.
+        getJobMock.mockResolvedValue({
+            name: 'payroll.computeRun',
+            data: { orgId: ORG_A },
+            getState: vi.fn().mockResolvedValue('completed'),
+            returnvalue: { id: 'run-1', period: '2026-06', status: 'DRAFT' },
+        });
+
+        const caller = formRouter.createCaller(makeCtx(ORG_A));
+
+        await expect(caller.digitizeJobStatus({ jobId: 'job-1' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 });
 

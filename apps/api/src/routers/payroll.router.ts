@@ -25,14 +25,18 @@ export const payrollRouter = router({
      * enqueue time) must match ctx.orgId — a job that doesn't exist and a job
      * that belongs to another org both report NOT_FOUND, so a caller can
      * never distinguish "not yours" from "doesn't exist" (same discipline as
-     * cycle.service.ts's pickup/deliver).
+     * cycle.service.ts's pickup/deliver). `heavy-jobs` is shared with
+     * form.digitizeFromPhoto (Task 22b) and BullMQ job IDs are queue-scoped,
+     * not job-type-scoped, so a same-org jobId belonging to the *other* job
+     * type must be rejected the same way, before job.returnvalue is ever
+     * cast to PayrollRunView.
      */
     jobStatus: orgOpsProcedure
         .use(requireModule('PAYROLL'))
         .input(payrollJobStatusSchema)
         .query(async ({ ctx, input }) => {
             const job = await getHeavyJobsQueue().getJob(input.jobId);
-            if (!job || job.data.orgId !== ctx.orgId) {
+            if (!job || job.data.orgId !== ctx.orgId || job.name !== PAYROLL_COMPUTE_RUN_JOB) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Job not found' });
             }
 
