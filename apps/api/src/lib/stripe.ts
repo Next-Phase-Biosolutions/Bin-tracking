@@ -21,5 +21,8 @@ export const PRICE_BY_PLAN: Record<string, string> = {
     PRO: process.env['STRIPE_PRICE_PRO'] ?? '',
     ENTERPRISE: process.env['STRIPE_PRICE_ENTERPRISE'] ?? '',
 };
-export const PLAN_BY_PRICE: Record<string, 'STARTER' | 'PRO' | 'ENTERPRISE'> =
-    Object.fromEntries(Object.entries(PRICE_BY_PLAN).map(([p, id]) => [id, p])) as never;
+export const PLAN_BY_PRICE: Record<string, 'STARTER' | 'PRO' | 'ENTERPRISE'> = Object.fromEntries(
+    Object.entries(PRICE_BY_PLAN)
+        .filter(([, id]) => id !== '')
+        .map(([p, id]) => [id, p]),
+) as never;
