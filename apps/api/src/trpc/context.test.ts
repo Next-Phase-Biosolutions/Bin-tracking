@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FastifyRequest } from 'fastify';
+import { hashToken } from '../lib/token.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────
 // Station lookup is the only path exercised here, so a minimal
@@ -12,9 +13,12 @@ interface FakeStation {
     facility: { id: string; name: string };
 }
 
+// Tokens are stored HASHED at rest — the fixtures hold the digest, and the
+// requests below present the raw value, proving context.ts hashes before
+// lookup (a raw-token lookup against these rows would find nothing).
 const stations: FakeStation[] = [
-    { id: 'st-active', token: 'token-active', revokedAt: null, facility: { id: 'f1', name: 'Facility 1' } },
-    { id: 'st-revoked', token: 'token-revoked', revokedAt: new Date('2020-01-01'), facility: { id: 'f1', name: 'Facility 1' } },
+    { id: 'st-active', token: hashToken('token-active'), revokedAt: null, facility: { id: 'f1', name: 'Facility 1' } },
+    { id: 'st-revoked', token: hashToken('token-revoked'), revokedAt: new Date('2020-01-01'), facility: { id: 'f1', name: 'Facility 1' } },
 ];
 
 // Mutable, per-test-controllable: lets the Bearer-branch tests below choose

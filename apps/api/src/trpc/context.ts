@@ -2,6 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { prisma } from '@bin-tracker/db';
 import type { User, Station, UserRole } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
+import { hashToken } from '../lib/token.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 import { resolveOrgId } from './org-context.js';
 
@@ -95,17 +96,25 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         // Station token auth — resolve station
         const token = authHeader.slice(8);
         if (token) {
+            // Tokens are stored hashed at rest (lib/token.ts) — hash the
+            // presented credential and match on the digest.
             station = await prisma.station.findUnique({
-                where: { token },
+                where: { token: hashToken(token) },
                 include: { facility: { select: { id: true, name: true } } },
             });
             if (station?.revokedAt) station = null; // revoked tokens are dead tokens
         }
     }
 
+    // Optional explicit org selection for multi-org users (see org-context.ts
+    // — validated against membership, fail-closed). Single-org users never
+    // need to send it.
+    const requestedOrgId = typeof req.headers['x-org-id'] === 'string' ? req.headers['x-org-id'] : null;
+
     const { orgId, orgRole } = await resolveOrgId(prisma, {
         userId: user?.id ?? null,
         facilityId: station?.facility.id ?? null,
+        requestedOrgId,
     });
 
     // See the bypass branch above — same log enrichment for the real-auth path.

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import type { FormDigitizeDraft, FormFillFrequencyValue, FormTriggerTypeValue } from '@bin-tracker/types';
 import { trpc } from '../../../lib/trpc';
-import { fileToBase64, cropImageRegion } from './image-utils';
+import { fileToBase64, cropImageRegion, type AcceptedImageMime } from './image-utils';
 import { FormDraftLivePreview } from './FormDraftLivePreview';
 import { useSubscription } from '../../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../../components/UpgradePrompt';
@@ -60,7 +60,8 @@ export default function FormImportPage() {
     const [step, setStep] = useState<Step>('capture');
     const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
-    const [mimeType, setMimeType] = useState('image/jpeg');
+    const [mimeType, setMimeType] = useState<AcceptedImageMime>('image/jpeg');
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [draft, setDraft] = useState<FormDigitizeDraft | null>(null);
     const [refineNote, setRefineNote] = useState('');
     const [selectingRegion, setSelectingRegion] = useState(false);
@@ -127,7 +128,7 @@ export default function FormImportPage() {
     const utils = trpc.useUtils();
 
     const startDigitize = useCallback(
-        (base64: string, mime: string) => {
+        (base64: string, mime: AcceptedImageMime) => {
             setImageBase64(base64);
             setMimeType(mime);
             setStep('digitize');
@@ -154,10 +155,17 @@ export default function FormImportPage() {
     }
 
     const handleFile = async (file: File) => {
-        const { base64, mimeType: mime } = await fileToBase64(file);
-        const dataUrl = `data:${mime};base64,${base64}`;
-        setImageDataUrl(dataUrl);
-        startDigitize(base64, mime);
+        setUploadError(null);
+        try {
+            const { base64, mimeType: mime } = await fileToBase64(file);
+            const dataUrl = `data:${mime};base64,${base64}`;
+            setImageDataUrl(dataUrl);
+            startDigitize(base64, mime);
+        } catch (error) {
+            // e.g. an unsupported format (HEIC) — surface it instead of an
+            // unhandled rejection with no UI feedback.
+            setUploadError(error instanceof Error ? error.message : 'Failed to read image');
+        }
     };
 
     const handleRefine = async () => {
@@ -234,7 +242,7 @@ export default function FormImportPage() {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/webp"
                             capture="environment"
                             className="hidden"
                             onChange={(e) => {
@@ -243,6 +251,11 @@ export default function FormImportPage() {
                             }}
                         />
                     </label>
+                    {uploadError && (
+                        <p role="alert" className="text-sm font-semibold text-red-600 text-center">
+                            {uploadError}
+                        </p>
+                    )}
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}

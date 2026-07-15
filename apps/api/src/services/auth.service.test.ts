@@ -75,11 +75,14 @@ beforeEach(() => {
 });
 
 describe('authService.bootstrap', () => {
-    it('creates a User row on first call with role ADMIN', async () => {
+    it('creates a User row on first call with the least-privileged global role, never ADMIN', async () => {
         const result = await authService.bootstrap({ sub: 'user-1', email: 'a@example.com' }, null);
 
         expect(store.users).toHaveLength(1);
-        expect(store.users[0]).toMatchObject({ id: 'user-1', email: 'a@example.com', role: 'ADMIN' });
+        // Global ADMIN-by-default was the raw material for the Task 25
+        // privilege escalation — org authority comes from the membership
+        // provisionOrganization() grants, not from this row.
+        expect(store.users[0]).toMatchObject({ id: 'user-1', email: 'a@example.com', role: 'WORKER' });
         expect(result.user.id).toBe('user-1');
     });
 

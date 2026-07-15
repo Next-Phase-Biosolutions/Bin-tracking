@@ -65,6 +65,28 @@ vi.mock('@bin-tracker/db', () => {
         },
         findUnique: ({ where }: { where: { token: string } }) =>
             Promise.resolve(store.invitations.find((i) => i.token === where.token) ?? null),
+        // Models what createInvitation's pending-invite lookup needs:
+        // orgId + email + acceptedAt: null + expiresAt > now.
+        findFirst: ({
+            where,
+        }: {
+            where: { orgId: string; email: string; acceptedAt: null; expiresAt: { gt: Date } };
+        }) =>
+            Promise.resolve(
+                store.invitations.find(
+                    (i) =>
+                        i.orgId === where.orgId &&
+                        i.email === where.email &&
+                        i.acceptedAt === null &&
+                        i.expiresAt.getTime() > where.expiresAt.gt.getTime(),
+                ) ?? null,
+            ),
+        update: ({ where, data }: { where: { id: string }; data: Partial<FakeInvitation> }) => {
+            const row = store.invitations.find((i) => i.id === where.id);
+            if (!row) return Promise.reject(new Error('not found'));
+            Object.assign(row, data);
+            return Promise.resolve({ ...row });
+        },
         updateMany: ({
             where,
             data,
@@ -134,6 +156,7 @@ vi.mock('@bin-tracker/db', () => {
 });
 
 const { invitationService } = await import('./invitation.service.js');
+const { hashToken } = await import('../lib/token.js');
 
 beforeEach(() => {
     store.orgs = [{ id: 'org-1', name: 'Acme Inc' }, { id: 'org-2', name: 'Beta Co' }];
@@ -145,19 +168,24 @@ beforeEach(() => {
     sendInvitationEmailMock.mockResolvedValue(undefined);
 });
 
+// The store holds the HASHED token (as the real DB now does); the returned
+// object carries the raw token — what the emailed link would contain and what
+// tests present to acceptInvitation. A raw-token lookup against the store
+// would find nothing, proving the service hashes before lookup.
 function makeInvitation(overrides: Partial<FakeInvitation> = {}): FakeInvitation {
+    const rawToken = nextId('token');
     const row: FakeInvitation = {
         id: nextId('inv'),
         orgId: 'org-1',
         email: 'invitee@example.com',
         role: 'OPS_MANAGER',
-        token: nextId('token'),
         expiresAt: new Date(Date.now() + 60_000),
         acceptedAt: null,
         ...overrides,
+        token: hashToken(overrides.token ?? rawToken),
     };
     store.invitations.push(row);
-    return row;
+    return { ...row, token: overrides.token ?? rawToken };
 }
 
 describe('invitationService.createInvitation', () => {
@@ -168,17 +196,34 @@ describe('invitationService.createInvitation', () => {
         expect(store.invitations[0]).toMatchObject({ orgId: 'org-1', email: 'new@example.com', role: 'DRIVER' });
         expect(result.expiresAt.getTime() - Date.now()).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
 
-        expect(sendInvitationEmailMock).toHaveBeenCalledWith(
-            'new@example.com',
-            expect.stringContaining(store.invitations[0]!.token),
-            'Acme Inc',
-        );
+        // The emailed link carries the RAW token; the DB row holds only its
+        // hash — the two must correspond, and the raw value must never be
+        // what's stored.
+        const [to, inviteUrl, orgName] = sendInvitationEmailMock.mock.calls[0]!;
+        expect(to).toBe('new@example.com');
+        expect(orgName).toBe('Acme Inc');
+        const rawToken = String(inviteUrl).split('/invite/')[1]!;
+        expect(hashToken(rawToken)).toBe(store.invitations[0]!.token);
+        expect(rawToken).not.toBe(store.invitations[0]!.token);
     });
 
     it('throws NOT_FOUND for an org that does not exist', async () => {
         await expect(invitationService.createInvitation('missing-org', 'a@example.com', 'DRIVER')).rejects.toMatchObject({
             code: 'NOT_FOUND',
         });
+    });
+
+    it('re-inviting the same email rotates the pending invitation instead of stacking a second one', async () => {
+        const first = await invitationService.createInvitation('org-1', 'new@example.com', 'DRIVER');
+        const firstToken = store.invitations[0]!.token;
+
+        const second = await invitationService.createInvitation('org-1', 'New@Example.com', 'OPS_MANAGER');
+
+        expect(store.invitations).toHaveLength(1); // updated in place
+        expect(store.invitations[0]!.token).not.toBe(firstToken); // fresh token
+        expect(store.invitations[0]!.role).toBe('OPS_MANAGER'); // latest role wins
+        expect(second.expiresAt.getTime()).toBeGreaterThanOrEqual(first.expiresAt.getTime());
+        expect(sendInvitationEmailMock).toHaveBeenCalledTimes(2); // resend still goes out
     });
 });
 
@@ -205,6 +250,25 @@ describe('invitationService.acceptInvitation', () => {
         await expect(
             invitationService.acceptInvitation('does-not-exist', { sub: 'user-1', email: 'a@example.com' }, null),
         ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('rejects an accept from an account that does not own the invited email', async () => {
+        const invitation = makeInvitation({ email: 'invitee@example.com' });
+        await expect(
+            invitationService.acceptInvitation(invitation.token, { sub: 'someone-else', email: 'attacker@example.com' }, null),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        expect(store.memberships).toHaveLength(0);
+        expect(store.invitations[0]!.acceptedAt).toBeNull(); // still usable by the real invitee
+    });
+
+    it('matches the invited email case-insensitively', async () => {
+        const invitation = makeInvitation({ email: 'Invitee@Example.com' });
+        const result = await invitationService.acceptInvitation(
+            invitation.token,
+            { sub: 'user-1', email: 'invitee@example.com' },
+            null,
+        );
+        expect(result.orgId).toBe('org-1');
     });
 
     it('creates the membership in the org the invitation belongs to, not any other org', async () => {
@@ -268,7 +332,7 @@ describe('invitationService.acceptInvitation', () => {
     it('sets the membership role to the invitation role, not the existing global ADMIN role — first accept', async () => {
         // Existing account with global role ADMIN, no memberships yet.
         store.users.push({ id: 'existing-admin', email: 'existing-admin@example.com', name: 'Existing Admin', role: 'ADMIN' });
-        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER' });
+        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER', email: 'existing-admin@example.com' });
 
         const result = await invitationService.acceptInvitation(
             invitation.token,
@@ -292,7 +356,7 @@ describe('invitationService.acceptInvitation', () => {
     it('updates the membership role to the invitation role on a re-invite of an existing member', async () => {
         store.users.push({ id: 'existing-admin', email: 'existing-admin@example.com', name: 'Existing Admin', role: 'ADMIN' });
         store.memberships.push({ orgId: 'org-2', userId: 'existing-admin', role: 'ADMIN' }); // stale/incorrect prior role
-        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER' });
+        const invitation = makeInvitation({ orgId: 'org-2', role: 'DRIVER', email: 'existing-admin@example.com' });
 
         await invitationService.acceptInvitation(
             invitation.token,

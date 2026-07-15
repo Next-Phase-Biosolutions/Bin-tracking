@@ -70,3 +70,28 @@ export function aiRateLimit(limiter: SlidingWindowLimiter = aiDigitizeLimiter) {
         return next({ ctx: { ...ctx, orgId: ctx.orgId } });
     });
 }
+
+/**
+ * Per-org cap on invitation emails. invitation.create sends real email to an
+ * arbitrary address — without a cap, one compromised/hostile org admin can
+ * burn the Resend quota and get the sending domain flagged as spam, which
+ * hurts every tenant. 20/day is far above any legitimate team-building burst;
+ * the global per-IP limiter doesn't help here (one admin, one IP, unlimited
+ * distinct recipients).
+ */
+const INVITES_PER_DAY = 20;
+const INVITE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const inviteLimiter = new SlidingWindowLimiter(INVITES_PER_DAY, INVITE_WINDOW_MS);
+
+export function inviteRateLimit(limiter: SlidingWindowLimiter = inviteLimiter) {
+    return middleware(async ({ ctx, next }) => {
+        if (!ctx.orgId) throw new TRPCError({ code: 'FORBIDDEN', message: 'No organization' });
+        if (!limiter.tryConsume(ctx.orgId)) {
+            throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message: 'Invitation limit reached for your organization. Try again tomorrow.',
+            });
+        }
+        return next({ ctx: { ...ctx, orgId: ctx.orgId } });
+    });
+}

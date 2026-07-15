@@ -1,6 +1,6 @@
 import { PrismaClient, FacilityType, UserRole, BinStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { provisionOrganization, DEFAULT_BIN_TYPES } from '../src/org-provision.js';
 
 // ─── Supabase Admin API helpers ────────────────────────────────────────────
@@ -16,6 +16,12 @@ if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
 
 function generateToken(): string {
     return randomBytes(32).toString('hex');
+}
+
+// Tokens are stored hashed at rest (see apps/api/src/lib/token.ts) — the DB
+// gets the digest, the console gets the raw value for tablet setup.
+function hashToken(raw: string): string {
+    return createHash('sha256').update(raw).digest('hex');
 }
 
 async function adminFetch(path: string, init?: RequestInit) {
@@ -222,12 +228,19 @@ async function main(): Promise<void> {
 
     // ─── 7. Stations (scanning tablets) ─────────────────────────
     console.log('📟 Creating stations...');
-    await Promise.all([
-        prisma.station.create({ data: { facilityId: chicago!.id, token: generateToken(), label: 'Chicago Tablet 1' } }),
-        prisma.station.create({ data: { facilityId: chicago!.id, token: generateToken(), label: 'Chicago Tablet 2' } }),
-        prisma.station.create({ data: { facilityId: detroit!.id, token: generateToken(), label: 'Detroit Tablet 1' } }),
-        prisma.station.create({ data: { facilityId: milwaukee!.id, token: generateToken(), label: 'Milwaukee Tablet 1' } }),
-    ]);
+    const stationSpecs = [
+        { facilityId: chicago!.id, label: 'Chicago Tablet 1' },
+        { facilityId: chicago!.id, label: 'Chicago Tablet 2' },
+        { facilityId: detroit!.id, label: 'Detroit Tablet 1' },
+        { facilityId: milwaukee!.id, label: 'Milwaukee Tablet 1' },
+    ].map((spec) => ({ ...spec, rawToken: generateToken() }));
+    await Promise.all(
+        stationSpecs.map((s) =>
+            prisma.station.create({ data: { facilityId: s.facilityId, token: hashToken(s.rawToken), label: s.label } }),
+        ),
+    );
+    console.log('   Raw station tokens (stored hashed — record these now, they are not recoverable):');
+    for (const s of stationSpecs) console.log(`   ${s.label}: ${s.rawToken}`);
 
     // ─── 8. Bin Types ────────────────────────────────────────────
     // Already created by provisionOrganization() above — fetch them back in

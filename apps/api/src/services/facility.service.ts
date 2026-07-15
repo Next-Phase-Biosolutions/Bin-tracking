@@ -4,6 +4,7 @@ import { prisma } from '@bin-tracker/db';
 import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput, CreateStationInput } from '@bin-tracker/validators';
 import { handlePrismaError } from '../lib/errors.js';
+import { hashToken } from '../lib/token.js';
 
 function generateStationToken(): string {
     return `STN-${randomUUID()}`;
@@ -133,13 +134,18 @@ export const facilityService = {
         const MAX_ATTEMPTS = 5;
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
             try {
-                return await prisma.station.create({
+                // Stored hashed at rest (lib/token.ts); the raw token is
+                // returned exactly once here for the setup QR code and is
+                // not recoverable afterwards.
+                const rawToken = generateStationToken();
+                const station = await prisma.station.create({
                     data: {
                         facilityId: input.facilityId,
-                        token: generateStationToken(),
+                        token: hashToken(rawToken),
                         label: input.label ?? 'Tablet',
                     },
                 });
+                return { ...station, token: rawToken };
             } catch (error: unknown) {
                 // P2002 = unique collision on token (astronomically unlikely
                 // with a UUID) — retry with a freshly generated token.

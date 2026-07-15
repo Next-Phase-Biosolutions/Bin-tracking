@@ -49,7 +49,13 @@ export async function bootstrap(
                 // (see jwt.ts) — seed a placeholder from the email's local
                 // part. Renaming via a profile screen isn't in scope for this task.
                 name: email.split('@')[0] ?? email,
-                role: 'ADMIN',
+                // Least privilege: the GLOBAL role is informational once org
+                // authorization reads OrganizationMember.role (Task 25) — a
+                // blanket global ADMIN here was the raw material for the
+                // privilege-escalation bug and stays a footgun for any future
+                // code that checks user.role. Real authority comes from the
+                // ADMIN membership provisionOrganization() grants the owner.
+                role: 'WORKER',
             },
         });
     } else if (fallbackUser) {

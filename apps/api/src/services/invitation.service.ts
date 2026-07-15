@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import type { User, UserRole } from '@prisma/client';
 import { sendInvitationEmail } from '../lib/email.js';
+import { hashToken } from '../lib/token.js';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -28,18 +29,29 @@ export async function createInvitation(orgId: string, email: string, role: UserR
     const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
     if (!org) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
 
-    const invitation = await prisma.invitation.create({
-        data: {
-            orgId,
-            email,
-            role,
-            token: randomUUID(),
-            expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
-        },
+    const normalizedEmail = email.toLowerCase();
+
+    // Re-inviting the same address rotates the existing pending invitation
+    // (fresh token + expiry) instead of accumulating rows — one live token
+    // per (org, email), and "resend" comes for free.
+    const pending = await prisma.invitation.findFirst({
+        where: { orgId, email: normalizedEmail, acceptedAt: null, expiresAt: { gt: new Date() } },
     });
 
+    // Stored hashed at rest (lib/token.ts); only the emailed link ever
+    // carries the raw token.
+    const rawToken = randomUUID();
+    const data = {
+        role,
+        token: hashToken(rawToken),
+        expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+    };
+    const invitation = pending
+        ? await prisma.invitation.update({ where: { id: pending.id }, data })
+        : await prisma.invitation.create({ data: { orgId, email: normalizedEmail, ...data } });
+
     const appUrl = process.env['APP_URL'] ?? 'http://localhost:3000';
-    await sendInvitationEmail(invitation.email, `${appUrl}/invite/${invitation.token}`, org.name);
+    await sendInvitationEmail(invitation.email, `${appUrl}/invite/${rawToken}`, org.name);
 
     return { id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt };
 }
@@ -90,7 +102,8 @@ export async function acceptInvitation(
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
     }
 
-    const invitation = await prisma.invitation.findUnique({ where: { token } });
+    // The URL carries the raw token; the DB stores its hash (lib/token.ts).
+    const invitation = await prisma.invitation.findUnique({ where: { token: hashToken(token) } });
     if (!invitation) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid invitation token' });
     }
@@ -99,6 +112,17 @@ export async function acceptInvitation(
     }
     if (invitation.expiresAt.getTime() < Date.now()) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invitation has expired' });
+    }
+    // The token proves receipt of the email; requiring the authenticated
+    // account to OWN the invited address closes the forwarded/leaked-link
+    // hole where any Supabase account holding the URL could join at the
+    // invited role. Skipped on the DISABLE_AUTH dev-bypass path (jwtPayload
+    // null), where the injected seed user's email never matches.
+    if (jwtPayload && email.toLowerCase() !== invitation.email.toLowerCase()) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This invitation was issued to a different email address. Sign in with the invited account.',
+        });
     }
 
     await prisma.$transaction(async (tx) => {

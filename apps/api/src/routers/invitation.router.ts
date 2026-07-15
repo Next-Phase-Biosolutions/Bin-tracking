@@ -1,4 +1,5 @@
 import { router, orgAdminProcedure, verifiedProcedure } from '../trpc/trpc.js';
+import { inviteRateLimit } from '../trpc/rate-limit.js';
 import { createInvitationSchema, acceptInvitationSchema } from '@bin-tracker/validators';
 import { invitationService } from '../services/invitation.service.js';
 
@@ -14,6 +15,7 @@ export const invitationRouter = router({
      * client input — so an admin can only ever invite into their own org.
      */
     create: orgAdminProcedure
+        .use(inviteRateLimit())
         .input(createInvitationSchema)
         .mutation(async ({ ctx, input }) => invitationService.createInvitation(ctx.orgId, input.email, input.role)),
 
