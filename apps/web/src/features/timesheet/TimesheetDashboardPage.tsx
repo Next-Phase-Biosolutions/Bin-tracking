@@ -29,7 +29,15 @@ export default function TimesheetDashboardPage() {
 
     const summaryQuery = trpc.attendance.summary.useQuery(range, { staleTime: 10_000 });
     const recentQuery = trpc.attendance.recent.useQuery({ limit: 20 }, { staleTime: 10_000 });
-    const { hasModule } = useSubscription();
+    const { hasModule, isLoading } = useSubscription();
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
+                Loading…
+            </div>
+        );
+    }
 
     if (!hasModule('WORKFORCE')) {
         return (

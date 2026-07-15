@@ -105,7 +105,15 @@ export default function FormImportPage() {
         [digitize],
     );
 
-    const { hasModule } = useSubscription();
+    const { hasModule, isLoading } = useSubscription();
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[#F5F8F2] flex flex-col items-center justify-center py-24 text-gray-500">
+                <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
+                <p className="font-semibold">Loading…</p>
+            </div>
+        );
+    }
     if (!hasModule('FORMS_AI_DIGITIZE')) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">

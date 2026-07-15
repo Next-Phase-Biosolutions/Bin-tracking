@@ -67,7 +67,15 @@ export default function ShipmentRegisterPage() {
             stationClient.shipment.register.mutate(input),
         onSuccess: (shipment) => setRegistered(shipment),
     });
-    const { hasModule } = useSubscription();
+    const { hasModule, isLoading } = useSubscription();
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
+                Loading…
+            </div>
+        );
+    }
 
     if (!hasModule('SHIPMENTS')) {
         return (

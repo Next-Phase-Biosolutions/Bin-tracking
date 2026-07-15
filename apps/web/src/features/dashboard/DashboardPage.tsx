@@ -186,7 +186,7 @@ export function DashboardPage() {
     const [customTo, setCustomTo] = useState<string>(toInputDate(new Date()));
     const [calendarOpen, setCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
-    const { hasModule } = useSubscription();
+    const { hasModule, isLoading: isSubscriptionLoading } = useSubscription();
 
     useState(() => { setAuthToken(TEST_ADMIN_TOKEN); });
 
@@ -249,12 +249,12 @@ export function DashboardPage() {
                         <Box className="w-4 h-4" /><span>Bin</span>
                     </Link>
 
-                    {hasModule('ANIMAL_INTAKE') && (
+                    {!isSubscriptionLoading && hasModule('ANIMAL_INTAKE') && (
                         <Link to="/app/animalregistration" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                             <PawPrint className="w-4 h-4" /><span>Animal Registration</span>
                         </Link>
                     )}
-                    {hasModule('WORKFORCE') && (
+                    {!isSubscriptionLoading && hasModule('WORKFORCE') && (
                         <>
                             <Link to="/app/employees/register" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                                 <UserPlus className="w-4 h-4" /><span>Register Employee</span>
@@ -267,7 +267,7 @@ export function DashboardPage() {
                             </Link>
                         </>
                     )}
-                    {hasModule('SHIPMENTS') && (
+                    {!isSubscriptionLoading && hasModule('SHIPMENTS') && (
                         <>
                             <Link to="/app/shipments" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                                 <Package className="w-4 h-4" /><span>Shipments</span>
@@ -277,12 +277,12 @@ export function DashboardPage() {
                             </Link>
                         </>
                     )}
-                    {hasModule('FORMS') && (
+                    {!isSubscriptionLoading && hasModule('FORMS') && (
                         <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                             <ClipboardList className="w-4 h-4" /><span>Fill Form</span>
                         </Link>
                     )}
-                    {hasModule('FORMS_AI_DIGITIZE') && (
+                    {!isSubscriptionLoading && hasModule('FORMS_AI_DIGITIZE') && (
                         <Link to="/app/forms/import" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
                             <PlusCircle className="w-4 h-4" /><span>Create a Form</span>
                         </Link>

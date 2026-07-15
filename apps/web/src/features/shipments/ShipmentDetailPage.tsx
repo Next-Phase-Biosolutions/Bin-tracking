@@ -21,7 +21,19 @@ function formatDateTime(value: string | Date | null): string {
 export default function ShipmentDetailPage() {
     const { id = '' } = useParams();
     const query = trpc.shipment.getById.useQuery({ id }, { enabled: id.length > 0 });
-    const { hasModule } = useSubscription();
+    const { hasModule, isLoading } = useSubscription();
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50 p-6">
+                <div className="mx-auto max-w-2xl">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-gray-400 shadow-sm">
+                        Loading…
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!hasModule('SHIPMENTS')) {
         return (
