@@ -1,17 +1,26 @@
 import { describe, it, expect, vi } from 'vitest';
+import { reviveJobResultDates } from '../lib/queue.js';
+import type { PayrollRunView } from '@bin-tracker/types';
 
 // payroll.computeRun enqueues on the heavy-jobs queue instead of running
 // inline (Task 22a); payroll.jobStatus polls it. Mock at the queue boundary
 // (lib/queue.js) and payroll.service.js's own DB logic (already covered by
 // payroll.service.test.ts), and drive the router through createCaller.
+// reviveJobResultDates is kept as the REAL implementation (importOriginal)
+// because it's exactly what's under test below — mocking it out would hide
+// the bug this file exists to catch.
 const addMock = vi.fn();
 const getJobMock = vi.fn();
 
-vi.mock('../lib/queue.js', () => ({
-    HEAVY_JOBS_QUEUE: 'heavy-jobs',
-    PAYROLL_COMPUTE_RUN_JOB: 'payroll.computeRun',
-    getHeavyJobsQueue: () => ({ add: addMock, getJob: getJobMock }),
-}));
+vi.mock('../lib/queue.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../lib/queue.js')>();
+    return {
+        ...actual,
+        HEAVY_JOBS_QUEUE: 'heavy-jobs',
+        PAYROLL_COMPUTE_RUN_JOB: 'payroll.computeRun',
+        getHeavyJobsQueue: () => ({ add: addMock, getJob: getJobMock }),
+    };
+});
 
 vi.mock('../services/payroll.service.js', () => ({
     payrollService: {
@@ -68,17 +77,84 @@ describe('payroll.jobStatus', () => {
         await expect(caller.jobStatus({ jobId: 'nope' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
-    it('returns the computed result once a same-org job has completed', async () => {
+    it('returns the computed result once a same-org job has completed, with real Date instances', async () => {
+        // BullMQ persists job.returnvalue to Redis via JSON.stringify and
+        // reconstructs it via JSON.parse when the job is read back, so every
+        // Date field silently becomes an ISO string by the time the router
+        // sees it — even though PayrollRunView's type still says Date. Route
+        // a real PayrollRunView through that exact round-trip (rather than
+        // hand-constructing a plain object) so this test would have failed
+        // before reviveJobResultDates existed: pre-fix, `result` was
+        // `job.returnvalue` verbatim, i.e. the JSON-round-tripped strings
+        // below, and `toBeInstanceOf(Date)` on a string fails.
+        const run: PayrollRunView = {
+            id: 'run-1',
+            period: '2026-06',
+            status: 'APPROVED',
+            rateCents: 1500,
+            currency: 'USD',
+            totalEmployees: 1,
+            totalMinutes: 480,
+            totalGrossCents: 12000,
+            computedAt: new Date('2026-06-30T12:00:00.000Z'),
+            createdAt: new Date('2026-06-01T00:00:00.000Z'),
+            lineItems: [
+                {
+                    id: 'line-1',
+                    employeeId: 'emp-1',
+                    employeeCode: 'E1',
+                    fullName: 'Jane Doe',
+                    minutes: 480,
+                    hours: 8,
+                    rateCents: 1500,
+                    grossCents: 12000,
+                    payoutStatus: 'PAID',
+                    payoutRef: 'ref-1',
+                    paidAt: new Date('2026-07-01T00:00:00.000Z'),
+                },
+            ],
+            exceptions: [],
+        };
+        const returnvalue = JSON.parse(JSON.stringify(run));
+
         getJobMock.mockResolvedValue({
             data: { orgId: ORG_A },
             getState: vi.fn().mockResolvedValue('completed'),
-            returnvalue: { id: 'run-1', period: '2026-06' },
+            returnvalue,
         });
 
         const caller = payrollRouter.createCaller(makeCtx(ORG_A));
         const result = await caller.jobStatus({ jobId: 'job-1' });
 
-        expect(result).toEqual({ state: 'completed', result: { id: 'run-1', period: '2026-06' } });
+        expect(result.state).toBe('completed');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payload = (result as any).result as PayrollRunView;
+        expect(payload.createdAt).toBeInstanceOf(Date);
+        expect(payload.createdAt.toISOString()).toBe('2026-06-01T00:00:00.000Z');
+        expect(payload.computedAt).toBeInstanceOf(Date);
+        expect(payload.computedAt?.toISOString()).toBe('2026-06-30T12:00:00.000Z');
+        expect(payload.lineItems[0]?.paidAt).toBeInstanceOf(Date);
+        expect(payload.lineItems[0]?.paidAt?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    });
+
+    it('reviveJobResultDates handles null computedAt / null paidAt without throwing', () => {
+        const revived = reviveJobResultDates({
+            id: 'run-2',
+            period: '2026-06',
+            status: 'DRAFT',
+            rateCents: 1500,
+            currency: 'USD',
+            totalEmployees: 0,
+            totalMinutes: 0,
+            totalGrossCents: 0,
+            computedAt: null,
+            createdAt: new Date('2026-06-01T00:00:00.000Z'),
+            lineItems: [],
+            exceptions: [],
+        });
+
+        expect(revived.computedAt).toBeNull();
+        expect(revived.createdAt).toBeInstanceOf(Date);
     });
 
     it('returns the failure reason once a same-org job has failed', async () => {

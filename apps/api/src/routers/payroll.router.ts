@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { router, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
 import { payrollPeriodSchema, payrollListSchema, payrollJobStatusSchema } from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
-import { getHeavyJobsQueue, PAYROLL_COMPUTE_RUN_JOB } from '../lib/queue.js';
+import { getHeavyJobsQueue, PAYROLL_COMPUTE_RUN_JOB, reviveJobResultDates } from '../lib/queue.js';
 
 export const payrollRouter = router({
     /**
@@ -37,7 +37,7 @@ export const payrollRouter = router({
 
             const state = await job.getState();
             if (state === 'completed') {
-                return { state, result: job.returnvalue };
+                return { state, result: reviveJobResultDates(job.returnvalue) };
             }
             if (state === 'failed') {
                 return { state, error: job.failedReason };

@@ -25,6 +25,30 @@ let _connection: IORedis | null = null;
 let _queue: Queue<PayrollComputeRunJobData, HeavyJobResult, HeavyJobName> | null = null;
 
 /**
+ * BullMQ persists `job.returnvalue` to Redis via `JSON.stringify` and
+ * reconstructs it via `JSON.parse` when the job is later read back. That
+ * round-trip silently turns every `Date` field in `PayrollRunView` into a
+ * plain ISO string, even though the type system still claims `Date` — so a
+ * completed job's raw `returnvalue` lies about its own shape. Revive the
+ * known `Date` fields here, once, at this boundary, so `PayrollRunView`
+ * stays an accurate contract for callers (e.g. payroll.router.ts's
+ * `jobStatus`). `new Date(...)` is idempotent on an already-real `Date`, so
+ * this is safe to call even if BullMQ's in-memory (non-persisted) fast path
+ * ever hands back the original object unchanged.
+ */
+export function reviveJobResultDates(raw: PayrollRunView): PayrollRunView {
+    return {
+        ...raw,
+        computedAt: raw.computedAt ? new Date(raw.computedAt) : null,
+        createdAt: new Date(raw.createdAt),
+        lineItems: raw.lineItems.map((item) => ({
+            ...item,
+            paidAt: item.paidAt ? new Date(item.paidAt) : null,
+        })),
+    };
+}
+
+/**
  * Creates an ioredis connection from REDIS_URL. `maxRetriesPerRequest: null`
  * is required by BullMQ for its blocking commands (see BullMQ docs). Throws
  * if REDIS_URL is unset — callers are responsible for only calling this when
