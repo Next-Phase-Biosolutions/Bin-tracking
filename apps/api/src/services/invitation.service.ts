@@ -1,0 +1,141 @@
+import { randomUUID } from 'node:crypto';
+import { TRPCError } from '@trpc/server';
+import { prisma } from '@bin-tracker/db';
+import type { User, UserRole } from '@prisma/client';
+import { sendInvitationEmail } from '../lib/email.js';
+
+const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export interface CreateInvitationResult {
+    id: string;
+    email: string;
+    role: UserRole;
+    expiresAt: Date;
+}
+
+/**
+ * Creates a pending Invitation and emails the accept link. `orgId` always
+ * comes from the caller's own org context (auth.router.ts passes ctx.orgId,
+ * resolved by orgAdminProcedure) — never client input — so an admin can
+ * only ever invite people into their own organization.
+ *
+ * The invitation row is committed before the email send is attempted; if
+ * the send throws (e.g. RESEND_API_KEY unset), the error propagates to the
+ * caller so they see it failed, but the invitation still exists and could
+ * be resent by a future re-invite flow (not in scope here).
+ */
+export async function createInvitation(orgId: string, email: string, role: UserRole): Promise<CreateInvitationResult> {
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
+    if (!org) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+
+    const invitation = await prisma.invitation.create({
+        data: {
+            orgId,
+            email,
+            role,
+            token: randomUUID(),
+            expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+        },
+    });
+
+    const appUrl = process.env['APP_URL'] ?? 'http://localhost:3000';
+    await sendInvitationEmail(invitation.email, `${appUrl}/invite/${invitation.token}`, org.name);
+
+    return { id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt };
+}
+
+export interface AcceptInvitationResult {
+    orgId: string;
+    role: UserRole;
+}
+
+/**
+ * Accepts an invitation. The token is the SOLE credential — invitation is
+ * looked up by token alone, never combined with or overridden by any other
+ * caller-supplied id, so only someone who possesses the token (i.e. received
+ * the email) can accept it. The resulting OrganizationMember.orgId is always
+ * the invitation's own orgId, read from the row the token resolved to —
+ * never client input — so a valid token for org A can never create
+ * membership in org B.
+ *
+ * The local User row's email is seeded from jwtPayload.email (the identity
+ * Supabase already authenticated the caller as), not invitation.email —
+ * Supabase, not this handler, is the source of truth for "who owns this
+ * email"; this handler only decides org membership + role from the token.
+ * `role` comes from the invitation (not hardcoded ADMIN like bootstrap),
+ * since accepting an invite should never silently grant admin.
+ *
+ * `jwtPayload` is null only under the DISABLE_AUTH dev bypass (verifiedProcedure
+ * skips its own check in that mode, same as bootstrap) — fall back to the
+ * dev-injected `fallbackUser` instead of crashing.
+ */
+export async function acceptInvitation(
+    token: string,
+    jwtPayload: { sub: string; email?: string } | null,
+    fallbackUser: User | null,
+): Promise<AcceptInvitationResult> {
+    let sub: string;
+    let email: string;
+
+    if (jwtPayload) {
+        if (!jwtPayload.email) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'JWT is missing an email claim' });
+        }
+        sub = jwtPayload.sub;
+        email = jwtPayload.email;
+    } else if (fallbackUser) {
+        sub = fallbackUser.id;
+        email = fallbackUser.email;
+    } else {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
+    }
+
+    const invitation = await prisma.invitation.findUnique({ where: { token } });
+    if (!invitation) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid invitation token' });
+    }
+    if (invitation.acceptedAt) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invitation has already been accepted' });
+    }
+    if (invitation.expiresAt.getTime() < Date.now()) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invitation has expired' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+        const user = await tx.user.upsert({
+            where: { id: sub },
+            update: {},
+            create: {
+                id: sub,
+                email,
+                name: email.split('@')[0] ?? email,
+                role: invitation.role,
+            },
+        });
+
+        await tx.organizationMember.upsert({
+            where: { orgId_userId: { orgId: invitation.orgId, userId: user.id } },
+            update: {},
+            create: { orgId: invitation.orgId, userId: user.id },
+        });
+
+        // Re-check acceptedAt inside the transaction to close the race where two
+        // concurrent accept calls both pass the pre-transaction check above —
+        // only the first writer's update sticks; the loser sees a mismatched
+        // count and is treated as a double-accept.
+        const result = await tx.invitation.updateMany({
+            where: { id: invitation.id, acceptedAt: null },
+            data: { acceptedAt: new Date() },
+        });
+        if (result.count === 0) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invitation has already been accepted' });
+        }
+    });
+
+    return { orgId: invitation.orgId, role: invitation.role };
+}
+
+export const invitationService = {
+    createInvitation,
+    acceptInvitation,
+};
