@@ -69,8 +69,12 @@ export async function provisionOrganization(
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const org = await tx.organization.create({ data: { name, slug } });
 
+        // The org's founder is its founding admin — this is the ONLY place a
+        // membership should ever get ADMIN without going through an explicit
+        // invitation (Task 25: invitations set OrganizationMember.role from
+        // invitation.role, never ADMIN).
         await tx.organizationMember.create({
-            data: { orgId: org.id, userId: ownerUserId },
+            data: { orgId: org.id, userId: ownerUserId, role: 'ADMIN' },
         });
 
         await tx.binType.createMany({

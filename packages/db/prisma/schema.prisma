@@ -137,6 +137,7 @@ model OrganizationMember {
   id        String   @id @default(cuid())
   orgId     String
   userId    String
+  role      UserRole
   createdAt DateTime @default(now())
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)

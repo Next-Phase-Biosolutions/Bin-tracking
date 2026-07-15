@@ -113,10 +113,16 @@ export async function acceptInvitation(
             },
         });
 
+        // Task 25: role must come from THIS invitation on both branches — a
+        // re-invite of an existing member has to actually change their access,
+        // not leave whatever role they happened to have before (that silent
+        // drop was the privilege-escalation hole: an existing account's global
+        // ADMIN role would otherwise keep winning over an org's explicit
+        // low-privilege invite).
         await tx.organizationMember.upsert({
             where: { orgId_userId: { orgId: invitation.orgId, userId: user.id } },
-            update: {},
-            create: { orgId: invitation.orgId, userId: user.id },
+            update: { role: invitation.role },
+            create: { orgId: invitation.orgId, userId: user.id, role: invitation.role },
         });
 
         // Re-check acceptedAt inside the transaction to close the race where two
