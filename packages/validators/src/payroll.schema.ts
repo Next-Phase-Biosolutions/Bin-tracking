@@ -16,3 +16,10 @@ export const payrollListSchema = z.object({
 });
 
 export type PayrollListInput = z.infer<typeof payrollListSchema>;
+
+/** Input for polling the status of an async `payroll.computeRun` job. */
+export const payrollJobStatusSchema = z.object({
+    jobId: z.string().min(1),
+});
+
+export type PayrollJobStatusInput = z.infer<typeof payrollJobStatusSchema>;

@@ -96,8 +96,10 @@ export {
 export {
     payrollPeriodSchema,
     payrollListSchema,
+    payrollJobStatusSchema,
     type PayrollPeriodInput,
     type PayrollListInput,
+    type PayrollJobStatusInput,
 } from './payroll.schema.js';
 
 export {
