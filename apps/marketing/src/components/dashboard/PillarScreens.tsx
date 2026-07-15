@@ -1,4 +1,3 @@
-"use client";
 
 import type { ReactNode } from "react";
 import { useTicker, useIncrement } from "@/lib/hooks";
@@ -258,7 +257,7 @@ function RecoveryScreen() {
   );
 }
 
-export const pillarScreens: Record<PillarId, () => JSX.Element> = {
+export const pillarScreens: Record<PillarId, () => ReactNode> = {
   hardware: HardwareScreen,
   ai: AIScreen,
   operations: OperationsScreen,

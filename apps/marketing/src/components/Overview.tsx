@@ -1,6 +1,5 @@
-"use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { overview } from "@/data/content";
 import { Reveal } from "./ui/Reveal";
 import { Eyebrow } from "./ui/atoms";
@@ -86,7 +85,7 @@ export function Overview() {
                   initial={reduce ? { scaleX: 1 } : { scaleX: 0 }}
                   whileInView={{ scaleX: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 1.3, ease: "easeInOut" }}
+                  transition={{ duration: 1.3, ease: "easeInOut" as const }}
                   style={{ right: 0 }}
                 />
                 <div className="relative grid grid-cols-3 gap-y-7 sm:grid-cols-6">

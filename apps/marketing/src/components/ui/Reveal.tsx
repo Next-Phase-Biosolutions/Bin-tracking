@@ -1,6 +1,5 @@
-"use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
 interface RevealProps {
@@ -27,7 +26,7 @@ export function Reveal({
       initial={reduce ? { opacity: 0 } : { opacity: 0, y }}
       whileInView={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.6, delay, ease: [0.21, 0.5, 0.27, 1] }}
+      transition={{ duration: 0.6, delay, ease: [0.21, 0.5, 0.27, 1] as [number, number, number, number] }}
     >
       {children}
     </MotionTag>

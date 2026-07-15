@@ -1,7 +1,6 @@
-"use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { Logo } from "./ui/atoms";
 
 const links = [

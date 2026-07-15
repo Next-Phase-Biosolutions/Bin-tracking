@@ -1,6 +1,5 @@
-"use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { problem } from "@/data/content";
 import { Reveal } from "./ui/Reveal";
 import { Eyebrow } from "./ui/atoms";

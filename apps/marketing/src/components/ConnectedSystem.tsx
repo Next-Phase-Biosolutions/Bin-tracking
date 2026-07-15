@@ -1,6 +1,5 @@
-"use client";
 
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "motion/react";
 import { connected } from "@/data/content";
 import { pillars } from "@/data/pillars";
 import { Reveal } from "./ui/Reveal";

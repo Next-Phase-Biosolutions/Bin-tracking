@@ -1,12 +1,7 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/atoms";
 import { LoginForm } from "@/components/LoginForm";
 
-export const metadata: Metadata = {
-  title: "Sign in | Next Phase BioSolutions",
-  description: "Sign in to your Next Phase BioSolutions facility portal.",
-};
 
 const marquee = ["CFIA", "Vision AI", "Carbon Credits", "Blockchain Verified"];
 
@@ -21,7 +16,7 @@ export default function LoginPage() {
           className="pointer-events-none absolute -right-24 top-1/3 h-80 w-80 rounded-full bg-rust/15 blur-3xl"
         />
 
-        <Link href="/" className="relative inline-flex" aria-label="Next Phase BioSolutions home">
+        <Link to="/" className="relative inline-flex" aria-label="Next Phase BioSolutions home">
           <Logo variant="light" className="h-9 w-auto" />
         </Link>
 
@@ -53,7 +48,7 @@ export default function LoginPage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg opacity-50 lg:hidden" />
         <div className="relative w-full max-w-md">
           {/* mobile logo */}
-          <Link href="/" className="mb-8 inline-flex lg:hidden" aria-label="Next Phase BioSolutions home">
+          <Link to="/" className="mb-8 inline-flex lg:hidden" aria-label="Next Phase BioSolutions home">
             <Logo className="h-8 w-auto" />
           </Link>
 
@@ -71,13 +66,13 @@ export default function LoginPage() {
 
           <p className="mt-7 border-t border-edge/70 pt-6 text-sm text-muted">
             Need access?{" "}
-            <Link href="/#contact" className="font-medium text-rust underline-offset-4 hover:underline">
+            <Link to="/#contact" className="font-medium text-rust underline-offset-4 hover:underline">
               Contact sales
             </Link>{" "}
             to book a walkthrough.
           </p>
           <p className="mt-4 text-sm">
-            <Link href="/" className="text-muted underline-offset-4 hover:text-olive-deep hover:underline">
+            <Link to="/" className="text-muted underline-offset-4 hover:text-olive-deep hover:underline">
               ← Back to website
             </Link>
           </p>

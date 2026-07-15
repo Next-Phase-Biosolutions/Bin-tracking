@@ -1,4 +1,3 @@
-"use client";
 
 import { useTicker } from "@/lib/hooks";
 import { Bar } from "./primitives";

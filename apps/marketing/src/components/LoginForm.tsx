@@ -1,13 +1,12 @@
-"use client";
 
 import { useState, type FormEvent } from "react";
 
 const field =
   "w-full rounded-xl border border-edge bg-white px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-rust focus:outline-none";
 
-// The facility app lives at its own URL. Set NEXT_PUBLIC_APP_URL to the app domain
+// The facility app lives at its own URL. Set VITE_APP_URL to the app domain
 // (e.g. https://app.nextphasebiosolutions.com) before deploying; defaults to local app port.
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4174";
+const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:4174";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);

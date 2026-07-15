@@ -1,5 +1,4 @@
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 
 export function Logo({
@@ -14,12 +13,11 @@ export function Logo({
   const src =
     variant === "light" ? "/NPB-Logo-light.png" : "/NPB-Logo-transparent.png";
   return (
-    <Image
+    <img
       src={src}
       alt="Next Phase BioSolutions"
       width={1185}
       height={312}
-      priority={priority}
       className={className}
     />
   );
@@ -73,7 +71,7 @@ export function CTAButton({
   }[variant];
 
   return (
-    <Link href={href} className={`${base} ${styles} ${className}`}>
+    <Link to={href} className={`${base} ${styles} ${className}`}>
       {children}
       <ArrowRight />
     </Link>

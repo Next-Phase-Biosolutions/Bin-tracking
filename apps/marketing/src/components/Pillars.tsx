@@ -1,7 +1,6 @@
-"use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { pillars, type PillarId } from "@/data/pillars";
 import { pillarScreens } from "./dashboard/PillarScreens";
 import { Reveal } from "./ui/Reveal";
@@ -75,7 +74,7 @@ export function Pillars() {
                 initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, y: -10 }}
-                transition={{ duration: 0.4, ease: [0.21, 0.5, 0.27, 1] }}
+                transition={{ duration: 0.4, ease: [0.21, 0.5, 0.27, 1] as [number, number, number, number] }}
               >
                 <p className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-rust">
                   {active.layer}
@@ -134,7 +133,7 @@ export function Pillars() {
                 initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: -8 }}
-                transition={{ duration: 0.45, ease: [0.21, 0.5, 0.27, 1] }}
+                transition={{ duration: 0.45, ease: [0.21, 0.5, 0.27, 1] as [number, number, number, number] }}
               >
                 <ActiveScreen />
               </motion.div>

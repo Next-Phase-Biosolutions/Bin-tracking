@@ -1,6 +1,5 @@
-"use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { CTAButton } from "./ui/atoms";
 import { HeroDashboard } from "./dashboard/HeroDashboard";
 
@@ -64,7 +63,7 @@ export function Hero() {
                   className="block"
                   initial={reduce ? false : { y: "100%" }}
                   animate={reduce ? false : { y: 0 }}
-                  transition={{ duration: 0.7, delay: 0.1 + i * 0.12, ease: [0.21, 0.6, 0.27, 1] }}
+                  transition={{ duration: 0.7, delay: 0.1 + i * 0.12, ease: [0.21, 0.6, 0.27, 1] as [number, number, number, number] }}
                 >
                   {i === 1 ? (
                     <>

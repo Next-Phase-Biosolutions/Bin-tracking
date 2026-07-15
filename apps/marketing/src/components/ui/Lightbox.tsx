@@ -1,8 +1,6 @@
-"use client";
 
-import Image from "next/image";
 import { useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { EmissionsJourney } from "../dashboard/EmissionsJourney";
 
 export type ZoomItem =
@@ -50,11 +48,11 @@ export function Lightbox({
             initial={{ scale: 0.94, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
-            transition={{ duration: 0.26, ease: [0.21, 0.5, 0.27, 1] }}
+            transition={{ duration: 0.26, ease: [0.21, 0.5, 0.27, 1] as [number, number, number, number] }}
             onClick={(e) => e.stopPropagation()}
           >
             {item.kind === "image" ? (
-              <Image
+              <img
                 src={item.src}
                 alt={item.alt}
                 width={1917}

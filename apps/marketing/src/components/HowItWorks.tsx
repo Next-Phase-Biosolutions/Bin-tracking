@@ -1,8 +1,6 @@
-"use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { steps } from "@/data/content";
 import { Reveal } from "./ui/Reveal";
 import { Eyebrow } from "./ui/atoms";
@@ -24,7 +22,7 @@ const media: Media[] = [
 /* ---- compact coded animation, shown small as an accent over the screenshot ---- */
 function StepVisual({ index }: { index: number }) {
   const reduce = useReducedMotion();
-  const float = reduce ? {} : { animate: { y: [0, -5, 0] }, transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } };
+  const float = reduce ? {} : { animate: { y: [0, -5, 0] }, transition: { duration: 3, repeat: Infinity, ease: "easeInOut" as const } };
 
   if (index === 0) {
     return (
@@ -153,7 +151,7 @@ function StepMedia({ index, onOpen }: { index: number; onOpen: (item: ZoomItem) 
         className="group absolute inset-0 block cursor-zoom-in"
         aria-label={`Enlarge ${m.alt}`}
       >
-        <Image src={m.src} alt={m.alt} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover object-left-top" />
+        <img src={m.src} alt={m.alt} className="absolute inset-0 h-full w-full object-cover object-left-top" />
         <EnlargeChip />
       </button>
       <AccentInset index={index} />
