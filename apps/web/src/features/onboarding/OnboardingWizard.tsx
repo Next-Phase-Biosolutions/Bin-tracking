@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { Building2, MapPin, QrCode as QrCodeIcon, Users, CheckCircle2 } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
 import { useAuth } from '../../context/AuthContext';
+import { MARKETING_URL } from '../../lib/marketingUrl';
 
 type Step = 'org' | 'facility' | 'station' | 'invite';
 
@@ -38,7 +39,7 @@ export default function OnboardingWizard() {
     useEffect(() => {
         if (loading) return;
         if (!user) {
-            navigate('/login', { replace: true });
+            window.location.href = `${MARKETING_URL}/login`;
             return;
         }
         if (checked) return;

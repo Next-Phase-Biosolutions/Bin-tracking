@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import { Sidebar } from '../app/Sidebar';
 import { TopBar } from '../app/TopBar';
+import { MARKETING_URL } from '../../lib/marketingUrl';
 
 export function AppShellLayout() {
     const { user, loading } = useAuth();
-    const navigate = useNavigate();
     const [drawer, setDrawer] = useState(false);
 
     useEffect(() => {
-        if (!loading && !user) navigate('/login', { replace: true });
-    }, [loading, user, navigate]);
+        if (!loading && !user) window.location.href = `${MARKETING_URL}/login`;
+    }, [loading, user]);
 
     if (loading || !user) {
         return (

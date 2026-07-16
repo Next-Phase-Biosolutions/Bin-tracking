@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { setAuthToken, trpc } from '../../lib/trpc';
+import { MARKETING_URL } from '../../lib/marketingUrl';
 
 /**
  * Lands here after a real login/signup on the marketing site's own origin
  * hands its Supabase session across via a URL hash fragment (never a query
  * param — fragments are never sent to a server or logged in a Referer
  * header). Sets the session locally, clears the hash immediately so the
- * tokens don't linger in the address bar or browser history, then follows
- * the same bootstrap-based redirect LoginPage/SignupPage use.
+ * tokens don't linger in the address bar or browser history, then runs the
+ * same bootstrap-based redirect the marketing site's forms used to run
+ * locally before login/signup moved there.
  */
 export default function AuthCallbackPage() {
     const navigate = useNavigate();
@@ -29,7 +31,7 @@ export default function AuthCallbackPage() {
         window.history.replaceState(null, '', window.location.pathname);
 
         if (!accessToken || !refreshToken) {
-            navigate('/login', { replace: true });
+            window.location.href = `${MARKETING_URL}/login`;
             return;
         }
 
@@ -44,7 +46,7 @@ export default function AuthCallbackPage() {
                 setAuthToken(data.session.access_token);
 
                 const { needsOrg } = await bootstrapMutation.mutateAsync();
-                navigate(needsOrg ? '/onboarding' : '/app/dashboard', { replace: true });
+                navigate(needsOrg ? '/app/onboarding' : '/app/dashboard', { replace: true });
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
             }
@@ -57,7 +59,7 @@ export default function AuthCallbackPage() {
             <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-6 text-center">
                 <p className="text-sm text-rust">{error}</p>
                 <button
-                    onClick={() => navigate('/login', { replace: true })}
+                    onClick={() => { window.location.href = `${MARKETING_URL}/login`; }}
                     className="rounded-xl bg-olive-deep px-5 py-2.5 text-sm font-semibold text-bone-light hover:bg-olive-deep/90"
                 >
                     Back to login

@@ -43,5 +43,12 @@ export default defineConfig(({ mode }) => {
                 'station provisioning in production).',
         );
     }
-    return baseConfig;
+    return {
+        ...baseConfig,
+        // Production serves this app's build from /app/* under the same
+        // domain as apps/marketing (see root netlify.toml) — asset URLs
+        // need the matching prefix. Local dev still runs standalone at the
+        // root of its own port, so this only applies to `vite build`.
+        base: mode === 'production' ? '/app/' : '/',
+    };
 });

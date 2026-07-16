@@ -51,7 +51,7 @@ export async function createInvitation(orgId: string, email: string, role: UserR
         : await prisma.invitation.create({ data: { orgId, email: normalizedEmail, ...data } });
 
     const appUrl = process.env['APP_URL'] ?? 'http://localhost:3000';
-    await sendInvitationEmail(invitation.email, `${appUrl}/invite/${rawToken}`, org.name);
+    await sendInvitationEmail(invitation.email, `${appUrl}/app/invite/${rawToken}`, org.name);
 
     return { id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt };
 }
