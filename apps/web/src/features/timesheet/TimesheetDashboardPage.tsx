@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Users, LogIn, LogOut, RefreshCw, UserPlus, ScanLine } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 
 function todayStr(): string {
     return new Date().toISOString().slice(0, 10);
@@ -33,15 +35,15 @@ export default function TimesheetDashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
-                Loading…
+            <div className="flex min-h-[60vh] items-center justify-center text-muted">
+                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
             </div>
         );
     }
 
     if (!hasModule('WORKFORCE')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-[60vh] items-center justify-center">
                 <UpgradePrompt module="WORKFORCE" />
             </div>
         );
@@ -66,187 +68,128 @@ export default function TimesheetDashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-6xl">
-                <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Timesheet Dashboard</h1>
-                        <p className="mt-1 text-sm text-gray-600">Hours worked per employee</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            to="/app/employees/register"
-                            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                        >
-                            <UserPlus className="h-4 w-4" /> Register
+        <div className="mx-auto max-w-6xl">
+            <PageHeader
+                title="Timesheet Dashboard"
+                subtitle="Hours worked per employee."
+                icon={<Icon name="clock" width={22} height={22} />}
+                actions={
+                    <>
+                        <Link to="/app/employees/register">
+                            <Button variant="secondary">
+                                <Icon name="users" width={15} height={15} /> Register
+                            </Button>
                         </Link>
-                        <Link
-                            to="/app/guard"
-                            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                        >
-                            <ScanLine className="h-4 w-4" /> Scanner
+                        <Link to="/app/guard">
+                            <Button variant="secondary">
+                                <Icon name="scan" width={15} height={15} /> Scanner
+                            </Button>
                         </Link>
-                    </div>
-                </header>
+                    </>
+                }
+            />
 
-                {/* Filters + summary cards */}
-                <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                        <label className="mb-1 block text-xs font-medium text-gray-500">From</label>
-                        <input
-                            type="date"
-                            value={fromDate}
-                            max={toDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                        />
-                        <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
-                        <input
-                            type="date"
-                            value={toDate}
-                            min={fromDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                        />
-                    </div>
-                    <StatCard
-                        icon={<Clock className="h-6 w-6" />}
-                        label="Total hours logged"
-                        value={formatHours(totals.minutes)}
+            {/* Filters + summary cards */}
+            <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <Card className="p-4">
+                    <label className="mb-1 block text-xs font-medium text-muted">From</label>
+                    <input
+                        type="date"
+                        value={fromDate}
+                        max={toDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="mb-3 w-full rounded-lg border border-edge px-3 py-2 text-sm text-ink outline-none focus:border-rust"
                     />
-                    <StatCard
-                        icon={<Users className="h-6 w-6" />}
-                        label="Currently on site"
-                        value={String(totals.onSite)}
+                    <label className="mb-1 block text-xs font-medium text-muted">To</label>
+                    <input
+                        type="date"
+                        value={toDate}
+                        min={fromDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        className="w-full rounded-lg border border-edge px-3 py-2 text-sm text-ink outline-none focus:border-rust"
                     />
-                </div>
+                </Card>
+                <Stat label="total_hours_logged" value={formatHours(totals.minutes)} icon={<Icon name="clock" width={18} height={18} />} />
+                <Stat label="currently_on_site" value={totals.onSite} icon={<Icon name="users" width={18} height={18} />} />
+            </div>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Employee hours table */}
-                    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm lg:col-span-2">
-                        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-                            <h2 className="font-semibold text-gray-900">Hours by employee</h2>
-                            <button
-                                onClick={refresh}
-                                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
-                            >
-                                <RefreshCw className={`h-4 w-4 ${summaryQuery.isFetching ? 'animate-spin' : ''}`} />
-                                Refresh
-                            </button>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="text-xs uppercase tracking-wider text-gray-400">
-                                    <tr>
-                                        <th className="px-5 py-3">Employee</th>
-                                        <th className="px-5 py-3">Department</th>
-                                        <th className="px-5 py-3 text-right">Sessions</th>
-                                        <th className="px-5 py-3 text-right">Hours</th>
-                                        <th className="px-5 py-3 text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {summaryQuery.isLoading ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-5 py-8 text-center text-gray-400">
-                                                Loading…
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Employee hours table */}
+                <Card className="overflow-hidden lg:col-span-2">
+                    <div className="flex items-center justify-between border-b border-edge/60 px-5 py-3.5">
+                        <h2 className="font-display font-bold text-olive-deep">Hours by employee</h2>
+                        <button onClick={refresh} className="flex items-center gap-1.5 text-sm text-muted hover:text-olive-deep">
+                            <Icon name="refresh" width={15} height={15} className={summaryQuery.isFetching ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-edge/60">
+                                    <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Employee</th>
+                                    <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Department</th>
+                                    <th className="px-5 py-2.5 text-right font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Sessions</th>
+                                    <th className="px-5 py-2.5 text-right font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Hours</th>
+                                    <th className="px-5 py-2.5 text-right font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-edge/40">
+                                {summaryQuery.isLoading ? (
+                                    <tr><td colSpan={5} className="px-5 py-8 text-center text-muted">Loading…</td></tr>
+                                ) : rows.length === 0 ? (
+                                    <tr><td colSpan={5} className="px-5 py-8 text-center text-muted">No attendance recorded for this range.</td></tr>
+                                ) : (
+                                    rows.map((row) => (
+                                        <tr key={row.employeeId} className="hover:bg-bone-light/40">
+                                            <td className="px-5 py-3">
+                                                <div className="font-medium text-ink">{row.fullName}</div>
+                                                <div className="font-mono text-xs text-muted">{row.employeeCode}</div>
+                                            </td>
+                                            <td className="px-5 py-3 text-muted">{row.department ?? '—'}</td>
+                                            <td className="px-5 py-3 text-right text-muted">{row.sessionCount}</td>
+                                            <td className="px-5 py-3 text-right font-semibold text-ink">{formatHours(row.totalMinutes)}</td>
+                                            <td className="px-5 py-3 text-right">
+                                                <Badge tone={row.openSession ? 'good' : 'idle'}>{row.openSession ? 'On site' : 'Off'}</Badge>
                                             </td>
                                         </tr>
-                                    ) : rows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-5 py-8 text-center text-gray-400">
-                                                No attendance recorded for this range.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        rows.map((row) => (
-                                            <tr key={row.employeeId} className="hover:bg-gray-50">
-                                                <td className="px-5 py-3">
-                                                    <div className="font-medium text-gray-900">{row.fullName}</div>
-                                                    <div className="font-mono text-xs text-gray-400">{row.employeeCode}</div>
-                                                </td>
-                                                <td className="px-5 py-3 text-gray-600">{row.department ?? '—'}</td>
-                                                <td className="px-5 py-3 text-right text-gray-600">{row.sessionCount}</td>
-                                                <td className="px-5 py-3 text-right font-semibold text-gray-900">
-                                                    {formatHours(row.totalMinutes)}
-                                                </td>
-                                                <td className="px-5 py-3 text-right">
-                                                    {row.openSession ? (
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                                                            On site
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-                                                            Off
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
+                </Card>
 
-                    {/* Recent scans feed */}
-                    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-                        <div className="border-b border-gray-100 px-5 py-3">
-                            <h2 className="font-semibold text-gray-900">Recent scans</h2>
-                        </div>
-                        <ul className="divide-y divide-gray-100">
-                            {recentQuery.isLoading ? (
-                                <li className="px-5 py-8 text-center text-gray-400">Loading…</li>
-                            ) : (recentQuery.data ?? []).length === 0 ? (
-                                <li className="px-5 py-8 text-center text-gray-400">No scans yet.</li>
-                            ) : (
-                                (recentQuery.data ?? []).map((event) => {
-                                    const isIn = event.eventType === 'CHECK_IN';
-                                    return (
-                                        <li key={event.id} className="flex items-center gap-3 px-5 py-3">
-                                            <span
-                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                                    isIn ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
-                                                }`}
-                                            >
-                                                {isIn ? <LogIn className="h-4 w-4" /> : <LogOut className="h-4 w-4" />}
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-medium text-gray-900">
-                                                    {event.employeeName}
-                                                </p>
-                                                <p className="text-xs text-gray-400">
-                                                    {isIn ? 'Checked in' : 'Checked out'} ·{' '}
-                                                    {new Date(event.scannedAt).toLocaleTimeString()}
-                                                </p>
-                                            </div>
-                                        </li>
-                                    );
-                                })
-                            )}
-                        </ul>
+                {/* Recent scans feed */}
+                <Card className="overflow-hidden">
+                    <div className="border-b border-edge/60 px-5 py-3.5">
+                        <h2 className="font-display font-bold text-olive-deep">Recent scans</h2>
                     </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-interface StatCardProps {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-}
-
-function StatCard({ icon, label, value }: StatCardProps) {
-    return (
-        <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#3d5aa8]/10 text-[#3d5aa8]">
-                {icon}
-            </div>
-            <div>
-                <p className="text-sm text-gray-500">{label}</p>
-                <p className="text-2xl font-bold text-gray-900">{value}</p>
+                    <ul className="divide-y divide-edge/40">
+                        {recentQuery.isLoading ? (
+                            <li className="px-5 py-8 text-center text-muted">Loading…</li>
+                        ) : (recentQuery.data ?? []).length === 0 ? (
+                            <li className="px-5 py-8 text-center text-muted">No scans yet.</li>
+                        ) : (
+                            (recentQuery.data ?? []).map((event) => {
+                                const isIn = event.eventType === 'CHECK_IN';
+                                return (
+                                    <li key={event.id} className="flex items-center gap-3 px-5 py-3">
+                                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isIn ? 'bg-live/15 text-live' : 'bg-olive/15 text-olive'}`}>
+                                            <Icon name={isIn ? 'check' : 'arrow'} width={15} height={15} className={isIn ? '' : 'rotate-90'} />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium text-ink">{event.employeeName}</p>
+                                            <p className="text-xs text-muted">
+                                                {isIn ? 'Checked in' : 'Checked out'} · {new Date(event.scannedAt).toLocaleTimeString()}
+                                            </p>
+                                        </div>
+                                    </li>
+                                );
+                            })
+                        )}
+                    </ul>
+                </Card>
             </div>
         </div>
     );

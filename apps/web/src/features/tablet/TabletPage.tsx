@@ -1,20 +1,19 @@
 import { useState } from 'react';
-import { trpc } from '../../lib/trpc';
-import { QRScanner } from '../../components/QRScanner';
-import { AlertCircle, CheckCircle2, QrCode, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
 import { createStationTRPCClient } from '../../lib/trpc';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Button } from '../../components/ui/primitives';
+import { CameraScanner } from '../../components/app/CameraScanner';
 
-const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || "Facility Scanner";
-const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || "";
+const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || 'Facility Scanner';
+const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
 
 export function TabletPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
-    const [scanError, setScanError] = useState<string | null>(null);
     const [manualQr, setManualQr] = useState<string>('');
     // Gate the scanner so it doesn't auto-re-trigger after a success or cancel
     const [isScannerActive, setIsScannerActive] = useState(true);
+    const [scanError, setScanError] = useState<string | null>(null);
 
     // Mutation states
     const [isPending, setIsPending] = useState(false);
@@ -24,9 +23,7 @@ export function TabletPage() {
     const handleScan = (decodedText: string) => {
         // Only update if it's a new bin to avoid constant re-renders
         if (decodedText !== scannedBinId) {
-            // Very basic validation - assume it's a bin ID if we got here
             setScannedBinId(decodedText);
-            setScanError(null);
             setIsSuccess(false);
             setError(null);
         }
@@ -48,16 +45,14 @@ export function TabletPage() {
             setIsSuccess(true);
             // Turn scanner OFF after success — prevent auto re-trigger
             setIsScannerActive(false);
-
-        } catch (err: any) {
-            console.error("Failed to start bin:", err);
-            let errorMessage = err.message || "Failed to start bin";
+        } catch (err: unknown) {
+            let errorMessage = err instanceof Error ? err.message : 'Failed to start bin';
             try {
                 const parsed = JSON.parse(errorMessage);
                 if (Array.isArray(parsed) && parsed[0]?.message) {
                     errorMessage = parsed[0].message;
                 }
-            } catch (_) {
+            } catch {
                 // Not JSON, use as is
             }
             setError({ message: errorMessage });
@@ -67,93 +62,87 @@ export function TabletPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F8F2] flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
+        <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-canvas p-4">
+            <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg opacity-40" />
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/3 rounded-b-[40px] bg-olive-deep shadow-panel" />
 
-            {/* Background design elements to align with marketing site */}
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-[#043F2E] rounded-b-[40px] shadow-xl z-0 pointer-events-none"></div>
+            <Card className="relative z-10 flex w-full max-w-lg flex-col items-center p-6 md:p-8">
+                <div className="mb-6 w-full text-center">
+                    <h1 className="font-display text-3xl font-extrabold tracking-tight text-olive-deep md:text-4xl">Facility Scanner</h1>
+                    <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-rust">Station: {TABLET_STATION_ID}</p>
 
-            <div className="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col items-center border border-[#BCD19B]/30">
-
-                <div className="w-full text-center mb-6">
-                    <h1 className="text-3xl md:text-4xl font-bold text-[#043F2E] tracking-tight">Facility Scanner</h1>
-                    <p className="text-[#3d5aa8] font-medium mt-2">Station: {TABLET_STATION_ID}</p>
-
-                    <div className="flex items-center justify-center gap-4 mt-6">
-                        <Link
-                            to="/app/dashboard"
-                            className="bg-white hover:bg-gray-50 text-[#043F2E] px-4 py-2 rounded-lg font-semibold text-sm border border-gray-200 shadow-sm transition-colors"
-                        >
-                            Dashboard
+                    <div className="mt-6 flex items-center justify-center gap-3">
+                        <Link to="/app/dashboard">
+                            <Button variant="secondary">Dashboard</Button>
                         </Link>
-                        <Link
-                            to="/app/driver"
-                            className="bg-white hover:bg-gray-50 text-[#043F2E] px-4 py-2 rounded-lg font-semibold text-sm border border-gray-200 shadow-sm transition-colors"
-                        >
-                            Driver
+                        <Link to="/app/driver">
+                            <Button variant="secondary">Driver</Button>
                         </Link>
                     </div>
 
                     {/* Fill a Form shortcut */}
                     <Link
                         to="/app/forms"
-                        className="w-full mt-4 flex items-center justify-center gap-2 bg-[#F5F8F2] hover:bg-[#e8f0e0] border border-[#BCD19B] text-[#043F2E] px-4 py-3 rounded-xl font-semibold text-sm transition-colors"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-edge bg-bone-light/50 px-4 py-3 text-sm font-semibold text-olive-deep transition-colors hover:bg-bone-light"
                     >
-                        <ClipboardList className="w-5 h-5" />
+                        <Icon name="form" width={18} height={18} />
                         Fill a Form
                     </Link>
                 </div>
 
                 {!scannedBinId ? (
-                    <div className="w-full flex flex-col items-center">
-                        <div className="mb-6 flex items-center justify-center bg-[#F5F8F2] p-4 rounded-full">
-                            <QrCode className="w-10 h-10 text-[#043F2E]" />
+                    <div className="flex w-full flex-col items-center">
+                        <div className="mb-6 flex items-center justify-center rounded-full bg-bone-light/60 p-4">
+                            <Icon name="scan" width={36} height={36} className="text-olive-deep" />
                         </div>
-                        <h2 className="text-xl font-semibold mb-4 text-gray-800 text-center">Scan Bin QR Code</h2>
+                        <h2 className="mb-4 text-center font-display text-xl font-bold text-olive-deep">Scan Bin QR Code</h2>
 
                         {isScannerActive ? (
                             <div className="w-full">
-                                <QRScanner onScan={handleScan} />
+                                <CameraScanner onScan={handleScan} onError={setScanError} />
+                                {scanError && <p className="mt-3 rounded-lg bg-rust/[0.08] px-3 py-2 text-center text-xs text-rust">{scanError}</p>}
                             </div>
                         ) : (
                             <button
                                 onClick={() => setIsScannerActive(true)}
-                                className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors flex items-center justify-center gap-3"
+                                className="flex w-full items-center justify-center gap-3 rounded-xl bg-olive-deep py-4 text-lg font-bold text-bone-light transition-colors hover:bg-olive-deep/90"
                             >
                                 Tap to Scan Next Bin
                             </button>
                         )}
 
-                        {/* Manual Entry Fallback for Testing */}
-                        <div className="w-full max-w-sm mt-6 flex gap-2">
+                        {/* Manual entry fallback */}
+                        <div className="mt-6 flex w-full max-w-sm gap-2">
                             <input
                                 type="text"
                                 placeholder="Enter QR code manually"
                                 value={manualQr}
                                 onChange={(e) => setManualQr(e.target.value)}
-                                className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
+                                className="flex-1 rounded-xl border border-edge bg-white px-4 py-2.5 text-sm text-ink focus:border-rust focus:outline-none"
                             />
                             <button
                                 onClick={() => { if (manualQr) { setIsScannerActive(true); handleScan(manualQr); } }}
                                 disabled={!manualQr}
-                                className="bg-[#3d5aa8] hover:bg-[#2d4280] text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                className="rounded-xl bg-rust px-4 py-2.5 text-sm font-medium text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
                             >
                                 Simulate Scan
                             </button>
                         </div>
 
-                        <p className="mt-6 text-sm text-gray-500 text-center max-w-xs">
-                            Hold the bin's QR code in front of the camera until it registers.
+                        <p className="mt-6 max-w-xs text-center text-sm text-muted">
+                            Hold the bin&apos;s QR code in front of the camera until it registers.
                         </p>
                     </div>
                 ) : (
-                    <div className="w-full flex flex-col items-center animate-in fade-in zoom-in duration-300">
-
+                    <div className="flex w-full flex-col items-center">
                         {isSuccess ? (
                             <div className="flex flex-col items-center py-8">
-                                <CheckCircle2 className="w-24 h-24 text-green-500 mb-4" />
-                                <h2 className="text-3xl font-bold text-[#043F2E] mb-2">Cycle Started!</h2>
-                                <p className="text-gray-600 text-center text-lg">
-                                    Bin <span className="font-bold text-[#3d5aa8]">{scannedBinId}</span> is now active.
+                                <span className="mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-live/15 text-live">
+                                    <Icon name="check" width={48} height={48} />
+                                </span>
+                                <h2 className="mb-2 font-display text-3xl font-extrabold text-olive-deep">Cycle Started!</h2>
+                                <p className="text-center text-lg text-muted">
+                                    Bin <span className="font-bold text-rust">{scannedBinId}</span> is now active.
                                 </p>
                                 <button
                                     onClick={() => {
@@ -161,46 +150,44 @@ export function TabletPage() {
                                         setIsSuccess(false);
                                         setIsScannerActive(true);
                                     }}
-                                    className="mt-8 bg-[#043F2E] hover:bg-[#032f22] text-white px-8 py-3 rounded-xl font-bold text-lg transition-colors"
+                                    className="mt-8 rounded-xl bg-olive-deep px-8 py-3 text-lg font-bold text-bone-light transition-colors hover:bg-olive-deep/90"
                                 >
                                     Scan Next Bin
                                 </button>
                             </div>
                         ) : (
                             <>
-                                <div className="bg-[#F5F8F2] w-full p-6 rounded-2xl mb-8 border border-[#BCD19B]/50">
-                                    <h3 className="text-sm uppercase tracking-wider text-gray-500 font-semibold mb-1">Scanned Bin</h3>
-                                    <p className="text-2xl font-bold text-[#043F2E] truncate">{scannedBinId}</p>
-
-                                    {/* We would ideally show organ type/DK hours here if we fetched the bin info first */}
+                                <div className="mb-8 w-full rounded-2xl border border-edge/70 bg-bone-light/40 p-6">
+                                    <h3 className="kicker mb-1">Scanned Bin</h3>
+                                    <p className="truncate font-display text-2xl font-extrabold text-olive-deep">{scannedBinId}</p>
                                     <div className="mt-4 flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                        <span className="text-blue-700 font-medium">Ready to start cycle</span>
+                                        <span className="h-3 w-3 rounded-full bg-live" />
+                                        <span className="font-medium text-live">Ready to start cycle</span>
                                     </div>
                                 </div>
 
                                 {error && (
-                                    <div className="w-full bg-red-50 text-red-700 p-4 rounded-xl mb-6 flex items-start gap-3 border border-red-200">
-                                        <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                                    <div className="mb-6 flex w-full items-start gap-3 rounded-xl border border-rust/30 bg-rust/10 p-4">
+                                        <Icon name="thermo" width={20} height={20} className="mt-0.5 shrink-0 text-rust" />
                                         <div>
-                                            <p className="font-semibold">Could not start bin</p>
-                                            <p className="text-sm mt-1">{error.message}</p>
+                                            <p className="font-semibold text-rust">Could not start bin</p>
+                                            <p className="mt-1 text-sm text-rust">{error.message}</p>
                                         </div>
                                     </div>
                                 )}
 
                                 <button
-                                    onClick={handleStart}
+                                    onClick={() => void handleStart()}
                                     disabled={isPending}
-                                    className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-6 rounded-2xl text-2xl font-bold uppercase tracking-wider transition-all transform active:scale-95 shadow-lg disabled:opacity-70 disabled:active:scale-100 flex items-center justify-center gap-3"
+                                    className="flex w-full transform items-center justify-center gap-3 rounded-2xl bg-olive-deep py-6 text-2xl font-bold uppercase tracking-wider text-bone-light shadow-panel transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100"
                                 >
                                     {isPending ? (
                                         <>
-                                            <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                                            Processing...
+                                            <span className="h-6 w-6 animate-spin rounded-full border-4 border-bone-light border-t-transparent" />
+                                            Processing…
                                         </>
                                     ) : (
-                                        "BIN STARTED"
+                                        'BIN STARTED'
                                     )}
                                 </button>
 
@@ -212,7 +199,7 @@ export function TabletPage() {
                                         setIsScannerActive(false);
                                     }}
                                     disabled={isPending}
-                                    className="mt-6 text-gray-500 hover:text-gray-800 font-medium underline-offset-4 hover:underline"
+                                    className="mt-6 font-medium text-muted underline-offset-4 hover:text-olive-deep hover:underline"
                                 >
                                     Cancel
                                 </button>
@@ -220,7 +207,7 @@ export function TabletPage() {
                         )}
                     </div>
                 )}
-            </div>
+            </Card>
         </div>
     );
 }

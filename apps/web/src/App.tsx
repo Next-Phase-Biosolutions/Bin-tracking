@@ -12,18 +12,14 @@ import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage'
 import ShipmentRegisterPage from './features/shipments/ShipmentRegisterPage';
 import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage';
 import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
-import FacilityLayout from './features/dashboard/FacilityLayout';
-import FacilityDashboardPage from './features/dashboard/FacilityDashboardPage';
-import ReceivingZonePage from './features/dashboard/ReceivingZonePage';
-import KillFloorPage from './features/dashboard/KillFloorPage';
-import WetAgingPage from './features/dashboard/WetAgingPage';
-import ValueAddPage from './features/dashboard/ValueAddPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
 import SignupPage from './features/onboarding/SignupPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import AcceptInvitePage from './features/onboarding/AcceptInvitePage';
 import LoginPage from './features/auth/LoginPage';
+import AuthCallbackPage from './features/auth/AuthCallbackPage';
+import { AppShellLayout } from './components/layout/AppShellLayout';
 import { useAuth } from './context/AuthContext';
 
 /**
@@ -44,29 +40,30 @@ export function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/onboarding" element={<OnboardingWizard />} />
             <Route path="/invite/:token" element={<AcceptInvitePage />} />
+
+            {/* Station-token kiosk routes: unattended facility-floor devices
+                authenticate via STATION_TOKEN, not a user session, so they
+                stay outside the shell's login-redirect gate. */}
             <Route path="/app/bin" element={<TabletPage />} />
-            <Route path="/app/driver" element={<DriverPage />} />
-            <Route path="/app/dashboard" element={<DashboardPage />} />
-            <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
-            <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
             <Route path="/app/guard" element={<GuardScannerPage />} />
-            <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
-            <Route path="/app/shipments" element={<ShipmentsDashboardPage />} />
-            <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
-            <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
             <Route path="/app/forms" element={<FormListPage />} />
-            <Route path="/app/forms/new" element={<FormBuilderPage />} />
-            <Route path="/app/forms/import" element={<FormImportPage />} />
-            <Route path="/admin/orgs" element={<OrgModulesPage />} />
-            <Route path="/settings/billing" element={<BillingSettingsPage />} />
-            <Route path="/app/facility" element={<FacilityLayout />}>
-                <Route index element={<FacilityDashboardPage />} />
-                <Route path="receiving" element={<ReceivingZonePage />} />
-                <Route path="killfloor" element={<KillFloorPage />} />
-                <Route path="wetaging" element={<WetAgingPage />} />
-                <Route path="valueadd" element={<ValueAddPage />} />
+            <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
+            <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
+
+            <Route element={<AppShellLayout />}>
+                <Route path="/app/driver" element={<DriverPage />} />
+                <Route path="/app/dashboard" element={<DashboardPage />} />
+                <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
+                <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
+                <Route path="/app/shipments" element={<ShipmentsDashboardPage />} />
+                <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
+                <Route path="/app/forms/new" element={<FormBuilderPage />} />
+                <Route path="/app/forms/import" element={<FormImportPage />} />
+                <Route path="/admin/orgs" element={<OrgModulesPage />} />
+                <Route path="/settings/billing" element={<BillingSettingsPage />} />
             </Route>
         </Routes>
     );

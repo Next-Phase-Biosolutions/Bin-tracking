@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import type { ModuleKey } from '@bin-tracker/types';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Badge } from '../../components/ui/primitives';
 
 const MODULE_LABELS: Record<ModuleKey, string> = {
     ANIMAL_INTAKE: 'Animal Intake',
@@ -28,8 +31,8 @@ export default function BillingSettingsPage() {
     if (!billingEnabled) {
         return (
             <CenteredCard>
-                <h1 className="text-xl font-bold text-gray-900">Billing</h1>
-                <p className="mt-3 text-sm text-gray-600">
+                <h1 className="font-display text-xl font-extrabold text-olive-deep">Billing</h1>
+                <p className="mt-3 text-sm text-muted">
                     You&apos;re on full access during our free early-access period — pricing coming soon.
                 </p>
             </CenteredCard>
@@ -57,71 +60,68 @@ function BillingDetails({
     });
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-2xl">
-                <header className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
-                    <p className="mt-1 text-sm text-gray-600">Your organization&apos;s subscription and enabled modules.</p>
-                </header>
+        <div className="mx-auto max-w-2xl">
+            <PageHeader
+                title="Billing"
+                subtitle="Your organization's subscription and enabled modules."
+                icon={<Icon name="badge" width={22} height={22} />}
+            />
 
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
-                        <div>
-                            <dt className="text-xs uppercase tracking-wider text-gray-400">Plan</dt>
-                            <dd className="mt-0.5 font-semibold text-gray-900">{plan ?? '—'}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs uppercase tracking-wider text-gray-400">Status</dt>
-                            <dd className="mt-0.5 font-semibold text-gray-900">{status ?? '—'}</dd>
-                        </div>
-                        <div className="col-span-2">
-                            <dt className="text-xs uppercase tracking-wider text-gray-400">Renews</dt>
-                            <dd className="mt-0.5 font-semibold text-gray-900">{formatDate(currentPeriodEnd)}</dd>
-                        </div>
-                    </dl>
-
-                    <div className="mt-6 border-t border-gray-100 pt-4">
-                        <p className="mb-2 text-xs uppercase tracking-wider text-gray-400">Enabled modules</p>
-                        {enabledModules.length === 0 ? (
-                            <p className="text-sm text-gray-500">No modules enabled yet.</p>
-                        ) : (
-                            <ul className="flex flex-wrap gap-2">
-                                {enabledModules.map((key) => (
-                                    <li key={key} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                        {MODULE_LABELS[key]}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        <p className="mt-2 text-xs text-gray-400">
-                            To change which modules are enabled, contact your account manager.
-                        </p>
+            <Card className="p-6">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                    <div>
+                        <dt className="kicker">Plan</dt>
+                        <dd className="mt-0.5 font-semibold text-ink">{plan ?? '—'}</dd>
                     </div>
+                    <div>
+                        <dt className="kicker">Status</dt>
+                        <dd className="mt-0.5 font-semibold text-ink">{status ?? '—'}</dd>
+                    </div>
+                    <div className="col-span-2">
+                        <dt className="kicker">Renews</dt>
+                        <dd className="mt-0.5 font-semibold text-ink">{formatDate(currentPeriodEnd)}</dd>
+                    </div>
+                </dl>
 
-                    {portalMutation.isError && (
-                        <p className="mt-4 text-sm text-red-600">{portalMutation.error.message}</p>
+                <div className="mt-6 border-t border-edge/60 pt-4">
+                    <p className="kicker mb-2">Enabled modules</p>
+                    {enabledModules.length === 0 ? (
+                        <p className="text-sm text-muted">No modules enabled yet.</p>
+                    ) : (
+                        <ul className="flex flex-wrap gap-2">
+                            {enabledModules.map((key) => (
+                                <li key={key}>
+                                    <Badge tone="good">{MODULE_LABELS[key]}</Badge>
+                                </li>
+                            ))}
+                        </ul>
                     )}
-
-                    <button
-                        type="button"
-                        onClick={() => portalMutation.mutate()}
-                        disabled={portalMutation.isPending}
-                        className="mt-6 w-full rounded-xl bg-[#3d5aa8] py-3 text-sm font-bold text-white transition-colors hover:bg-[#2d4898] disabled:opacity-50"
-                    >
-                        {portalMutation.isPending ? 'Redirecting…' : 'Manage billing'}
-                    </button>
+                    <p className="mt-2 text-xs text-muted">
+                        To change which modules are enabled, contact your account manager.
+                    </p>
                 </div>
-            </div>
+
+                {portalMutation.isError && (
+                    <p className="mt-4 text-sm text-rust">{portalMutation.error.message}</p>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() => portalMutation.mutate()}
+                    disabled={portalMutation.isPending}
+                    className="mt-6 w-full rounded-xl bg-rust py-3 text-sm font-bold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
+                >
+                    {portalMutation.isPending ? 'Redirecting…' : 'Manage billing'}
+                </button>
+            </Card>
         </div>
     );
 }
 
 function CenteredCard({ children }: { children: ReactNode }) {
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-            <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-                {children}
-            </div>
+        <div className="flex min-h-[60vh] items-center justify-center">
+            <Card className="w-full max-w-md p-8 text-center">{children}</Card>
         </div>
     );
 }
