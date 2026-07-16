@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Package, PackagePlus, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 const ACCENT = '#043F2E';
 
@@ -15,6 +17,24 @@ function formatDateTime(value: string | Date): string {
 
 export default function ShipmentsDashboardPage() {
     const listQuery = trpc.shipment.list.useQuery({ limit: 100 }, { staleTime: 10_000 });
+    const { hasModule, isLoading } = useSubscription();
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
+                Loading…
+            </div>
+        );
+    }
+
+    if (!hasModule('SHIPMENTS')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="SHIPMENTS" />
+            </div>
+        );
+    }
+
     const rows = listQuery.data ?? [];
 
     const totals = rows.reduce(

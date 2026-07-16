@@ -1,0 +1,103 @@
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { Urgency } from '@prisma/client';
+import type { Plan } from '@bin-tracker/types';
+import { reconcileModulesForPlan } from './module-service.js';
+
+/**
+ * Default bin-type set every new organization gets on creation.
+ * Values mirror what used to be hardcoded directly in prisma/seed.ts —
+ * extracted here so the seed script and (future, Phase 4) self-serve signup
+ * share one source of truth instead of drifting apart.
+ *
+ * Lives in @bin-tracker/db (not apps/api) so prisma/seed.ts can import it
+ * without a reverse dependency on apps/api — apps/api already depends on
+ * this package, so a cycle back the other way would break the turbo task
+ * graph and this package's composite TS project boundary. apps/api re-exports
+ * this from src/services/org-provision.service.ts for callers there.
+ */
+export const DEFAULT_BIN_TYPES = [
+    { organType: 'heart', dkHours: 4, urgency: Urgency.CRITICAL, prefix: 'BIN-HEART', masterQrCode: 'TYPE-HEART' },
+    { organType: 'liver', dkHours: 6, urgency: Urgency.CRITICAL, prefix: 'BIN-LIVER', masterQrCode: 'TYPE-LIVER' },
+    { organType: 'kidney', dkHours: 12, urgency: Urgency.MEDIUM, prefix: 'BIN-KIDNEY', masterQrCode: 'TYPE-KIDNEY' },
+    { organType: 'skin', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-SKIN', masterQrCode: 'TYPE-SKIN' },
+    { organType: 'fat', dkHours: 24, urgency: Urgency.STANDARD, prefix: 'BIN-FAT', masterQrCode: 'TYPE-FAT' },
+    { organType: 'bone', dkHours: 48, urgency: Urgency.LOW, prefix: 'BIN-BONE', masterQrCode: 'TYPE-BONE' },
+] as const;
+
+// Starter default until an admin sets a real rate via the Settings screen —
+// the Settings row must exist (payroll checks for its presence), but the rate
+// itself is just a placeholder the org is expected to configure.
+const DEFAULT_HOURLY_RATE_CENTS = 1500; // $15.00/hr
+
+/**
+ * Re-exported from apps/api/src/services/billing.service.ts, where the
+ * conventional entry point lives (Task 13 extends that file with the rest
+ * of the Stripe billing logic — checkout sessions, webhook sync — which
+ * belongs in apps/api, not here). This one function has to live in
+ * packages/db for the same reason as the rest of this file: provisionOrganization()
+ * needs it inside its transaction, and provisionOrganization must stay
+ * callable from prisma/seed.ts without a reverse dependency on apps/api.
+ */
+export function defaultPlanForNewOrg(): Plan {
+    // Free launch period: every new org gets the full module bundle at no charge.
+    // Flip BILLING_ENABLED=true once you're ready to actually charge — new
+    // signups will then default to STARTER and go through real Stripe checkout.
+    return process.env['BILLING_ENABLED'] === 'true' ? 'STARTER' : 'ENTERPRISE';
+}
+
+export interface ProvisionOrganizationInput {
+    name: string;
+    slug: string;
+    ownerUserId: string;
+}
+
+export interface ProvisionOrganizationResult {
+    orgId: string;
+}
+
+/**
+ * Creates a brand-new tenant: the Organization row, an owner membership, the
+ * default BinType set, a default Settings row, and a STARTER/TRIALING
+ * Subscription. Runs as one transaction — a failure partway through leaves
+ * nothing half-created. Used by the seed script and, in a later phase,
+ * self-serve signup.
+ */
+export async function provisionOrganization(
+    prisma: PrismaClient,
+    { name, slug, ownerUserId }: ProvisionOrganizationInput,
+): Promise<ProvisionOrganizationResult> {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const org = await tx.organization.create({ data: { name, slug } });
+
+        // The org's founder is its founding admin — this is the ONLY place a
+        // membership should ever get ADMIN without going through an explicit
+        // invitation (Task 25: invitations set OrganizationMember.role from
+        // invitation.role, never ADMIN).
+        await tx.organizationMember.create({
+            data: { orgId: org.id, userId: ownerUserId, role: 'ADMIN' },
+        });
+
+        await tx.binType.createMany({
+            data: DEFAULT_BIN_TYPES.map((binType) => ({ ...binType, organizationId: org.id })),
+        });
+
+        await tx.settings.create({
+            data: { organizationId: org.id, flatHourlyRateCents: DEFAULT_HOURLY_RATE_CENTS },
+        });
+
+        const plan = defaultPlanForNewOrg();
+
+        await tx.subscription.create({
+            data: {
+                orgId: org.id,
+                plan,
+                status: process.env['BILLING_ENABLED'] === 'true' ? 'TRIALING' : 'ACTIVE',
+                stripeCustomerId: null,
+            },
+        });
+
+        await reconcileModulesForPlan(tx, org.id, plan);
+
+        return { orgId: org.id };
+    });
+}

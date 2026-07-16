@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import type { Employee } from '@bin-tracker/db';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type {
     EmployeeRegisterInput,
     EmployeeListInput,
@@ -29,7 +30,22 @@ export const employeeService = {
      * Register an employee (one-time) and mint a unique, permanent QR token.
      * Retries on the rare code/token collision.
      */
-    async register(input: EmployeeRegisterInput): Promise<Employee> {
+    async register(input: EmployeeRegisterInput, organizationId: string): Promise<Employee> {
+        // Every org gets a Subscription row at provisioning time (org-provision.ts),
+        // so this should always resolve — if it's ever missing, skip the quantity
+        // check rather than block employee registration on an unrelated invariant break.
+        const subscription = await prisma.subscription.findUnique({ where: { orgId: organizationId } });
+        const maxEmployees = subscription ? PLAN_LIMITS[subscription.plan].maxEmployees : -1;
+        if (maxEmployees !== -1) {
+            const count = await prisma.employee.count({ where: { organizationId, status: 'ACTIVE' } });
+            if (count >= maxEmployees) {
+                throw new TRPCError({
+                    code: 'FORBIDDEN',
+                    message: `Your plan allows up to ${maxEmployees} employees. Upgrade your plan to add more.`,
+                });
+            }
+        }
+
         const MAX_ATTEMPTS = 5;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -43,6 +59,7 @@ export const employeeService = {
                         phone: input.phone ?? null,
                         department: input.department ?? null,
                         position: input.position ?? null,
+                        organizationId,
                     },
                 });
             } catch (error: unknown) {
@@ -63,16 +80,19 @@ export const employeeService = {
         });
     },
 
-    async list(input: EmployeeListInput): Promise<Employee[]> {
+    async list(orgId: string, input: EmployeeListInput): Promise<Employee[]> {
         return prisma.employee.findMany({
-            where: input.status ? { status: input.status } : undefined,
+            where: { organizationId: orgId, ...(input.status ? { status: input.status } : {}) },
             orderBy: { createdAt: 'desc' },
         });
     },
 
-    async getById(id: string): Promise<Employee> {
+    async getById(orgId: string, id: string): Promise<Employee> {
         const employee = await prisma.employee.findUnique({ where: { id } });
-        if (!employee) {
+        // Cross-org mismatch reports as NOT_FOUND (never FORBIDDEN) — same
+        // discipline as cycle.service.ts — so a caller can't distinguish
+        // "doesn't exist" from "exists but isn't yours".
+        if (!employee || employee.organizationId !== orgId) {
             throw new TRPCError({
                 code: 'NOT_FOUND',
                 message: 'Employee not found',

@@ -19,3 +19,11 @@ export const stationAuthSchema = z.object({
 });
 
 export type StationAuthInput = z.infer<typeof stationAuthSchema>;
+
+// ─── Create Organization (self-serve signup wizard) ───────────
+
+export const createOrganizationSchema = z.object({
+    name: z.string().min(1, 'Organization name is required').max(200),
+});
+
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;

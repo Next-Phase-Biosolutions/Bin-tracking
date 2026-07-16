@@ -12,12 +12,13 @@ export const binService = {
      * - Transaction with Serializable isolation prevents TOCTOU
      * - @@unique([binId, status]) prevents duplicate active cycles at DB level
      */
-    async start(input: BinStartInput, stationId: string) {
+    async start(orgId: string, input: BinStartInput, stationId: string) {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find bin by QR code (with bin type for DK hours)
+                // qrCode is unique per-organization, so this is the compound-key lookup.
                 const bin = await tx.bin.findUnique({
-                    where: { qrCode: input.qrCode },
+                    where: { organizationId_qrCode: { organizationId: orgId, qrCode: input.qrCode } },
                     include: { binType: true },
                 });
 
@@ -53,6 +54,7 @@ export const binService = {
                         facilityId: bin.currentFacilityId,
                         startedAt: now,
                         deadline,
+                        organizationId: orgId,
                     },
                 });
 
@@ -97,13 +99,14 @@ export const binService = {
      * 
      * Creates a new generic Bin on the fly from a Master QR Code and immediately starts a cycle for it.
      */
-    async startDynamic(input: import('@bin-tracker/validators').BinStartDynamicInput, stationId: string) {
+    async startDynamic(orgId: string, input: import('@bin-tracker/validators').BinStartDynamicInput, stationId: string) {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find the parent BinType by the scanned Master QR code (normailze case/spaces for fuzzy matching)
                 const normalizedQr = input.masterQrCode.trim().toUpperCase().replace(/\s+/g, '-');
+                // masterQrCode is unique per-organization, so this is the compound-key lookup.
                 const binType = await tx.binType.findUnique({
-                    where: { masterQrCode: normalizedQr },
+                    where: { organizationId_masterQrCode: { organizationId: orgId, masterQrCode: normalizedQr } },
                 });
 
                 if (!binType) {
@@ -141,16 +144,18 @@ export const binService = {
                         binTypeId: binType.id,
                         currentFacilityId: station.facilityId,
                         status: 'ACTIVE',
+                        organizationId: orgId,
                     }
                 });
 
-                // 4. Create cycle 
+                // 4. Create cycle
                 const cycle = await tx.binCycle.create({
                     data: {
                         binId: bin.id,
                         facilityId: bin.currentFacilityId,
                         startedAt: now,
                         deadline,
+                        organizationId: orgId,
                     },
                 });
 
@@ -185,9 +190,9 @@ export const binService = {
     },
 
     /** Get bin by ID with active cycle and countdown */
-    async getById(id: string, userId: string, userRole: string) {
-        const bin = await prisma.bin.findUnique({
-            where: { id },
+    async getById(orgId: string, id: string, userId: string, userRole: string) {
+        const bin = await prisma.bin.findFirst({
+            where: { id, organizationId: orgId },
             include: {
                 binType: true,
                 currentFacility: { select: { id: true, name: true, type: true } },
@@ -222,9 +227,10 @@ export const binService = {
     },
 
     /** Get bin by QR code */
-    async getByQrCode(qrCode: string, userId: string, userRole: string) {
+    async getByQrCode(orgId: string, qrCode: string, userId: string, userRole: string) {
+        // qrCode is unique per-organization, so this is the compound-key lookup.
         let bin = await prisma.bin.findUnique({
-            where: { qrCode },
+            where: { organizationId_qrCode: { organizationId: orgId, qrCode } },
             include: {
                 binType: true,
                 currentFacility: { select: { id: true, name: true, type: true } },
@@ -239,8 +245,9 @@ export const binService = {
         // MVP Fallback: if scanning a Master QR code (e.g. TYPE-HEART), find the oldest active dynamic bin of that type
         if (!bin) {
             const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
+            // masterQrCode is unique per-organization, so this is the compound-key lookup.
             const binType = await prisma.binType.findUnique({
-                where: { masterQrCode: normalizedQr },
+                where: { organizationId_masterQrCode: { organizationId: orgId, masterQrCode: normalizedQr } },
             });
 
             if (binType) {
@@ -249,6 +256,7 @@ export const binService = {
                         binTypeId: binType.id,
                         status: { in: ['ACTIVE', 'IN_TRANSIT'] },
                         deletedAt: null,
+                        organizationId: orgId,
                     },
                     include: {
                         binType: true,
@@ -294,7 +302,7 @@ export const binService = {
      * Get all active bins associated with a scanned QR Code (or Master QR Code).
      * Used by the driver portal to resolve dynamic ambiguity and guarantee access. 
      */
-    async getActiveDynamicMatches(qrCode: string, userId: string, userRole: string) {
+    async getActiveDynamicMatches(orgId: string, qrCode: string, userId: string, userRole: string) {
         // 1. Resolve permitted facility IDs first (Drivers only see bins physically at their facilities)
         let permittedFacilityIds: string[] | undefined = undefined;
         if (userRole !== 'ADMIN') {
@@ -308,8 +316,9 @@ export const binService = {
         const facilityFilter = permittedFacilityIds ? { currentFacilityId: { in: permittedFacilityIds } } : {};
 
         // 2. Check if the QR code is an exact physical Bin match
+        // qrCode is unique per-organization, so this is the compound-key lookup.
         const exactBin = await prisma.bin.findUnique({
-            where: { qrCode },
+            where: { organizationId_qrCode: { organizationId: orgId, qrCode } },
             include: {
                 binType: true,
                 currentFacility: { select: { id: true, name: true, type: true } },
@@ -336,8 +345,9 @@ export const binService = {
 
         // 3. Fallback: Check if it's a Master QR code to find dynamic bins
         const normalizedQr = qrCode.trim().toUpperCase().replace(/\s+/g, '-');
+        // masterQrCode is unique per-organization, so this is the compound-key lookup.
         const binType = await prisma.binType.findUnique({
-            where: { masterQrCode: normalizedQr }
+            where: { organizationId_masterQrCode: { organizationId: orgId, masterQrCode: normalizedQr } }
         });
 
         if (!binType) {
@@ -350,6 +360,7 @@ export const binService = {
                 binTypeId: binType.id,
                 status: { in: ['ACTIVE', 'IN_TRANSIT'] },
                 deletedAt: null,
+                organizationId: orgId,
                 ...facilityFilter
             },
             include: {
@@ -374,11 +385,12 @@ export const binService = {
     },
 
     /** List bins with filters and cursor pagination */
-    async list(input: BinListInput, facilityIds: string[], userRole: string) {
+    async list(orgId: string, input: BinListInput, facilityIds: string[], userRole: string) {
         const facilityFilter = userRole === 'ADMIN' ? {} : { currentFacilityId: { in: facilityIds } };
 
         const where = {
             deletedAt: null,
+            organizationId: orgId,
             ...(input.facilityId && { currentFacilityId: input.facilityId }),
             ...(input.status && { status: input.status }),
             ...(input.binTypeId && { binTypeId: input.binTypeId }),

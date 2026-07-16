@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import type { FormDigitizeDraft, FormFillFrequencyValue, FormTriggerTypeValue } from '@bin-tracker/types';
 import { trpc } from '../../../lib/trpc';
-import { fileToBase64, cropImageRegion } from './image-utils';
+import { fileToBase64, cropImageRegion, type AcceptedImageMime } from './image-utils';
 import { FormDraftLivePreview } from './FormDraftLivePreview';
+import { useSubscription } from '../../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../../components/UpgradePrompt';
 
 const STAGES = ['RECEIVING', 'KILL_FLOOR', 'WET_AGING', 'VALUE_ADD', 'SHIPPING'] as const;
 
@@ -58,7 +60,8 @@ export default function FormImportPage() {
     const [step, setStep] = useState<Step>('capture');
     const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
-    const [mimeType, setMimeType] = useState('image/jpeg');
+    const [mimeType, setMimeType] = useState<AcceptedImageMime>('image/jpeg');
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [draft, setDraft] = useState<FormDigitizeDraft | null>(null);
     const [refineNote, setRefineNote] = useState('');
     const [selectingRegion, setSelectingRegion] = useState(false);
@@ -70,13 +73,44 @@ export default function FormImportPage() {
     const [stage, setStage] = useState<string>('RECEIVING');
     const [triggerType, setTriggerType] = useState<FormTriggerTypeValue>('manual');
     const [fillFrequency, setFillFrequency] = useState<FormFillFrequencyValue>('as_needed');
+    const [digitizeJobId, setDigitizeJobId] = useState<string | null>(null);
 
+    // digitizeFromPhoto enqueues a job (Gemini's vision call runs 15-30s) and
+    // returns a jobId; digitizeJobStatus polls it every 1.5s while the job is
+    // waiting/active, and stops (refetchInterval returns false) once it
+    // completes or fails. The effect below advances the wizard step once a
+    // result lands, mirroring the old onSuccess handler.
     const digitize = trpc.form.digitizeFromPhoto.useMutation({
         onSuccess: (data) => {
-            setDraft(data);
-            setStep('verify');
+            setDigitizeJobId(data.jobId);
         },
     });
+
+    const digitizeStatus = trpc.form.digitizeJobStatus.useQuery(
+        { jobId: digitizeJobId ?? '' },
+        {
+            enabled: digitizeJobId !== null,
+            refetchInterval: (query) => {
+                const state = query.state.data?.state;
+                return state === 'completed' || state === 'failed' ? false : 1500;
+            },
+        },
+    );
+
+    useEffect(() => {
+        const data = digitizeStatus.data;
+        if (!data || data.state !== 'completed') return;
+        setDraft(data.result);
+        setStep('verify');
+        setDigitizeJobId(null);
+    }, [digitizeStatus.data]);
+
+    const digitizeErrorMessage =
+        digitize.error?.message ??
+        digitizeStatus.error?.message ??
+        (digitizeStatus.data?.state === 'failed'
+            ? digitizeStatus.data.error ?? 'Digitization failed'
+            : undefined);
 
     const refine = trpc.form.refineFromRegion.useMutation({
         onSuccess: (data) => {
@@ -94,7 +128,7 @@ export default function FormImportPage() {
     const utils = trpc.useUtils();
 
     const startDigitize = useCallback(
-        (base64: string, mime: string) => {
+        (base64: string, mime: AcceptedImageMime) => {
             setImageBase64(base64);
             setMimeType(mime);
             setStep('digitize');
@@ -103,11 +137,35 @@ export default function FormImportPage() {
         [digitize],
     );
 
+    const { hasModule, isLoading } = useSubscription();
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[#F5F8F2] flex flex-col items-center justify-center py-24 text-gray-500">
+                <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
+                <p className="font-semibold">Loading…</p>
+            </div>
+        );
+    }
+    if (!hasModule('FORMS_AI_DIGITIZE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="FORMS_AI_DIGITIZE" />
+            </div>
+        );
+    }
+
     const handleFile = async (file: File) => {
-        const { base64, mimeType: mime } = await fileToBase64(file);
-        const dataUrl = `data:${mime};base64,${base64}`;
-        setImageDataUrl(dataUrl);
-        startDigitize(base64, mime);
+        setUploadError(null);
+        try {
+            const { base64, mimeType: mime } = await fileToBase64(file);
+            const dataUrl = `data:${mime};base64,${base64}`;
+            setImageDataUrl(dataUrl);
+            startDigitize(base64, mime);
+        } catch (error) {
+            // e.g. an unsupported format (HEIC) — surface it instead of an
+            // unhandled rejection with no UI feedback.
+            setUploadError(error instanceof Error ? error.message : 'Failed to read image');
+        }
     };
 
     const handleRefine = async () => {
@@ -184,7 +242,7 @@ export default function FormImportPage() {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/webp"
                             capture="environment"
                             className="hidden"
                             onChange={(e) => {
@@ -193,6 +251,11 @@ export default function FormImportPage() {
                             }}
                         />
                     </label>
+                    {uploadError && (
+                        <p role="alert" className="text-sm font-semibold text-red-600 text-center">
+                            {uploadError}
+                        </p>
+                    )}
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
@@ -214,14 +277,17 @@ export default function FormImportPage() {
                     <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
                     <p className="font-semibold">Digitizing form with AI…</p>
                     <p className="text-sm mt-1">This may take 15–30 seconds</p>
-                    {digitize.error && (
+                    {digitizeErrorMessage && (
                         <div className="mt-6 max-w-md rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm">
                             <AlertCircle className="w-5 h-5 inline mr-2" />
-                            {digitize.error.message}
+                            {digitizeErrorMessage}
                             <button
                                 type="button"
                                 className="block mt-3 underline"
-                                onClick={() => setStep('capture')}
+                                onClick={() => {
+                                    setDigitizeJobId(null);
+                                    setStep('capture');
+                                }}
                             >
                                 Try another photo
                             </button>

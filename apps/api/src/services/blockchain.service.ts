@@ -8,9 +8,10 @@ type CycleForAnchoring = Awaited<ReturnType<typeof fetchCycles>>[number];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function fetchCycles(start: Date, end: Date) {
+async function fetchCycles(orgId: string, start: Date, end: Date) {
     return prisma.binCycle.findMany({
         where: {
+            organizationId: orgId,
             status: 'COMPLETED',
             deliveredAt: { gte: start, lte: end },
         },
@@ -86,7 +87,7 @@ export const blockchainService = {
      * Aggregate daily completed cycles and build the CIP-25 metadata payload.
      * Everything is computed server-side; frontend only handles wallet interaction.
      */
-    async getDailySummary(fromDate: string, toDate: string) {
+    async getDailySummary(orgId: string, fromDate: string, toDate: string) {
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRe.test(fromDate) || !dateRe.test(toDate)) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'Dates must be YYYY-MM-DD.' });
@@ -99,7 +100,7 @@ export const blockchainService = {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid date value.' });
         }
 
-        const cycles = await fetchCycles(start, end);
+        const cycles = await fetchCycles(orgId, start, end);
 
         const rangeLabel = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
 
@@ -182,7 +183,7 @@ export const blockchainService = {
      * Idempotent: only updates cycles where anchored = false.
      * This means a retry after a network error is safe.
      */
-    async confirmAnchor(cycleIds: string[], txHash: string) {
+    async confirmAnchor(orgId: string, cycleIds: string[], txHash: string) {
         // txHash on Cardano is always exactly 64 hex characters
         if (!/^[0-9a-f]{64}$/i.test(txHash)) {
             throw new TRPCError({
@@ -195,10 +196,13 @@ export const blockchainService = {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'No cycle IDs provided.' });
         }
 
-        // Idempotent: WHERE anchored = false prevents re-updating already-anchored rows
+        // Idempotent: WHERE anchored = false prevents re-updating already-anchored rows.
+        // organizationId guard prevents an admin from one org anchoring (or being able to
+        // probe existence of) another org's cycle IDs.
         const result = await prisma.binCycle.updateMany({
             where: {
                 id: { in: cycleIds },
+                organizationId: orgId,
                 anchored: false, // critical idempotency guard
             },
             data: {

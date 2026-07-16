@@ -1,0 +1,30 @@
+# Isolated from api_net by design — see kvmplan.md §0 ("The isolation guarantee").
+# Add one service block per future agent, each with its own mem_limit/cpus
+# and its own env_file: .env.<agent> (a leaked key exposes only that agent).
+services:
+  hermes:
+    image: <hermes-image-or-build>
+    container_name: hermes
+    restart: unless-stopped
+    env_file: .env.hermes
+    networks: [agents_net]
+    mem_limit: 4g
+    cpus: 2
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+  redis:
+    image: redis:7-alpine
+    container_name: agents_redis
+    restart: unless-stopped
+    networks: [agents_net]
+    mem_limit: 512m
+    volumes: [agents_redis_data:/data]
+
+networks:
+  agents_net:
+    name: agents_net # deliberately NOT the same network as api_net
+
+volumes:
+  agents_redis_data:

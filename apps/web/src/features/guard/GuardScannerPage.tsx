@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
 import { QRScanner } from '../../components/QRScanner';
-import { trpc, type RouterOutputs } from '../../lib/trpc';
+import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
+
+// attendance.scan requires stationProcedure — scoped to this one call so it
+// doesn't collide with any bearer-gated call elsewhere on the page.
+const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 type ScanMode = 'handheld' | 'camera';
 
@@ -26,7 +33,10 @@ export default function GuardScannerPage() {
     const [lastScanned, setLastScanned] = useState<string | null>(null);
     const handheldRef = useRef<HTMLInputElement | null>(null);
 
-    const scanMutation = trpc.attendance.scan.useMutation();
+    const scanMutation = useMutation({
+        mutationFn: (input: Parameters<typeof stationClient.attendance.scan.mutate>[0]) =>
+            stationClient.attendance.scan.mutate(input),
+    });
 
     const submitScan = (qrCode: string) => {
         if (!qrCode || qrCode === lastScanned) return;
@@ -60,6 +70,22 @@ export default function GuardScannerPage() {
             handheldRef.current?.focus();
         }
     }, [scanMode, showScanPanel, scanMutation.isPending]);
+
+    const { hasModule, isLoading } = useSubscription();
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
+                Loading…
+            </div>
+        );
+    }
+    if (!hasModule('WORKFORCE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
 
     const isCheckIn = result?.action === 'CHECK_IN';
 

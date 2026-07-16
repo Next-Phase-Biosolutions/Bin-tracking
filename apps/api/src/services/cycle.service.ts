@@ -11,7 +11,7 @@ export const cycleService = {
      * Pickup (Scan 2 — Driver)
      * Transition: ACTIVE → IN_TRANSIT
      */
-    async pickup(input: CyclePickupInput, userId: string, userRole: string) {
+    async pickup(orgId: string, input: CyclePickupInput, userId: string, userRole: string) {
         try {
             return await prisma.$transaction(
                 async (tx: Prisma.TransactionClient) => {
@@ -23,7 +23,10 @@ export const cycleService = {
                         },
                     });
 
-                    if (!cycle) {
+                    // Cross-org mismatch reports as NOT_FOUND (never FORBIDDEN) so a
+                    // caller can't distinguish "doesn't exist" from "exists but isn't
+                    // yours" — that distinction would leak cross-tenant existence.
+                    if (!cycle || cycle.organizationId !== orgId) {
                         throw new TRPCError({ code: 'NOT_FOUND', message: 'Cycle not found' });
                     }
 
@@ -100,7 +103,7 @@ export const cycleService = {
      * Deliver (Scan 3 — Driver)
      * Transition: IN_TRANSIT → COMPLETED + Bin reset to IDLE
      */
-    async deliver(input: CycleDeliverInput, userId: string, userRole: string) {
+    async deliver(orgId: string, input: CycleDeliverInput, userId: string, userRole: string) {
         try {
             return await prisma.$transaction(
                 async (tx: Prisma.TransactionClient) => {
@@ -111,7 +114,10 @@ export const cycleService = {
                         },
                     });
 
-                    if (!cycle) {
+                    // Cross-org mismatch reports as NOT_FOUND (never FORBIDDEN) so a
+                    // caller can't distinguish "doesn't exist" from "exists but isn't
+                    // yours" — that distinction would leak cross-tenant existence.
+                    if (!cycle || cycle.organizationId !== orgId) {
                         throw new TRPCError({ code: 'NOT_FOUND', message: 'Cycle not found' });
                     }
 
@@ -131,8 +137,9 @@ export const cycleService = {
                     }
 
                     // CRITICAL FIX: Validate destinationId exists and is RENDERING facility
-                    const destination = await tx.facility.findUnique({
-                        where: { id: input.destinationId },
+                    // (org-scoped: a destination from another org must read as NOT_FOUND)
+                    const destination = await tx.facility.findFirst({
+                        where: { id: input.destinationId, organizationId: orgId },
                     });
 
                     if (!destination || destination.deletedAt) {
@@ -191,7 +198,7 @@ export const cycleService = {
     },
 
     /** Get cycle by ID with countdown */
-    async getById(id: string, userId: string, userRole: string) {
+    async getById(orgId: string, id: string, userId: string, userRole: string) {
         const cycle = await prisma.binCycle.findUnique({
             where: { id },
             include: {
@@ -206,7 +213,8 @@ export const cycleService = {
             },
         });
 
-        if (!cycle) {
+        // Cross-org mismatch reports as NOT_FOUND — same discipline as pickup/deliver.
+        if (!cycle || cycle.organizationId !== orgId) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Cycle not found' });
         }
 
@@ -236,10 +244,11 @@ export const cycleService = {
     },
 
     /** List active cycles with countdown and pagination */
-    async listActive(input: CycleListInput, facilityIds: string[], userRole: string) {
+    async listActive(orgId: string, input: CycleListInput, facilityIds: string[], userRole: string) {
         const facilityFilter = userRole === 'ADMIN' ? {} : { facilityId: { in: facilityIds } };
 
         const where = {
+            organizationId: orgId,
             ...(input.status ? { status: input.status } : { status: { in: ['ACTIVE' as const, 'IN_TRANSIT' as const] } }),
             ...(input.facilityId && { facilityId: input.facilityId }),
             ...(input.binId && { binId: input.binId }),
@@ -280,10 +289,10 @@ export const cycleService = {
     },
 
     /** Get cycle history for a bin (all past cycles) */
-    async getHistory(input: CycleHistoryInput, userId: string, userRole: string) {
+    async getHistory(orgId: string, input: CycleHistoryInput, userId: string, userRole: string) {
         // First get the bin to check facility access
-        const bin = await prisma.bin.findUnique({
-            where: { id: input.binId },
+        const bin = await prisma.bin.findFirst({
+            where: { id: input.binId, organizationId: orgId },
             select: { currentFacilityId: true },
         });
 
@@ -312,7 +321,7 @@ export const cycleService = {
 
         const [items, totalCount] = await Promise.all([
             prisma.binCycle.findMany({
-                where: { binId: input.binId },
+                where: { binId: input.binId, organizationId: orgId },
                 include: {
                     facility: { select: { id: true, name: true } },
                     destination: { select: { id: true, name: true } },
@@ -322,7 +331,7 @@ export const cycleService = {
                 ...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
                 orderBy: { startedAt: 'desc' },
             }),
-            prisma.binCycle.count({ where: { binId: input.binId } }),
+            prisma.binCycle.count({ where: { binId: input.binId, organizationId: orgId } }),
         ]);
 
         const hasMore = items.length > input.limit;

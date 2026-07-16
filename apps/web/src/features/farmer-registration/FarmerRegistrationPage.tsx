@@ -1,8 +1,15 @@
 import { useState, useCallback } from 'react';
-import { trpc } from '../../lib/trpc';
+import { useMutation } from '@tanstack/react-query';
+import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
 import { AnimalForm } from './AnimalForm';
 import { VoiceRecorder } from './VoiceRecorder';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
+
+// farmer.transcribe/register both require stationProcedure — scoped to
+// these two calls rather than a page-level auth flag.
+const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 const EMPTY_FIELDS: ExtractedAnimalFields = {
     animalType: null,
@@ -21,8 +28,14 @@ export default function FarmerRegistrationPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
 
-    const transcribeMutation = trpc.farmer.transcribe.useMutation();
-    const registerMutation = trpc.farmer.register.useMutation();
+    const transcribeMutation = useMutation({
+        mutationFn: (input: Parameters<typeof stationClient.farmer.transcribe.mutate>[0]) =>
+            stationClient.farmer.transcribe.mutate(input),
+    });
+    const registerMutation = useMutation({
+        mutationFn: (input: Parameters<typeof stationClient.farmer.register.mutate>[0]) =>
+            stationClient.farmer.register.mutate(input),
+    });
 
     // Called by VoiceRecorder once audio blob is base64-encoded and ready
     const handleAudioReady = useCallback(
@@ -55,6 +68,22 @@ export default function FarmerRegistrationPage() {
         },
         [transcribeMutation],
     );
+
+    const { hasModule, isLoading } = useSubscription();
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
+                Loading…
+            </div>
+        );
+    }
+    if (!hasModule('ANIMAL_INTAKE')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+                <UpgradePrompt module="ANIMAL_INTAKE" />
+            </div>
+        );
+    }
 
     const handleFieldChange = (field: keyof ExtractedAnimalFields, value: string) => {
         setFormFields((prev) => ({ ...prev, [field]: value || null }));

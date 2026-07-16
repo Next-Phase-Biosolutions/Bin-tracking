@@ -64,3 +64,5 @@ export type {
     FormTemplate,
     FormDigitizeDraft,
 } from './form.js';
+export type { Plan, SubscriptionStatus, ModuleKey, PlanLimits } from './entitlements.js';
+export { PLAN_LIMITS, PLAN_DEFAULT_MODULES, ALL_MODULE_KEYS, defaultModulesForPlan, isSubscriptionUsable } from './entitlements.js';

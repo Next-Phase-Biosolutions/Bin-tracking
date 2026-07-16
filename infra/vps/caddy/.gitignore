@@ -1,0 +1,4 @@
+# Written by ../bintracker-api/deploy.sh on the VPS — never committed, so
+# deploys never dirty the git checkout.
+upstream.caddy
+upstream.txt

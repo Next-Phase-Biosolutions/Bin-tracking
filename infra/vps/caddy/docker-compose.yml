@@ -1,0 +1,18 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host # needs to reach api_blue/api_green on localhost ports
+    ports: ['80:80', '443:443']
+    volumes:
+      # Mount the directory (not just the Caddyfile) so the untracked
+      # upstream.caddy snippet written by ../bintracker-api/deploy.sh is
+      # visible at /etc/caddy/upstream.caddy for the Caddyfile's `import`.
+      - ./:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

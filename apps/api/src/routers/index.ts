@@ -1,4 +1,6 @@
 import { router } from '../trpc/trpc.js';
+import { authRouter } from './auth.router.js';
+import { invitationRouter } from './invitation.router.js';
 import { binRouter } from './bin.router.js';
 import { cycleRouter } from './cycle.router.js';
 import { facilityRouter } from './facility.router.js';
@@ -10,8 +12,12 @@ import { employeeRouter } from './employee.router.js';
 import { attendanceRouter } from './attendance.router.js';
 import { shipmentRouter } from './shipment.router.js';
 import { payrollRouter } from './payroll.router.js';
+import { billingRouter } from './billing.router.js';
+import { adminRouter } from './admin.router.js';
 
 export const appRouter = router({
+    auth: authRouter,
+    invitation: invitationRouter,
     bin: binRouter,
     cycle: cycleRouter,
     facility: facilityRouter,
@@ -23,6 +29,8 @@ export const appRouter = router({
     attendance: attendanceRouter,
     shipment: shipmentRouter,
     payroll: payrollRouter,
+    billing: billingRouter,
+    admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

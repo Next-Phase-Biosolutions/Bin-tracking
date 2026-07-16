@@ -2,11 +2,14 @@ import { AssemblyAI } from 'assemblyai';
 import Anthropic from '@anthropic-ai/sdk';
 import { TRPCError } from '@trpc/server';
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { prisma } from '@bin-tracker/db';
 import type { FormTemplate, FormDigitizeDraft } from '@bin-tracker/types';
+import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { FormCreateInput, FormTranscribeFieldInput } from '@bin-tracker/validators';
 import { formSchemaSchema } from '@bin-tracker/validators';
 import { applyVoiceEnabledToSchema, generateFieldIds } from '../lib/form-schema-utils.js';
 import { formDigitizeService } from './form-digitize.service.js';
+import { usageService } from './usage.service.js';
 
 const assemblyai = new AssemblyAI({
     apiKey: process.env['ASSEMBLYAI_API_KEY'] ?? '',
@@ -51,34 +54,39 @@ function toFormTemplate(raw: {
 }
 
 export const formService = {
-    async listByStage(prisma: PrismaClient, stage: string): Promise<FormTemplate[]> {
+    async listByStage(prisma: PrismaClient, orgId: string, stage: string): Promise<FormTemplate[]> {
         const rows = await prisma.formTemplate.findMany({
-            where: stage && stage !== 'ALL' ? { stage, isActive: true } : { isActive: true },
+            where: {
+                organizationId: orgId,
+                ...(stage && stage !== 'ALL' ? { stage, isActive: true } : { isActive: true }),
+            },
             orderBy: [{ stage: 'asc' }, { sortOrder: 'asc' }],
         });
         return rows.map(toFormTemplate);
     },
 
-    async getById(prisma: PrismaClient, id: string): Promise<FormTemplate | null> {
+    async getById(prisma: PrismaClient, orgId: string, id: string): Promise<FormTemplate | null> {
         const row = await prisma.formTemplate.findUnique({ where: { id } });
-        if (!row) return null;
+        // Cross-org mismatch reads as "not found" — same discipline as cycle.service.ts.
+        if (!row || row.organizationId !== orgId) return null;
         return toFormTemplate(row);
     },
 
-    async digitizeFromPhoto(imageBase64: string, mimeType: string): Promise<FormDigitizeDraft> {
-        return formDigitizeService.digitizeFromPhoto(imageBase64, mimeType);
+    async digitizeFromPhoto(imageBase64: string, orgId: string, mimeType: string): Promise<FormDigitizeDraft> {
+        return formDigitizeService.digitizeFromPhoto(imageBase64, orgId, mimeType);
     },
 
     async refineFromRegion(
         imageBase64: string,
         draft: FormDigitizeDraft,
+        orgId: string,
         mimeType: string,
         userNote?: string,
     ): Promise<FormDigitizeDraft> {
-        return formDigitizeService.refineFromRegion(imageBase64, draft, mimeType, userNote);
+        return formDigitizeService.refineFromRegion(imageBase64, draft, orgId, mimeType, userNote);
     },
 
-    async create(prisma: PrismaClient, input: FormCreateInput): Promise<FormTemplate> {
+    async create(prisma: PrismaClient, input: FormCreateInput, organizationId: string): Promise<FormTemplate> {
         const parsed = formSchemaSchema.safeParse(input.schema);
         if (!parsed.success) {
             throw new TRPCError({
@@ -91,7 +99,7 @@ export const formService = {
         schema = applyVoiceEnabledToSchema(schema);
 
         const maxSort = await prisma.formTemplate.aggregate({
-            where: { stage: input.stage },
+            where: { organizationId, stage: input.stage },
             _max: { sortOrder: true },
         });
 
@@ -107,13 +115,21 @@ export const formService = {
                 fillFrequency: input.fillFrequency,
                 triggerConfig: (input.triggerConfig ?? undefined) as Prisma.InputJsonValue | undefined,
                 sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+                organizationId,
             },
         });
 
         return toFormTemplate(row);
     },
 
-    async transcribeField(input: FormTranscribeFieldInput): Promise<{ value: string | null }> {
+    async transcribeField(input: FormTranscribeFieldInput, orgId: string): Promise<{ value: string | null }> {
+        // Second, independent check after requireModule('FORMS') has already gated
+        // access — "how much have they used this month" (voice_transcribe covers
+        // both this AssemblyAI+Claude call and farmer.service.ts's).
+        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+        const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyTranscribe : -1;
+        await usageService.checkAndIncrement(orgId, 'voice_transcribe', limit);
+
         const audioBuffer = Buffer.from(input.audioBase64, 'base64');
 
         let transcript: string;

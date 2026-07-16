@@ -1,4 +1,4 @@
-import { router, publicProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure, requireModule } from '../trpc/trpc.js';
 import {
     attendanceScanSchema,
     attendanceSummarySchema,
@@ -8,23 +8,26 @@ import { attendanceService } from '../services/attendance.service.js';
 
 export const attendanceRouter = router({
     /** Guard scan — toggles check-in / check-out for the scanned badge */
-    scan: publicProcedure
+    scan: stationOrgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceScanSchema)
-        .mutation(async ({ input }) => {
-            return attendanceService.scan(input);
+        .mutation(async ({ input, ctx }) => {
+            return attendanceService.scan(ctx.orgId, input);
         }),
 
     /** Per-employee total hours for the timesheet dashboard */
-    summary: publicProcedure
+    summary: orgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceSummarySchema)
-        .query(async ({ input }) => {
-            return attendanceService.summary(input);
+        .query(async ({ input, ctx }) => {
+            return attendanceService.summary(ctx.orgId, input);
         }),
 
     /** Recent scan feed */
-    recent: publicProcedure
+    recent: orgProcedure
+        .use(requireModule('WORKFORCE'))
         .input(attendanceRecentSchema)
-        .query(async ({ input }) => {
-            return attendanceService.recent(input);
+        .query(async ({ input, ctx }) => {
+            return attendanceService.recent(ctx.orgId, input);
         }),
 });

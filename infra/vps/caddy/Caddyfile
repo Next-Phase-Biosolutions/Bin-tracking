@@ -1,0 +1,13 @@
+# The live upstream lives in upstream.caddy (untracked, written by deploy.sh)
+# so deploys never modify this tracked file — a `git pull` on the VPS can
+# always fast-forward it. upstream.txt tracks the current color for deploy.sh.
+#
+# One-time VPS provisioning (before first `docker compose up` of caddy):
+#   echo "to localhost:3001" > upstream.caddy
+api.<your-domain> {
+    reverse_proxy {
+        import upstream.caddy
+        health_uri /health
+        health_interval 10s
+    }
+}

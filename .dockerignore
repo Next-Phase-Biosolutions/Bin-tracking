@@ -1,0 +1,22 @@
+# Never bake secrets or git history into image layers. The VPS build context
+# (/opt/bin-tracker) contains the real production .env under infra/vps/ —
+# without these excludes, every `docker compose build` copies it into the
+# image via apps/api/Dockerfile's `COPY . .`.
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed by the API image
+infra/
+apps/web/
+apps/marketing/
+node_modules/
+**/node_modules/
+**/dist/
+.claude/
+.github/
+.superpowers/
+*.md

@@ -4,6 +4,11 @@ import { Menu, X } from 'lucide-react';
 
 const imgLogo = "/assets/imgLogo.png";
 
+// The app now lives on its own domain/subdomain (see apps/web). Point
+// "Launch App" at its signup page instead of an in-app route.
+const APP_URL = import.meta.env.VITE_APP_URL ?? 'http://localhost:3000';
+const signupUrl = `${APP_URL}/signup`;
+
 const navLinks = [
   { label: "Home", to: "/" },
   { label: "About Us", to: "/about" },
@@ -76,12 +81,12 @@ export function Navbar() {
             >
               Contact Us
             </a>
-            <Link
-              to="/app/dashboard"
+            <a
+              href={signupUrl}
               className="btn-glow px-5 py-2.5 text-sm font-bold rounded-full"
             >
-              Launch App
-            </Link>
+              Get Started
+            </a>
           </div>
         </div>
 
@@ -126,12 +131,12 @@ export function Navbar() {
             <a href="#" className="btn-glass py-3 text-sm font-semibold text-center rounded-full">
               Contact Us
             </a>
-            <Link
-              to="/app/dashboard"
+            <a
+              href={signupUrl}
               className="btn-glow py-3 text-sm font-bold text-center rounded-full"
             >
-              Launch App
-            </Link>
+              Get Started
+            </a>
           </div>
         </div>
       )}

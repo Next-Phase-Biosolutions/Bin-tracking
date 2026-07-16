@@ -13,6 +13,11 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            # Pure grep against source — no dependencies or DB needed, so it
+            # runs first and fails fast.
+            - name: Tenancy audit
+              run: bash apps/api/scripts/tenancy-audit.sh
+
             - uses: pnpm/action-setup@v4
               with:
                   version: 9.15.4

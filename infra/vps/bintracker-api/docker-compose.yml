@@ -1,0 +1,104 @@
+# Runs from within a full repo checkout on the VPS (e.g. /opt/bin-tracker/infra/vps/bintracker-api).
+# See kvmplan.md §5. Blue/green: only one color is live at a time — deploy.sh
+# builds+starts the idle color, health-checks it, then flips Caddy's upstream.
+#
+# redis + worker back the BullMQ `heavy-jobs` queue (payroll.computeRun,
+# form.digitizeFromPhoto). They are NOT blue/green — one of each, restarted in
+# place by deploy.sh after the traffic flip; BullMQ's stalled-job recovery
+# covers the restart window. REDIS_URL in .env must point at
+# redis://redis:6379 (service name on api_net).
+#
+# node:22-slim ships neither wget nor curl, so all healthchecks use node's
+# built-in fetch (same check as apps/api/Dockerfile's HEALTHCHECK).
+services:
+  api_blue:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: api_blue
+    restart: unless-stopped
+    env_file: .env
+    networks: [api_net]
+    ports: ['3001:3001']
+    mem_limit: 2g
+    cpus: 1.5
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+  api_green:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: api_green
+    restart: 'no' # only started explicitly by deploy.sh during a deploy
+    env_file: .env
+    networks: [api_net]
+    ports: ['3002:3001']
+    mem_limit: 2g
+    cpus: 1.5
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+  worker:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: bintracker_worker
+    restart: unless-stopped
+    command: ['./node_modules/.bin/tsx', 'src/worker.ts']
+    env_file: .env
+    networks: [api_net]
+    mem_limit: 1g
+    cpus: 1
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
+  redis:
+    image: redis:7-alpine
+    container_name: bintracker_redis
+    restart: unless-stopped
+    networks: [api_net]
+    mem_limit: 512m
+    # Persist so queued-but-unprocessed jobs survive a Redis restart. Job
+    # payloads include digitize images, hence the 256mb cap + noeviction
+    # (BullMQ requires noeviction; the queue's removeOnComplete/removeOnFail
+    # ages bound growth instead).
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '256mb', '--maxmemory-policy', 'noeviction']
+    volumes: [bintracker_redis_data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  api_net:
+    name: api_net
+
+volumes:
+  bintracker_redis_data:

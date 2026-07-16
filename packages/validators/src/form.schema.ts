@@ -134,9 +134,24 @@ export const formFillFrequencySchema = z.enum([
     'as_needed',
 ]);
 
+/**
+ * ~10.5MB of binary image (base64 inflates by 4/3) — generous for a phone
+ * photo of a paper form, while keeping oversized payloads out of the Redis
+ * job queue (the digitize job stores the image in job data). The global
+ * Fastify bodyLimit (20MB) is the outer bound; this is the per-field one.
+ */
+const IMAGE_BASE64_MAX_CHARS = 14 * 1024 * 1024;
+/** Only formats Gemini vision actually accepts here — never a free-form string. */
+const imageMimeType = z.enum(['image/jpeg', 'image/png', 'image/webp']);
+
 export const formDigitizeFromPhotoSchema = z.object({
-    imageBase64: z.string().min(1),
-    mimeType: z.string().default('image/jpeg'),
+    imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX_CHARS),
+    mimeType: imageMimeType.default('image/jpeg'),
+});
+
+/** Input for polling the status of an async `form.digitizeFromPhoto` job. */
+export const formDigitizeJobStatusSchema = z.object({
+    jobId: z.string().min(1),
 });
 
 export const formRefineRegionSchema = z.object({
@@ -147,8 +162,8 @@ export const formRefineRegionSchema = z.object({
 });
 
 export const formRefineFromRegionSchema = z.object({
-    imageBase64: z.string().min(1),
-    mimeType: z.string().default('image/jpeg'),
+    imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX_CHARS),
+    mimeType: imageMimeType.default('image/jpeg'),
     currentDraft: z.object({
         title: z.string(),
         description: z.string().nullable().optional(),
@@ -183,6 +198,7 @@ export const formTranscribeFieldSchema = z.object({
 export type FormListByStageInput = z.infer<typeof formListByStageSchema>;
 export type FormGetByIdInput = z.infer<typeof formGetByIdSchema>;
 export type FormDigitizeFromPhotoInput = z.infer<typeof formDigitizeFromPhotoSchema>;
+export type FormDigitizeJobStatusInput = z.infer<typeof formDigitizeJobStatusSchema>;
 export type FormRefineFromRegionInput = z.infer<typeof formRefineFromRegionSchema>;
 export type FormCreateInput = z.infer<typeof formCreateSchema>;
 export type FormTranscribeFieldInput = z.infer<typeof formTranscribeFieldSchema>;

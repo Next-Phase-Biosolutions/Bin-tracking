@@ -33,6 +33,11 @@ export function createUserTRPCClient() {
     });
 }
 
+// Test-station-token convention shared by every kiosk-style page/component
+// that needs a per-call station-authenticated client (see createStationTRPCClient
+// below). Real per-device station provisioning is Phase 4.
+export const STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
+
 // ─── Station tRPC client (station token auth) ──────────────────────────────
 // Used for bin.start which requires "Authorization: Station <token>"
 // Returns a vanilla (non-React) client for one-off mutation calls

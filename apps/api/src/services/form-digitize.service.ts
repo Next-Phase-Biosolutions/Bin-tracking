@@ -6,9 +6,24 @@ import {
     repeatingSchemaSchema,
 } from '@bin-tracker/validators';
 import type { FormDigitizeDraft, FormTypeValue } from '@bin-tracker/types';
+import { PLAN_LIMITS } from '@bin-tracker/types';
+import { prisma } from '@bin-tracker/db';
 import { FORM_DIGITIZE_SYSTEM_PROMPT } from './form-digitize.prompt.js';
 import { repairDigitizedDraft } from './form-digitize.repair.js';
 import { generateFieldIds, normalizeDigitizedPayload } from '../lib/form-schema-utils.js';
+import { usageService } from './usage.service.js';
+
+/**
+ * Second, independent check that runs after requireModule('FORMS_AI_DIGITIZE')
+ * has already gated whether the org can use this feature at all — this is
+ * "how much have they used this month". Same Subscription.plan lookup
+ * pattern as facility.service.ts / employee.service.ts's quantity limits.
+ */
+async function meterDigitize(orgId: string): Promise<void> {
+    const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+    const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyDigitize : -1;
+    await usageService.checkAndIncrement(orgId, 'form_digitize', limit);
+}
 
 /** Vision-capable models; tried in order when primary is unavailable/over-quota */
 const DIGITIZE_MODEL_FALLBACKS = [
@@ -168,7 +183,8 @@ async function runVision(
 }
 
 export const formDigitizeService = {
-    async digitizeFromPhoto(imageBase64: string, mimeType = 'image/jpeg'): Promise<FormDigitizeDraft> {
+    async digitizeFromPhoto(imageBase64: string, orgId: string, mimeType = 'image/jpeg'): Promise<FormDigitizeDraft> {
+        await meterDigitize(orgId);
         const prompt =
             'Digitize this paper form. Any rectangular GRID (header row + empty data rows, same number of columns in each row) must become a TABLE: tableColumns with fields:[] (or formType repeating if the whole page is one grid only). Count vertical grid lines for column count. Never output grid columns as a vertical list of fields. Include every sub-column under grouped headers. Put intro text in description.';
         try {
@@ -194,9 +210,11 @@ export const formDigitizeService = {
     async refineFromRegion(
         imageBase64: string,
         draft: FormDigitizeDraft,
+        orgId: string,
         mimeType = 'image/jpeg',
         userNote?: string,
     ): Promise<FormDigitizeDraft> {
+        await meterDigitize(orgId);
         const note = userNote ? `\nUser note: ${userNote}` : '';
         const prompt = `This image is a cropped region of a form. Update ONLY the affected parts of this draft JSON:\n${JSON.stringify(draft)}${note}\nReturn the full updated JSON object. Preserve table/repeating structure.`;
         try {

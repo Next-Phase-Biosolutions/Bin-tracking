@@ -92,19 +92,153 @@ enum FormFillFrequency {
   as_needed
 }
 
-// ─── Models ───────────────────────────────────────────────────────
+// ─── Organizations / Tenancy ──────────────────────────────────────
 
-model User {
+enum Plan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model Organization {
   id        String   @id @default(cuid())
-  email     String   @unique
   name      String
-  role      UserRole
+  slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  members      OrganizationMember[]
+  invitations  Invitation[]
+  subscription Subscription?
+
+  facilities          Facility[]
+  binTypes            BinType[]
+  bins                Bin[]
+  binCycles           BinCycle[]
+  employees           Employee[]
+  shipments           Shipment[]
+  formTemplates       FormTemplate[]
+  animalRegistrations AnimalRegistration[]
+  settings            Settings?
+  payrollRuns         PayrollRun[]
+  modules             OrganizationModule[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
+  role      UserRole
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  orgId      String
+  email      String
+  role       UserRole
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("invitations")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  orgId                String             @unique
+  stripeCustomerId     String?            @unique // null until first checkout — row exists from org provisioning
+  stripeSubscriptionId String?            @unique
+  plan                 Plan               @default(STARTER)
+  status               SubscriptionStatus @default(TRIALING)
+  currentPeriodEnd     DateTime?
+  // Stripe `event.created` of the last webhook applied to this row. Stripe
+  // does NOT guarantee delivery order — a retried older event must never
+  // overwrite state written by a newer one (billing.service.ts skips it).
+  lastStripeEventAt    DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+enum ModuleKey {
+  ANIMAL_INTAKE
+  WORKFORCE
+  SHIPMENTS
+  FORMS
+  FORMS_AI_DIGITIZE
+  BLOCKCHAIN_ANCHOR
+  PAYROLL
+}
+
+model OrganizationModule {
+  id        String    @id @default(cuid())
+  orgId     String
+  module    ModuleKey
+  enabled   Boolean   @default(true)
+  source    String    @default("plan") // 'plan' | 'manual' — manual survives plan changes
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   // platform admin's user id, set only when source = 'manual'
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, module])
+  @@index([orgId])
+  @@map("organization_modules")
+}
+
+// Monthly per-org AI usage counters (Gemini digitize, AssemblyAI/Claude
+// transcribe) — metered separately from OrganizationModule's on/off gate.
+model UsageCounter {
+  id        String   @id @default(cuid())
+  orgId     String
+  metric    String   // 'form_digitize' | 'voice_transcribe'
+  period    String   // 'YYYY-MM'
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, metric, period])
+  @@map("usage_counters")
+}
+
+// ─── Models ───────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  role            UserRole
+  isPlatformAdmin Boolean  @default(false) // SaaS operator flag, org-independent — set manually via psql/Prisma Studio only, never self-serve
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   facilities   UserFacility[]
   driverCycles BinCycle[]
-  driverEvents EventLog[]     @relation("EventDriver")
+  driverEvents EventLog[]           @relation("EventDriver")
+  memberships  OrganizationMember[]
 
   @@map("users")
 }
@@ -125,33 +259,37 @@ model UserFacility {
 }
 
 model Facility {
-  id        String       @id @default(cuid())
-  name      String
-  type      FacilityType @default(PROCESSING)
-  address   String
-  lat       Float
-  lng       Float
-  deletedAt DateTime?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  name           String
+  type           FacilityType @default(PROCESSING)
+  address        String
+  lat            Float
+  lng            Float
+  deletedAt      DateTime?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  users      UserFacility[]
-  stations   Station[]
-  bins       Bin[]          @relation("CurrentFacility")
-  cycles     BinCycle[]     @relation("CycleFacility")
-  deliveries BinCycle[]     @relation("CycleDestination")
-  shipments  Shipment[]     @relation("FacilityShipments")
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  users        UserFacility[]
+  stations     Station[]
+  bins         Bin[]          @relation("CurrentFacility")
+  cycles       BinCycle[]     @relation("CycleFacility")
+  deliveries   BinCycle[]     @relation("CycleDestination")
+  shipments    Shipment[]     @relation("FacilityShipments")
 
+  @@index([organizationId])
   @@map("facilities")
 }
 
 model Station {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   facilityId String
-  token      String   @unique
-  label      String   @default("Tablet")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  token      String    @unique
+  label      String    @default("Tablet")
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   facility Facility   @relation(fields: [facilityId], references: [id])
   events   EventLog[]
@@ -161,36 +299,45 @@ model Station {
 }
 
 model BinType {
-  id           String   @id @default(cuid())
-  organType    String   @unique
-  dkHours      Int
-  urgency      Urgency
-  prefix       String
-  masterQrCode String?  @unique
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  organType      String
+  dkHours        Int
+  urgency        Urgency
+  prefix         String
+  masterQrCode   String?
+  organizationId String
+  createdAt      DateTime @default(now())
 
-  bins Bin[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bins         Bin[]
 
+  @@unique([organizationId, organType])
+  @@unique([organizationId, masterQrCode])
+  @@index([organizationId])
   @@map("bin_types")
 }
 
 model Bin {
   id                String    @id @default(cuid())
-  qrCode            String    @unique
+  qrCode            String
   binTypeId         String
   currentFacilityId String
   status            BinStatus @default(IDLE)
   deletedAt         DateTime?
+  organizationId    String
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  binType         BinType    @relation(fields: [binTypeId], references: [id])
-  currentFacility Facility   @relation("CurrentFacility", fields: [currentFacilityId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  binType         BinType      @relation(fields: [binTypeId], references: [id])
+  currentFacility Facility     @relation("CurrentFacility", fields: [currentFacilityId], references: [id])
   cycles          BinCycle[]
 
+  @@unique([organizationId, qrCode])
   @@index([status])
   @@index([currentFacilityId])
   @@index([binTypeId])
+  @@index([organizationId])
   @@map("bins")
 }
 
@@ -209,14 +356,16 @@ model BinCycle {
   complianceResult ComplianceResult?
   anchored         Boolean           @default(false)
   anchorTxHash     String?
+  organizationId   String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  bin         Bin        @relation(fields: [binId], references: [id])
-  facility    Facility   @relation("CycleFacility", fields: [facilityId], references: [id])
-  destination Facility?  @relation("CycleDestination", fields: [destinationId], references: [id])
-  driver      User?      @relation(fields: [driverId], references: [id])
-  events      EventLog[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bin          Bin          @relation(fields: [binId], references: [id])
+  facility     Facility     @relation("CycleFacility", fields: [facilityId], references: [id])
+  destination  Facility?    @relation("CycleDestination", fields: [destinationId], references: [id])
+  driver       User?        @relation(fields: [driverId], references: [id])
+  events       EventLog[]
 
   // Note: We use application-level validation (serializable transactions) to prevent
   // duplicate ACTIVE/IN_TRANSIT cycles. A DB constraint would incorrectly prevent
@@ -226,6 +375,7 @@ model BinCycle {
   @@index([status])
   @@index([deadline])
   @@index([facilityId])
+  @@index([organizationId])
   @@map("bin_cycles")
 }
 
@@ -260,33 +410,42 @@ model AnimalRegistration {
   ownerName       String
   healthCondition String?
   rawTranscript   String?
+  organizationId  String
   createdAt       DateTime @default(now())
 
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@map("animal_registrations")
 }
 
 // ─── Employee Time Tracking ───────────────────────────────────────
 
 model Employee {
-  id           String         @id @default(cuid())
-  employeeCode String         @unique
-  fullName     String
-  email        String?
-  phone        String?
-  department   String?
-  position     String?
-  status       EmployeeStatus @default(ACTIVE)
-  qrCode       String         @unique
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  employeeCode   String
+  fullName       String
+  email          String?
+  phone          String?
+  department     String?
+  position       String?
+  status         EmployeeStatus @default(ACTIVE)
+  qrCode         String
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  sessions WorkSession[]
-  events   AttendanceEvent[]
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  sessions     WorkSession[]
+  events       AttendanceEvent[]
 
   payrollLineItems  PayrollLineItem[]
   payrollExceptions PayrollException[]
 
+  @@unique([organizationId, employeeCode])
+  @@unique([organizationId, qrCode])
   @@index([status])
+  @@index([organizationId])
   @@map("employees")
 }
 
@@ -333,47 +492,55 @@ model AttendanceEvent {
 // A single inbound package recorded by staff when it arrives.
 
 model Shipment {
-  id            String            @id @default(cuid())
-  shipmentCode  String            @unique
-  supplier      String
-  reference     String?
-  contents      String?
-  quantity      Int?
-  weightKg      Float?
-  condition     ShipmentCondition @default(GOOD)
-  conditionNote String?
-  receivedBy    String?
-  expectedAt    DateTime?
-  receivedAt    DateTime          @default(now())
-  facilityId    String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  shipmentCode   String
+  supplier       String
+  reference      String?
+  contents       String?
+  quantity       Int?
+  weightKg       Float?
+  condition      ShipmentCondition @default(GOOD)
+  conditionNote  String?
+  receivedBy     String?
+  expectedAt     DateTime?
+  receivedAt     DateTime          @default(now())
+  facilityId     String?
+  organizationId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  facility Facility? @relation("FacilityShipments", fields: [facilityId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  facility     Facility?    @relation("FacilityShipments", fields: [facilityId], references: [id])
 
+  @@unique([organizationId, shipmentCode])
   @@index([receivedAt])
   @@index([supplier])
   @@index([facilityId])
+  @@index([organizationId])
   @@map("shipments")
 }
 
 model FormTemplate {
-  id              String             @id @default(cuid())
-  title           String
-  description     String?
-  stage           String
-  formType        FormType
-  schema          Json
-  sourceImageUrl  String?
-  triggerType     FormTriggerType?
-  triggerConfig   Json?
-  fillFrequency   FormFillFrequency?
-  isActive        Boolean            @default(true)
-  sortOrder       Int                @default(0)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id             String             @id @default(cuid())
+  title          String
+  description    String?
+  stage          String
+  formType       FormType
+  schema         Json
+  sourceImageUrl String?
+  triggerType    FormTriggerType?
+  triggerConfig  Json?
+  fillFrequency  FormFillFrequency?
+  isActive       Boolean            @default(true)
+  sortOrder      Int                @default(0)
+  organizationId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([stage, isActive])
+  @@index([organizationId])
   @@map("form_templates")
 }
 
@@ -400,44 +567,50 @@ enum PayrollExceptionType {
   AUTO_CLOSED
 }
 
-// Company-wide config. Single row enforced by the unique `singleton` flag.
+// Company-wide config. Single row per org enforced by the unique `organizationId`.
 model Settings {
   id                  String   @id @default(cuid())
-  singleton           Boolean  @unique @default(true)
   flatHourlyRateCents Int
   currency            String   @default("CAD")
   companyTimezone     String   @default("America/Toronto")
   managerEmail        String?
+  organizationId      String   @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@map("settings")
 }
 
 // One payroll per month. UNIQUE(period) prevents paying a month twice.
 model PayrollRun {
-  id              String           @id @default(cuid())
-  period          String           @unique // 'YYYY-MM'
-  status          PayrollRunStatus @default(DRAFT)
-  rateCents       Int // flat rate snapshot used for this run
-  currency        String           @default("CAD")
-  totalEmployees  Int              @default(0)
-  totalMinutes    Int              @default(0)
-  totalGrossCents Int              @default(0)
-  notes           String?
+  id                String           @id @default(cuid())
+  period            String // 'YYYY-MM'
+  status            PayrollRunStatus @default(DRAFT)
+  rateCents         Int // flat rate snapshot used for this run
+  currency          String           @default("CAD")
+  totalEmployees    Int              @default(0)
+  totalMinutes      Int              @default(0)
+  totalGrossCents   Int              @default(0)
+  notes             String?
   computedAt        DateTime? // when the run's line items were calculated
   approvedAt        DateTime?
   approvedBy        String? // who approved (manager identifier)
   approvalCodeHash  String? // hashed one-time 2FA approval code
   approvalExpiresAt DateTime? // expiry for the approval code
-  paidAt          DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  paidAt            DateTime?
+  organizationId    String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  lineItems  PayrollLineItem[]
-  exceptions PayrollException[]
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  lineItems    PayrollLineItem[]
+  exceptions   PayrollException[]
 
+  @@unique([organizationId, period])
   @@index([status])
+  @@index([organizationId])
   @@map("payroll_runs")
 }
 

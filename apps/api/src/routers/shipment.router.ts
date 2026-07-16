@@ -1,4 +1,4 @@
-import { router, publicProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure, stationOrgProcedure, requireModule } from '../trpc/trpc.js';
 import {
     shipmentRegisterSchema,
     shipmentGetByIdSchema,
@@ -8,28 +8,33 @@ import { shipmentService } from '../services/shipment.service.js';
 
 export const shipmentRouter = router({
     /** Record a new inbound supplier shipment on arrival */
-    register: publicProcedure
+    register: stationOrgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentRegisterSchema)
-        .mutation(async ({ input }) => {
-            return shipmentService.register(input);
+        .mutation(async ({ input, ctx }) => {
+            return shipmentService.register(input, ctx.orgId);
         }),
 
     /** List shipments (optionally filtered by condition) */
-    list: publicProcedure
+    list: orgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentListSchema)
-        .query(async ({ input }) => {
-            return shipmentService.list(input);
+        .query(async ({ input, ctx }) => {
+            return shipmentService.list(ctx.orgId, input);
         }),
 
     /** Fetch a single shipment by id */
-    getById: publicProcedure
+    getById: orgProcedure
+        .use(requireModule('SHIPMENTS'))
         .input(shipmentGetByIdSchema)
-        .query(async ({ input }) => {
-            return shipmentService.getById(input.id);
+        .query(async ({ input, ctx }) => {
+            return shipmentService.getById(ctx.orgId, input.id);
         }),
 
-    /** Public id/name list of facilities for the arrival form dropdown */
-    facilityOptions: publicProcedure.query(async () => {
-        return shipmentService.facilityOptions();
-    }),
+    /** Id/name list of facilities for the arrival form dropdown (station-scoped to the station's org) */
+    facilityOptions: stationOrgProcedure
+        .use(requireModule('SHIPMENTS'))
+        .query(async ({ ctx }) => {
+            return shipmentService.facilityOptions(ctx.orgId);
+        }),
 });

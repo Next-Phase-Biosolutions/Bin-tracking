@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ClipboardList, CheckSquare, Grid3x3, TableProperties, AlertCircle, Loader2, PlusCircle, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { trpc } from '../../lib/trpc';
+import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
 import { FormRenderer } from './FormRenderer';
 import { FormBuilder } from './FormBuilder';
 
-const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
+// form.listByStage requires stationProcedure — scoped to this one call.
+const stationClient = createStationTRPCClient(STATION_TOKEN);
+
 const STAGE = import.meta.env.VITE_STATION_STAGE || 'ALL';
 
 const typeConfig: Record<FormTypeValue, { label: string; Icon: React.ElementType; color: string }> = {
@@ -48,13 +51,12 @@ export function FormListPage() {
     const [openForm, setOpenForm] = useState<FormTemplate | null>(null);
     const [showBuilder, setShowBuilder] = useState(false);
 
-    const { data: forms, isLoading, error } = trpc.form.listByStage.useQuery(
-        { stage: STAGE },
-        {
-            staleTime: 5 * 60 * 1000,
-            retry: 2,
-        },
-    );
+    const { data: forms, isLoading, error } = useQuery({
+        queryKey: ['form.listByStage', STAGE],
+        queryFn: () => stationClient.form.listByStage.query({ stage: STAGE }),
+        staleTime: 5 * 60 * 1000,
+        retry: 2,
+    });
 
     if (showBuilder) {
         return <FormBuilder onBack={() => setShowBuilder(false)} />;
