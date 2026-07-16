@@ -1,29 +1,70 @@
--- DropIndex
-DROP INDEX "bin_types_masterQrCode_key";
+-- Backfill: this migration's SET NOT NULL statements below fail against any
+-- database with pre-existing rows (production already has them — the
+-- "no live data yet" assumption from the additive migration's era is stale).
+-- Assign every legacy row to a "Default Organization" before enforcing the
+-- constraint, mirroring packages/db/src/backfill-org.ts's tenant-table loop
+-- so `migrate deploy` alone is sufficient on any environment. Idempotent:
+-- ON CONFLICT DO NOTHING + "IS NULL" guards make re-runs a no-op, and this
+-- is a no-op on empty databases (CI, fresh dev) since there are no rows to touch.
+DO $$
+DECLARE
+  default_org_id TEXT;
+BEGIN
+  INSERT INTO "organizations" ("id", "name", "slug", "createdAt", "updatedAt")
+  VALUES (gen_random_uuid()::text, 'Default Organization', 'default', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  ON CONFLICT ("slug") DO NOTHING;
+
+  SELECT "id" INTO default_org_id FROM "organizations" WHERE "slug" = 'default';
+
+  -- Legacy org keeps full access, matching backfill-org.ts (requireModule
+  -- denies orgs without an enabled module/subscription otherwise).
+  INSERT INTO "subscriptions" ("id", "orgId", "plan", "status", "createdAt", "updatedAt")
+  VALUES (gen_random_uuid()::text, default_org_id, 'ENTERPRISE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  ON CONFLICT ("orgId") DO NOTHING;
+
+  UPDATE "facilities" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "bin_types" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "bins" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "bin_cycles" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "employees" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "shipments" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "form_templates" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "animal_registrations" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "settings" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+  UPDATE "payroll_runs" SET "organizationId" = default_org_id WHERE "organizationId" IS NULL;
+END $$;
 
 -- DropIndex
-DROP INDEX "bin_types_organType_key";
+-- IF EXISTS: production's index set has drifted from migration history
+-- (these legacy unique indexes are already gone there), so a plain DROP
+-- INDEX fails with "does not exist" on that environment. IF EXISTS makes
+-- the statement work regardless of which environment's actual index state
+-- it runs against.
+DROP INDEX IF EXISTS "bin_types_masterQrCode_key";
 
 -- DropIndex
-DROP INDEX "bins_qrCode_key";
+DROP INDEX IF EXISTS "bin_types_organType_key";
 
 -- DropIndex
-DROP INDEX "employees_employeeCode_key";
+DROP INDEX IF EXISTS "bins_qrCode_key";
 
 -- DropIndex
-DROP INDEX "employees_qrCode_key";
+DROP INDEX IF EXISTS "employees_employeeCode_key";
 
 -- DropIndex
-DROP INDEX "payroll_runs_period_key";
+DROP INDEX IF EXISTS "employees_qrCode_key";
 
 -- DropIndex
-DROP INDEX "settings_organizationId_idx";
+DROP INDEX IF EXISTS "payroll_runs_period_key";
 
 -- DropIndex
-DROP INDEX "settings_singleton_key";
+DROP INDEX IF EXISTS "settings_organizationId_idx";
 
 -- DropIndex
-DROP INDEX "shipments_shipmentCode_key";
+DROP INDEX IF EXISTS "settings_singleton_key";
+
+-- DropIndex
+DROP INDEX IF EXISTS "shipments_shipmentCode_key";
 
 -- AlterTable
 ALTER TABLE "animal_registrations" ALTER COLUMN "organizationId" SET NOT NULL;
