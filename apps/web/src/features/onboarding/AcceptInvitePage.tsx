@@ -12,7 +12,8 @@ import { trpc } from '../../lib/trpc';
  * fresh signup for someone new to Bin Tracker) and then call
  * invitation.accept, which resolves org + role from the token server-side.
  *
- * Follows SignupPage/LoginPage's Supabase-then-tRPC-mutation shape (Task 18).
+ * Its own self-contained login/signup form (not the marketing site's) since
+ * the invite token has to be consumed in the same step as authenticating.
  */
 export default function AcceptInvitePage() {
     const { token } = useParams<{ token: string }>();

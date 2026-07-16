@@ -1,15 +1,23 @@
 [build]
-  # Tell Netlify to generate the database client first via pnpm, then build the frontend
-  command = "pnpm db:generate && pnpm --filter=@bin-tracker/web build"
-  
-  # Tell Netlify where the compiled frontend files end up
-  publish = "apps/web/dist"
-  
-  # Tell Netlify where to run the build command from
+  # Single site, single domain: apps/marketing owns "/" (the public site,
+  # login/signup), apps/web owns "/app/*" (the authenticated tool). Build
+  # both, then assemble one combined publish directory — marketing's build
+  # at the root, web's build nested under app/.
+  command = "pnpm db:generate && pnpm --filter=@bin-tracker/marketing build && pnpm --filter=@bin-tracker/web build && rm -rf dist && mkdir -p dist/app && cp -r apps/marketing/dist/. dist/ && cp -r apps/web/dist/. dist/app/"
+
+  publish = "dist"
+
   base = "/"
 
 [[redirects]]
-  # This ensures React Router handles all page refreshing correctly
+  # apps/web's client-side routes — must come before the marketing catch-all
+  # below, since Netlify matches redirects top-to-bottom, first match wins.
+  from = "/app/*"
+  to = "/app/index.html"
+  status = 200
+
+[[redirects]]
+  # apps/marketing's client-side routes.
   from = "/*"
   to = "/index.html"
   status = 200

@@ -172,8 +172,8 @@ export async function createCheckoutSession(orgId: string, plan: Plan): Promise<
         mode: 'subscription',
         customer: subscription?.stripeCustomerId ?? undefined,
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${appUrl}/settings/billing?checkout=success`,
-        cancel_url: `${appUrl}/settings/billing?checkout=cancelled`,
+        success_url: `${appUrl}/app/settings/billing?checkout=success`,
+        cancel_url: `${appUrl}/app/settings/billing?checkout=cancelled`,
         metadata: { orgId },
         subscription_data: { metadata: { orgId } },
     });
@@ -223,7 +223,7 @@ export async function createPortalSession(orgId: string): Promise<{ url: string 
 
     const session = await getStripe().billingPortal.sessions.create({
         customer: subscription.stripeCustomerId,
-        return_url: `${appUrl}/settings/billing`,
+        return_url: `${appUrl}/app/settings/billing`,
     });
     return { url: session.url };
 }

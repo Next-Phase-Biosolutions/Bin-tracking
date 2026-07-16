@@ -14,35 +14,40 @@ import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage'
 import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
-import SignupPage from './features/onboarding/SignupPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import AcceptInvitePage from './features/onboarding/AcceptInvitePage';
-import LoginPage from './features/auth/LoginPage';
 import AuthCallbackPage from './features/auth/AuthCallbackPage';
 import { AppShellLayout } from './components/layout/AppShellLayout';
 import { useAuth } from './context/AuthContext';
+import { MARKETING_URL } from './lib/marketingUrl';
 
 /**
- * The marketing pages (home, about, solutions, process) now live in the
- * separate apps/marketing site. The app's root route just routes an
- * unauthenticated visitor to /login and an authenticated one to their
- * dashboard.
+ * Login and signup live on the marketing site now — this app is post-auth
+ * only. The root route sends an authenticated visitor to their dashboard;
+ * an unauthenticated one is bounced out to the marketing site's real login,
+ * not an in-app form (there isn't one anymore).
  */
 function RootRedirect() {
     const { user, loading } = useAuth();
     if (loading) return null;
-    return <Navigate to={user ? '/app/dashboard' : '/login'} replace />;
+    if (!user) {
+        window.location.href = `${MARKETING_URL}/login`;
+        return null;
+    }
+    return <Navigate to="/app/dashboard" replace />;
 }
 
 export function App() {
     return (
         <Routes>
+            {/* Both "/" (local standalone dev, port 3000 root) and "/app"
+                (production, this bundle is served from /app/* under the
+                marketing domain) land on the same auth-based redirect. */}
             <Route path="/" element={<RootRedirect />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/onboarding" element={<OnboardingWizard />} />
-            <Route path="/invite/:token" element={<AcceptInvitePage />} />
+            <Route path="/app" element={<RootRedirect />} />
+            <Route path="/app/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/app/onboarding" element={<OnboardingWizard />} />
+            <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
 
             {/* Station-token kiosk routes: unattended facility-floor devices
                 authenticate via STATION_TOKEN, not a user session, so they
@@ -62,8 +67,8 @@ export function App() {
                 <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
                 <Route path="/app/forms/new" element={<FormBuilderPage />} />
                 <Route path="/app/forms/import" element={<FormImportPage />} />
-                <Route path="/admin/orgs" element={<OrgModulesPage />} />
-                <Route path="/settings/billing" element={<BillingSettingsPage />} />
+                <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
+                <Route path="/app/settings/billing" element={<BillingSettingsPage />} />
             </Route>
         </Routes>
     );
