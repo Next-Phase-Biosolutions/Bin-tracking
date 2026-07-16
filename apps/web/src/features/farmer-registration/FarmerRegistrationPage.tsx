@@ -6,6 +6,8 @@ import { VoiceRecorder } from './VoiceRecorder';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
 
 // farmer.transcribe/register both require stationProcedure — scoped to
 // these two calls rather than a page-level auth flag.
@@ -72,14 +74,14 @@ export default function FarmerRegistrationPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
-                Loading…
+            <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
+                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
             </div>
         );
     }
     if (!hasModule('ANIMAL_INTAKE')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
                 <UpgradePrompt module="ANIMAL_INTAKE" />
             </div>
         );
@@ -120,22 +122,22 @@ export default function FarmerRegistrationPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-5xl">
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">Farmer Animal Registration</h1>
-                    <p className="mt-1 text-sm text-gray-600">
-                        Record your answers by voice — the form will fill automatically.
-                    </p>
-                </div>
+        <div className="min-h-screen bg-canvas p-6">
+            <div aria-hidden className="pointer-events-none fixed inset-0 data-grid-bg opacity-40" />
+            <div className="relative mx-auto max-w-5xl">
+                <PageHeader
+                    title="Farmer Animal Registration"
+                    subtitle="Record your answers by voice — the form will fill automatically."
+                    icon={<Icon name="cow" width={22} height={22} />}
+                />
 
                 {transcribeError && (
-                    <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="mb-4 rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">
                         {transcribeError}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                     {/* Left — Form */}
                     <AnimalForm
                         fields={formFields}

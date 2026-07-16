@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Package, PackagePlus, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
-
-const ACCENT = '#043F2E';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 
 function formatDateTime(value: string | Date): string {
     return new Date(value).toLocaleString([], {
@@ -21,15 +21,15 @@ export default function ShipmentsDashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
-                Loading…
+            <div className="flex min-h-[60vh] items-center justify-center text-muted">
+                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
             </div>
         );
     }
 
     if (!hasModule('SHIPMENTS')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-[60vh] items-center justify-center">
                 <UpgradePrompt module="SHIPMENTS" />
             </div>
         );
@@ -48,129 +48,77 @@ export default function ShipmentsDashboardPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-6xl">
-                <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Supplier Shipments</h1>
-                        <p className="mt-1 text-sm text-gray-600">Inbound packages recorded on arrival</p>
-                    </div>
-                    <Link
-                        to="/app/shipments/new"
-                        className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors"
-                        style={{ backgroundColor: ACCENT }}
-                    >
-                        <PackagePlus className="h-4 w-4" /> Record Shipment
+        <div className="mx-auto max-w-6xl">
+            <PageHeader
+                title="Supplier Shipments"
+                subtitle="Inbound packages recorded on arrival."
+                icon={<Icon name="box" width={22} height={22} />}
+                actions={
+                    <Link to="/app/shipments/new">
+                        <Button variant="rust">
+                            <Icon name="box" width={15} height={15} /> Record Shipment
+                        </Button>
                     </Link>
-                </header>
+                }
+            />
 
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard icon={<Package className="h-6 w-6" />} label="Total shipments" value={String(totals.count)} />
-                    <StatCard icon={<Boxes className="h-6 w-6" />} label="Total items" value={String(totals.items)} />
-                    <StatCard
-                        icon={<AlertTriangle className="h-6 w-6" />}
-                        label="Damaged"
-                        value={String(totals.damaged)}
-                        danger={totals.damaged > 0}
-                    />
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-                        <h2 className="font-semibold text-gray-900">All shipments</h2>
-                        <button
-                            onClick={() => void listQuery.refetch()}
-                            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
-                        >
-                            <RefreshCw className={`h-4 w-4 ${listQuery.isFetching ? 'animate-spin' : ''}`} />
-                            Refresh
-                        </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="text-xs uppercase tracking-wider text-gray-400">
-                                <tr>
-                                    <th className="px-5 py-3">Shipment</th>
-                                    <th className="px-5 py-3">Supplier</th>
-                                    <th className="px-5 py-3">Facility</th>
-                                    <th className="px-5 py-3 text-right">Qty</th>
-                                    <th className="px-5 py-3">Received</th>
-                                    <th className="px-5 py-3 text-right">Condition</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {listQuery.isLoading ? (
-                                    <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400">Loading…</td></tr>
-                                ) : rows.length === 0 ? (
-                                    <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400">No shipments recorded yet.</td></tr>
-                                ) : (
-                                    rows.map((s) => (
-                                        <tr key={s.id} className="cursor-pointer hover:bg-gray-50">
-                                            <td className="px-5 py-3">
-                                                <Link to={`/app/shipments/${s.id}`} className="block">
-                                                    <span className="font-mono text-xs text-gray-500">{s.shipmentCode}</span>
-                                                    {s.reference && (
-                                                        <span className="block text-xs text-gray-400">{s.reference}</span>
-                                                    )}
-                                                </Link>
-                                            </td>
-                                            <td className="px-5 py-3 font-medium text-gray-900">
-                                                <Link to={`/app/shipments/${s.id}`} className="block">{s.supplier}</Link>
-                                            </td>
-                                            <td className="px-5 py-3 text-gray-600">{s.facilityName ?? '—'}</td>
-                                            <td className="px-5 py-3 text-right text-gray-600">{s.quantity ?? '—'}</td>
-                                            <td className="px-5 py-3 text-gray-600">{formatDateTime(s.receivedAt)}</td>
-                                            <td className="px-5 py-3 text-right">
-                                                <ConditionBadge condition={s.condition} />
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Stat label="total_shipments" value={totals.count} icon={<Icon name="box" width={18} height={18} />} />
+                <Stat label="total_items" value={totals.items} icon={<Icon name="grid" width={18} height={18} />} />
+                <Stat label="damaged" value={totals.damaged} icon={<Icon name="thermo" width={18} height={18} />} accent={totals.damaged > 0} />
             </div>
+
+            <Card className="overflow-hidden">
+                <div className="flex items-center justify-between border-b border-edge/60 px-5 py-3.5">
+                    <h2 className="font-display font-bold text-olive-deep">All shipments</h2>
+                    <button onClick={() => void listQuery.refetch()} className="flex items-center gap-1.5 text-sm text-muted hover:text-olive-deep">
+                        <Icon name="refresh" width={15} height={15} className={listQuery.isFetching ? 'animate-spin' : ''} />
+                        Refresh
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-edge/60">
+                                {['Shipment', 'Supplier', 'Facility', 'Qty', 'Received', 'Condition'].map((h) => (
+                                    <th key={h} className={`px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted ${h === 'Qty' || h === 'Condition' ? 'text-right' : ''}`}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-edge/40">
+                            {listQuery.isLoading ? (
+                                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">Loading…</td></tr>
+                            ) : rows.length === 0 ? (
+                                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No shipments recorded yet.</td></tr>
+                            ) : (
+                                rows.map((s) => (
+                                    <tr key={s.id} className="cursor-pointer hover:bg-bone-light/40">
+                                        <td className="px-5 py-3">
+                                            <Link to={`/app/shipments/${s.id}`} className="block">
+                                                <span className="font-mono text-xs text-muted">{s.shipmentCode}</span>
+                                                {s.reference && <span className="block text-xs text-muted/70">{s.reference}</span>}
+                                            </Link>
+                                        </td>
+                                        <td className="px-5 py-3 font-medium text-ink">
+                                            <Link to={`/app/shipments/${s.id}`} className="block">{s.supplier}</Link>
+                                        </td>
+                                        <td className="px-5 py-3 text-muted">{s.facilityName ?? '—'}</td>
+                                        <td className="px-5 py-3 text-right text-muted">{s.quantity ?? '—'}</td>
+                                        <td className="px-5 py-3 text-muted">{formatDateTime(s.receivedAt)}</td>
+                                        <td className="px-5 py-3 text-right">
+                                            <ConditionBadge condition={s.condition} />
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
         </div>
     );
 }
 
 export function ConditionBadge({ condition }: { condition: 'GOOD' | 'DAMAGED' }) {
-    if (condition === 'DAMAGED') {
-        return (
-            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                Damaged
-            </span>
-        );
-    }
-    return (
-        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-            Good
-        </span>
-    );
-}
-
-interface StatCardProps {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-    danger?: boolean;
-}
-
-function StatCard({ icon, label, value, danger }: StatCardProps) {
-    return (
-        <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div
-                className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                    danger ? 'bg-red-100 text-red-600' : 'bg-[#043F2E]/10 text-[#043F2E]'
-                }`}
-            >
-                {icon}
-            </div>
-            <div>
-                <p className="text-sm text-gray-500">{label}</p>
-                <p className="text-2xl font-bold text-gray-900">{value}</p>
-            </div>
-        </div>
-    );
+    return <Badge tone={condition === 'DAMAGED' ? 'alert' : 'good'}>{condition === 'DAMAGED' ? 'Damaged' : 'Good'}</Badge>;
 }

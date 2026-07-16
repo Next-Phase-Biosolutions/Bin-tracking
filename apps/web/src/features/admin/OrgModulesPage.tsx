@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 import { ALL_MODULE_KEYS } from '@bin-tracker/types';
 import type { ModuleKey } from '@bin-tracker/types';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card } from '../../components/ui/primitives';
 
 type OrgRow = RouterOutputs['admin']['listOrganizations'][number];
 
@@ -75,80 +78,77 @@ function OrgModulesTable() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-6xl">
-                <header className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">Organization Modules</h1>
-                    <p className="mt-1 text-sm text-gray-600">
-                        Assign or revoke individual modules per organization, independent of their plan.
-                    </p>
-                </header>
+        <div className="mx-auto max-w-6xl">
+            <PageHeader
+                title="Organization Modules"
+                subtitle="Assign or revoke individual modules per organization, independent of their plan."
+                icon={<Icon name="grid" width={22} height={22} />}
+            />
 
-                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="text-xs uppercase tracking-wider text-gray-400">
+            <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-edge/60">
+                                <th className="px-5 py-3 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Organization</th>
+                                <th className="px-5 py-3 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Plan</th>
+                                <th className="px-5 py-3 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Status</th>
+                                {ALL_MODULE_KEYS.map((key) => (
+                                    <th key={key} className="px-3 py-3 text-center font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">
+                                        {MODULE_LABELS[key]}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-edge/40">
+                            {listQuery.isLoading ? (
                                 <tr>
-                                    <th className="px-5 py-3">Organization</th>
-                                    <th className="px-5 py-3">Plan</th>
-                                    <th className="px-5 py-3">Status</th>
-                                    {ALL_MODULE_KEYS.map((key) => (
-                                        <th key={key} className="px-3 py-3 text-center">
-                                            {MODULE_LABELS[key]}
-                                        </th>
-                                    ))}
+                                    <td colSpan={columnCount} className="px-5 py-8 text-center text-muted">
+                                        Loading…
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {listQuery.isLoading ? (
-                                    <tr>
-                                        <td colSpan={columnCount} className="px-5 py-8 text-center text-gray-400">
-                                            Loading…
-                                        </td>
+                            ) : listQuery.isError ? (
+                                <tr>
+                                    <td colSpan={columnCount} className="px-5 py-8 text-center text-rust">
+                                        {listQuery.error.message}
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={columnCount} className="px-5 py-8 text-center text-muted">
+                                        No organizations yet.
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((org) => (
+                                    <tr key={org.id}>
+                                        <td className="px-5 py-3 font-medium text-ink">{org.name}</td>
+                                        <td className="px-5 py-3 text-muted">{org.plan}</td>
+                                        <td className="px-5 py-3 text-muted">{org.status}</td>
+                                        {ALL_MODULE_KEYS.map((key) => {
+                                            const enabled = org.modules.find((m) => m.module === key)?.enabled ?? false;
+                                            const cellKey = `${org.id}:${key}`;
+                                            const isPending = pendingKey === cellKey && toggleMutation.isPending;
+                                            return (
+                                                <td key={key} className="px-3 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={enabled}
+                                                        disabled={isPending}
+                                                        onChange={() => handleToggle(org, key, enabled)}
+                                                        aria-label={`${MODULE_LABELS[key]} for ${org.name}`}
+                                                        className="h-4 w-4 rounded border-edge text-rust focus:ring-rust disabled:opacity-50"
+                                                    />
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
-                                ) : listQuery.isError ? (
-                                    <tr>
-                                        <td colSpan={columnCount} className="px-5 py-8 text-center text-red-600">
-                                            {listQuery.error.message}
-                                        </td>
-                                    </tr>
-                                ) : rows.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={columnCount} className="px-5 py-8 text-center text-gray-400">
-                                            No organizations yet.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    rows.map((org) => (
-                                        <tr key={org.id}>
-                                            <td className="px-5 py-3 font-medium text-gray-900">{org.name}</td>
-                                            <td className="px-5 py-3 text-gray-600">{org.plan}</td>
-                                            <td className="px-5 py-3 text-gray-600">{org.status}</td>
-                                            {ALL_MODULE_KEYS.map((key) => {
-                                                const enabled = org.modules.find((m) => m.module === key)?.enabled ?? false;
-                                                const cellKey = `${org.id}:${key}`;
-                                                const isPending = pendingKey === cellKey && toggleMutation.isPending;
-                                                return (
-                                                    <td key={key} className="px-3 py-3 text-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={enabled}
-                                                            disabled={isPending}
-                                                            onChange={() => handleToggle(org, key, enabled)}
-                                                            aria-label={`${MODULE_LABELS[key]} for ${org.name}`}
-                                                            className="h-4 w-4 rounded border-gray-300 text-[#3d5aa8] focus:ring-[#3d5aa8] disabled:opacity-50"
-                                                        />
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }
@@ -164,5 +164,5 @@ function withModuleOverride(org: OrgRow, moduleKey: ModuleKey, enabled: boolean)
 }
 
 function CenteredMessage({ children }: { children: ReactNode }) {
-    return <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">{children}</div>;
+    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted">{children}</div>;
 }

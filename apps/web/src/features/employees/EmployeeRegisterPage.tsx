@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { Link } from 'react-router-dom';
-import { UserPlus, Download, Printer, CheckCircle2, IdCard } from 'lucide-react';
+import { motion } from 'motion/react';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Button } from '../../components/ui/primitives';
 
 type Employee = RouterOutputs['employee']['register'];
 
@@ -36,15 +39,15 @@ export default function EmployeeRegisterPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
-                Loading…
+            <div className="flex min-h-[60vh] items-center justify-center text-muted">
+                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
             </div>
         );
     }
 
     if (!hasModule('WORKFORCE')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-[60vh] items-center justify-center">
                 <UpgradePrompt module="WORKFORCE" />
             </div>
         );
@@ -73,30 +76,26 @@ export default function EmployeeRegisterPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mx-auto max-w-2xl">
-                <header className="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Employee Registration</h1>
-                        <p className="mt-1 text-sm text-gray-600">
-                            Fill in the employee details once to generate their personal QR badge.
-                        </p>
-                    </div>
-                    <Link
-                        to="/app/timesheet"
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                    >
-                        Timesheet
+        <div className="mx-auto max-w-2xl">
+            <PageHeader
+                title="Employee Registration"
+                subtitle="Fill in the employee details once to generate their personal QR badge."
+                icon={<Icon name="users" width={22} height={22} />}
+                actions={
+                    <Link to="/app/timesheet">
+                        <Button variant="secondary">
+                            <Icon name="clock" width={15} height={15} />
+                            Timesheet
+                        </Button>
                     </Link>
-                </header>
+                }
+            />
 
-                {registered ? (
-                    <EmployeeBadge employee={registered} onRegisterAnother={handleRegisterAnother} />
-                ) : (
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
-                    >
+            {registered ? (
+                <EmployeeBadge employee={registered} onRegisterAnother={handleRegisterAnother} />
+            ) : (
+                <Card as="section" className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <Field
                             label="Full name"
                             required
@@ -133,7 +132,7 @@ export default function EmployeeRegisterPage() {
                         </div>
 
                         {registerMutation.isError && (
-                            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <div className="rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">
                                 {registerMutation.error.message}
                             </div>
                         )}
@@ -141,14 +140,14 @@ export default function EmployeeRegisterPage() {
                         <button
                             type="submit"
                             disabled={registerMutation.isPending || !form.fullName.trim()}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3d5aa8] py-3.5 text-lg font-bold text-white transition-colors hover:bg-[#2d4280] disabled:opacity-50"
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-rust py-3.5 text-sm font-semibold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
                         >
-                            <UserPlus className="h-5 w-5" />
-                            {registerMutation.isPending ? 'Registering...' : 'Register & Generate QR'}
+                            <Icon name="badge" width={16} height={16} />
+                            {registerMutation.isPending ? 'Registering…' : 'Register & Generate QR'}
                         </button>
                     </form>
-                )}
-            </div>
+                </Card>
+            )}
         </div>
     );
 }
@@ -165,9 +164,9 @@ interface FieldProps {
 function Field({ label, value, onChange, type = 'text', placeholder, required }: FieldProps) {
     return (
         <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
+            <span className="mb-1.5 block text-xs font-semibold text-olive-deep">
                 {label}
-                {required && <span className="text-red-500"> *</span>}
+                {required && <span className="text-rust"> *</span>}
             </span>
             <input
                 type={type}
@@ -175,7 +174,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, required }:
                 required={required}
                 placeholder={placeholder}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                className="w-full rounded-xl border border-edge bg-white px-3.5 py-2.5 text-sm text-ink focus:border-rust focus:outline-none"
             />
         </label>
     );
@@ -248,75 +247,72 @@ function EmployeeBadge({ employee, onRegisterAnother }: EmployeeBadgeProps) {
     };
 
     return (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 text-green-600">
-                <CheckCircle2 className="h-6 w-6" />
-                <span className="font-semibold">Employee registered successfully</span>
-            </div>
-
-            <div className="flex flex-col items-center text-center">
-                <p className="text-xl font-bold text-gray-900">{employee.fullName}</p>
-                <p className="mt-1 flex items-center gap-1 font-mono text-sm text-gray-500">
-                    <IdCard className="h-4 w-4" /> {employee.employeeCode}
-                </p>
-
-                <div className="my-6 flex h-[280px] w-[280px] items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white">
-                    {qrError ? (
-                        <span className="px-4 text-sm text-red-600">{qrError}</span>
-                    ) : qrDataUrl ? (
-                        <img src={qrDataUrl} alt={`QR badge for ${employee.fullName}`} className="h-full w-full" />
-                    ) : (
-                        <span className="text-sm text-gray-400">Generating QR…</span>
-                    )}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="p-6">
+                <div className="mb-4 flex items-center gap-2 text-live">
+                    <Icon name="check" width={20} height={20} />
+                    <span className="font-semibold">Employee registered successfully</span>
                 </div>
 
-                {/* Code 128 barcode for handheld scanners (e.g. Inateck BCST-70) */}
-                <div className="mb-2 w-full max-w-sm">
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-400">
-                        Barcode (handheld scanner)
+                <div className="flex flex-col items-center text-center">
+                    <p className="font-display text-xl font-extrabold text-olive-deep">{employee.fullName}</p>
+                    <p className="mt-1 flex items-center gap-1 font-mono text-sm text-muted">
+                        <Icon name="badge" width={14} height={14} /> {employee.employeeCode}
                     </p>
-                    <div className="flex w-full items-center justify-center overflow-x-auto rounded-xl border border-gray-200 bg-white p-3">
-                        <canvas ref={barcodeRef} className="max-w-full" />
-                    </div>
-                </div>
 
-                <div className="flex w-full max-w-sm flex-wrap gap-3">
-                    <a
-                        href={qrDataUrl ?? '#'}
-                        download={`${employee.employeeCode}-qr.png`}
-                        aria-disabled={!qrDataUrl}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#3d5aa8] py-3 font-semibold text-white transition-colors hover:bg-[#2d4280] ${
-                            qrDataUrl ? '' : 'pointer-events-none opacity-50'
-                        }`}
-                    >
-                        <Download className="h-5 w-5" /> QR
-                    </a>
-                    <a
-                        href={barcodeDataUrl ?? '#'}
-                        download={`${employee.employeeCode}-barcode.png`}
-                        aria-disabled={!barcodeDataUrl}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-3 font-semibold text-white transition-colors hover:bg-[#032f22] ${
-                            barcodeDataUrl ? '' : 'pointer-events-none opacity-50'
-                        }`}
-                    >
-                        <Download className="h-5 w-5" /> Barcode
-                    </a>
-                    <button
-                        onClick={handlePrint}
-                        disabled={!qrDataUrl}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                    >
-                        <Printer className="h-5 w-5" /> Print
+                    <div className="my-6 flex h-70 w-70 items-center justify-center rounded-xl border-2 border-dashed border-edge bg-white">
+                        {qrError ? (
+                            <span className="px-4 text-sm text-rust">{qrError}</span>
+                        ) : qrDataUrl ? (
+                            <img src={qrDataUrl} alt={`QR badge for ${employee.fullName}`} className="h-full w-full" />
+                        ) : (
+                            <span className="text-sm text-muted">Generating QR…</span>
+                        )}
+                    </div>
+
+                    {/* Code 128 barcode for handheld scanners (e.g. Inateck BCST-70). */}
+                    <div className="mb-2 w-full max-w-sm">
+                        <p className="kicker mb-1">Barcode (handheld scanner)</p>
+                        <div className="flex w-full items-center justify-center overflow-x-auto rounded-xl border border-edge bg-white p-3">
+                            <canvas ref={barcodeRef} className="max-w-full" />
+                        </div>
+                    </div>
+
+                    <div className="flex w-full max-w-sm flex-wrap gap-3">
+                        <a
+                            href={qrDataUrl ?? '#'}
+                            download={`${employee.employeeCode}-qr.png`}
+                            aria-disabled={!qrDataUrl}
+                            className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-rust py-3 font-semibold text-canvas transition-colors hover:bg-rust/90 ${
+                                qrDataUrl ? '' : 'pointer-events-none opacity-50'
+                            }`}
+                        >
+                            <Icon name="upload" width={18} height={18} className="rotate-180" /> QR
+                        </a>
+                        <a
+                            href={barcodeDataUrl ?? '#'}
+                            download={`${employee.employeeCode}-barcode.png`}
+                            aria-disabled={!barcodeDataUrl}
+                            className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-olive-deep py-3 font-semibold text-bone-light transition-colors hover:bg-olive-deep/90 ${
+                                barcodeDataUrl ? '' : 'pointer-events-none opacity-50'
+                            }`}
+                        >
+                            <Icon name="upload" width={18} height={18} className="rotate-180" /> Barcode
+                        </a>
+                        <button
+                            onClick={handlePrint}
+                            disabled={!qrDataUrl}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-edge bg-white py-3 font-semibold text-olive-deep transition-colors hover:bg-bone-light disabled:opacity-50"
+                        >
+                            <Icon name="form" width={18} height={18} /> Print
+                        </button>
+                    </div>
+
+                    <button onClick={onRegisterAnother} className="mt-4 text-sm font-medium text-rust hover:underline">
+                        Register another employee
                     </button>
                 </div>
-
-                <button
-                    onClick={onRegisterAnother}
-                    className="mt-4 text-sm font-medium text-[#3d5aa8] hover:underline"
-                >
-                    Register another employee
-                </button>
-            </div>
-        </div>
+            </Card>
+        </motion.div>
     );
 }

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ScanLine, LogIn, LogOut, AlertCircle, ShieldCheck, Camera, Barcode } from 'lucide-react';
-import { QRScanner } from '../../components/QRScanner';
 import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Button } from '../../components/ui/primitives';
+import { CameraScanner } from '../../components/app/CameraScanner';
 
 // attendance.scan requires stationProcedure — scoped to this one call so it
 // doesn't collide with any bearer-gated call elsewhere on the page.
@@ -74,14 +75,14 @@ export default function GuardScannerPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">
-                Loading…
+            <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
+                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
             </div>
         );
     }
     if (!hasModule('WORKFORCE')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
                 <UpgradePrompt module="WORKFORCE" />
             </div>
         );
@@ -90,57 +91,53 @@ export default function GuardScannerPage() {
     const isCheckIn = result?.action === 'CHECK_IN';
 
     return (
-        <div className="flex min-h-screen flex-col bg-gray-50 p-4 md:p-8">
-            <header className="mb-6 flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="flex min-h-screen flex-col bg-canvas p-4 md:p-8">
+            <div aria-hidden className="pointer-events-none fixed inset-0 data-grid-bg opacity-40" />
+            <header className="relative mb-6 flex items-center justify-between rounded-2xl border border-edge/70 bg-white p-4 shadow-card">
                 <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-[#043F2E] p-2">
-                        <ShieldCheck className="h-6 w-6 text-white" />
-                    </div>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-olive-deep text-bone-light">
+                        <Icon name="badge" width={22} height={22} />
+                    </span>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900">Guard Scanner</h1>
-                        <p className="text-sm text-gray-500">Scan an employee badge to check in or out</p>
+                        <h1 className="font-display text-lg font-extrabold text-olive-deep">Guard Scanner</h1>
+                        <p className="text-sm text-muted">Scan an employee badge to check in or out</p>
                     </div>
                 </div>
-                <Link
-                    to="/app/timesheet"
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                >
-                    Timesheet
+                <Link to="/app/timesheet">
+                    <Button variant="secondary">
+                        <Icon name="clock" width={15} height={15} /> Timesheet
+                    </Button>
                 </Link>
             </header>
 
-            <main className="mx-auto w-full max-w-md flex-1">
+            <main className="relative mx-auto w-full max-w-md flex-1">
                 {showScanPanel && (
-                    <div className="flex flex-col items-center rounded-3xl border border-gray-100 bg-white p-6 text-center shadow-sm">
+                    <Card className="flex flex-col items-center p-6 text-center">
                         {/* Mode toggle: handheld scanner (Inateck BCST-70) vs phone camera */}
-                        <div className="mb-5 flex w-full rounded-xl bg-gray-100 p-1">
+                        <div className="mb-5 flex w-full items-center gap-1 rounded-full border border-edge bg-bone-light/60 p-1">
                             <button
                                 onClick={() => setScanMode('handheld')}
-                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${
-                                    scanMode === 'handheld' ? 'bg-white text-[#043F2E] shadow-sm' : 'text-gray-500'
-                                }`}
+                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold transition-colors ${scanMode === 'handheld' ? 'bg-olive-deep text-bone-light' : 'text-muted hover:text-olive-deep'}`}
                             >
-                                <Barcode className="h-4 w-4" /> Handheld scanner
+                                Handheld scanner
                             </button>
                             <button
                                 onClick={() => setScanMode('camera')}
-                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${
-                                    scanMode === 'camera' ? 'bg-white text-[#043F2E] shadow-sm' : 'text-gray-500'
-                                }`}
+                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold transition-colors ${scanMode === 'camera' ? 'bg-olive-deep text-bone-light' : 'text-muted hover:text-olive-deep'}`}
                             >
-                                <Camera className="h-4 w-4" /> Camera
+                                Camera
                             </button>
                         </div>
 
-                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                            <ScanLine className="h-8 w-8" />
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-live/15 text-live">
+                            <Icon name="scan" width={30} height={30} />
                         </div>
-                        <h2 className="mb-2 text-2xl font-bold text-gray-900">Scan Badge</h2>
+                        <h2 className="mb-2 font-display text-2xl font-extrabold text-olive-deep">Scan Badge</h2>
 
                         {scanMode === 'handheld' ? (
                             <>
-                                <p className="mb-6 text-gray-500">
-                                    Scan the employee's barcode with the handheld scanner. Keep this box focused.
+                                <p className="mb-6 text-sm text-muted">
+                                    Scan the employee&apos;s barcode with the handheld scanner. Keep this box focused.
                                 </p>
                                 <input
                                     ref={handheldRef}
@@ -156,34 +153,31 @@ export default function GuardScannerPage() {
                                         }
                                     }}
                                     onBlur={() => {
-                                        // Re-grab focus so the wedge scanner always lands here.
                                         if (scanMode === 'handheld' && showScanPanel) {
                                             setTimeout(() => handheldRef.current?.focus(), 0);
                                         }
                                     }}
-                                    className="w-full rounded-xl border-2 border-[#043F2E]/30 px-4 py-4 text-center text-lg text-gray-900 focus:border-[#043F2E] focus:ring-[#043F2E]"
+                                    className="w-full rounded-xl border-2 border-olive-deep/30 px-4 py-4 text-center text-lg text-ink focus:border-rust focus:outline-none"
                                 />
-                                <div className="mt-3 flex items-center gap-2 text-sm text-emerald-600">
+                                <div className="mt-3 flex items-center gap-2 text-sm text-live">
                                     <span className="relative flex h-2.5 w-2.5">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="absolute inline-flex h-full w-full animate-ping-soft rounded-full bg-live opacity-75" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-live" />
                                     </span>
                                     Ready to scan
                                 </div>
                             </>
                         ) : (
                             <>
-                                <p className="mb-6 text-gray-500">Point the camera at the employee's QR code.</p>
+                                <p className="mb-6 text-sm text-muted">Point the camera at the employee&apos;s QR code.</p>
                                 {scannerActive ? (
-                                    <div className="w-full">
-                                        <QRScanner onScan={submitScan} />
-                                    </div>
+                                    <CameraScanner onScan={submitScan} onError={setErrorMsg} />
                                 ) : (
                                     <button
                                         onClick={() => setScannerActive(true)}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-4 text-lg font-bold text-white transition-colors hover:bg-[#032f22]"
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep py-4 text-lg font-bold text-bone-light transition-colors hover:bg-olive-deep/90"
                                     >
-                                        <ScanLine className="h-5 w-5" /> Tap to Start Scanning
+                                        <Icon name="scan" width={18} height={18} /> Tap to Start Scanning
                                     </button>
                                 )}
                                 <div className="mt-6 flex w-full gap-2">
@@ -198,12 +192,12 @@ export default function GuardScannerPage() {
                                                 submitScan(manualCode.trim());
                                             }
                                         }}
-                                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#043F2E] focus:ring-[#043F2E]"
+                                        className="flex-1 rounded-xl border border-edge bg-white px-4 py-2.5 text-sm text-ink focus:border-rust focus:outline-none"
                                     />
                                     <button
                                         onClick={() => submitScan(manualCode.trim())}
                                         disabled={!manualCode.trim()}
-                                        className="rounded-lg bg-[#043F2E] px-4 py-2 font-medium text-white transition-colors hover:bg-[#032f22] disabled:opacity-50"
+                                        className="rounded-xl bg-olive-deep px-4 py-2.5 text-sm font-medium text-bone-light transition-colors hover:bg-olive-deep/90 disabled:opacity-50"
                                     >
                                         Submit
                                     </button>
@@ -211,59 +205,45 @@ export default function GuardScannerPage() {
                             </>
                         )}
 
-                        {scanMutation.isPending && (
-                            <p className="mt-4 text-sm text-gray-500">Recording scan…</p>
-                        )}
-                    </div>
+                        {scanMutation.isPending && <p className="mt-4 text-sm text-muted">Recording scan…</p>}
+                    </Card>
                 )}
 
                 {result && (
-                    <div className="rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-                        <div
-                            className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full ${
-                                isCheckIn ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
-                            }`}
-                        >
-                            {isCheckIn ? <LogIn className="h-10 w-10" /> : <LogOut className="h-10 w-10" />}
+                    <Card className="p-8 text-center">
+                        <div className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full ${isCheckIn ? 'bg-live/15 text-live' : 'bg-olive/15 text-olive'}`}>
+                            <Icon name={isCheckIn ? 'check' : 'arrow'} width={36} height={36} className={isCheckIn ? '' : 'rotate-90'} />
                         </div>
-                        <p className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+                        <p className="kicker">
                             {isCheckIn ? 'Checked In' : 'Checked Out'}
                             {result.debounced && ' (already recorded)'}
                         </p>
-                        <h3 className="mt-1 text-2xl font-bold text-gray-900">{result.employeeName}</h3>
-                        <p className="font-mono text-sm text-gray-500">{result.employeeCode}</p>
-                        <p className="mt-2 text-gray-600">
+                        <h3 className="mt-1 font-display text-2xl font-extrabold text-olive-deep">{result.employeeName}</h3>
+                        <p className="font-mono text-sm text-muted">{result.employeeCode}</p>
+                        <p className="mt-2 text-sm text-muted">
                             {new Date(result.occurredAt).toLocaleTimeString()}
                             {!isCheckIn && result.durationMin !== null && (
-                                <span className="ml-2 font-semibold text-gray-900">
-                                    · {formatDuration(result.durationMin)} worked
-                                </span>
+                                <span className="ml-2 font-semibold text-ink">· {formatDuration(result.durationMin)} worked</span>
                             )}
                         </p>
 
-                        <button
-                            onClick={reset}
-                            className="mt-8 w-full rounded-xl bg-[#043F2E] py-3 font-semibold text-white transition-colors hover:bg-[#032f22]"
-                        >
+                        <button onClick={reset} className="mt-8 w-full rounded-xl bg-olive-deep py-3 font-semibold text-bone-light transition-colors hover:bg-olive-deep/90">
                             Scan Next Badge
                         </button>
-                    </div>
+                    </Card>
                 )}
 
                 {errorMsg && (
-                    <div className="rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-600">
-                            <AlertCircle className="h-10 w-10" />
+                    <Card className="p-8 text-center">
+                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-rust/12 text-rust">
+                            <Icon name="thermo" width={36} height={36} />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900">Scan failed</h3>
-                        <p className="mt-2 text-gray-600">{errorMsg}</p>
-                        <button
-                            onClick={reset}
-                            className="mt-8 w-full rounded-xl bg-[#043F2E] py-3 font-semibold text-white transition-colors hover:bg-[#032f22]"
-                        >
+                        <h3 className="font-display text-xl font-extrabold text-olive-deep">Scan failed</h3>
+                        <p className="mt-2 text-sm text-muted">{errorMsg}</p>
+                        <button onClick={reset} className="mt-8 w-full rounded-xl bg-olive-deep py-3 font-semibold text-bone-light transition-colors hover:bg-olive-deep/90">
                             Try Again
                         </button>
-                    </div>
+                    </Card>
                 )}
             </main>
         </div>

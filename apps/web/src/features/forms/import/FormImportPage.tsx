@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-    ArrowLeft,
-    Camera,
-    Upload,
-    Loader2,
-    CheckCircle2,
-    AlertCircle,
-    ChevronRight,
-    Highlighter,
-} from 'lucide-react';
 import type { FormDigitizeDraft, FormFillFrequencyValue, FormTriggerTypeValue } from '@bin-tracker/types';
 import { trpc } from '../../../lib/trpc';
 import { fileToBase64, cropImageRegion, type AcceptedImageMime } from './image-utils';
 import { FormDraftLivePreview } from './FormDraftLivePreview';
 import { useSubscription } from '../../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../../components/UpgradePrompt';
+import { Icon } from '../../../components/ui/Icon';
 
 const STAGES = ['RECEIVING', 'KILL_FLOOR', 'WET_AGING', 'VALUE_ADD', 'SHIPPING'] as const;
 
@@ -41,9 +32,9 @@ type Step = 'capture' | 'digitize' | 'verify' | 'workflow' | 'done';
 function DraftWarningsBanner({ warnings }: { warnings: string[] }) {
     if (warnings.length === 0) return null;
     return (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            <p className="font-semibold mb-1">Structure adjusted to match the paper table layout</p>
-            <ul className="list-disc pl-4 space-y-0.5">
+        <div className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-ink">
+            <p className="mb-1 font-semibold text-warn">Structure adjusted to match the paper table layout</p>
+            <ul className="list-disc space-y-0.5 pl-4">
                 {warnings.map((w) => (
                     <li key={w}>{w}</li>
                 ))}
@@ -140,15 +131,15 @@ export default function FormImportPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#F5F8F2] flex flex-col items-center justify-center py-24 text-gray-500">
-                <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
+            <div className="flex min-h-screen flex-col items-center justify-center bg-canvas py-24 text-muted">
+                <span className="mb-4 h-2 w-2 animate-blink rounded-full bg-rust" />
                 <p className="font-semibold">Loading…</p>
             </div>
         );
     }
     if (!hasModule('FORMS_AI_DIGITIZE')) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+            <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
                 <UpgradePrompt module="FORMS_AI_DIGITIZE" />
             </div>
         );
@@ -209,16 +200,14 @@ export default function FormImportPage() {
     };
 
     const header = (
-        <div className="bg-[#043F2E] px-4 pt-10 pb-6">
-            <Link
-                to="/app/forms"
-                className="flex items-center gap-2 text-white/70 hover:text-white text-sm mb-4 transition-colors"
-            >
-                <ArrowLeft className="w-4 h-4" />
+        <div className="relative overflow-hidden bg-olive-deep px-4 pb-6 pt-10">
+            <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg-dark opacity-60" />
+            <Link to="/app/forms" className="relative mb-4 flex items-center gap-2 text-sm text-bone/70 transition-colors hover:text-bone">
+                <Icon name="arrow" width={15} height={15} className="rotate-180" />
                 Back to Forms
             </Link>
-            <h1 className="text-2xl font-bold text-white">Create from Photo</h1>
-            <p className="text-white/60 text-sm mt-1">
+            <h1 className="relative font-display text-2xl font-extrabold text-bone">Create from Photo</h1>
+            <p className="relative mt-1 text-sm text-bone/60">
                 {step === 'capture' && 'Take or upload a photo of your paper form'}
                 {step === 'digitize' && 'AI is reading your form…'}
                 {step === 'verify' && 'Compare your photo with the live form preview'}
@@ -230,13 +219,13 @@ export default function FormImportPage() {
 
     if (step === 'capture') {
         return (
-            <div className="min-h-screen bg-[#F5F8F2]">
+            <div className="min-h-screen bg-canvas">
                 {header}
-                <div className="px-4 py-8 max-w-xl mx-auto flex flex-col gap-4">
-                    <label className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#043F2E]/30 bg-white p-10 cursor-pointer hover:border-[#043F2E]/50 transition-colors">
-                        <Camera className="w-12 h-12 text-[#043F2E]" />
-                        <span className="font-semibold text-gray-900">Take photo or choose file</span>
-                        <span className="text-sm text-gray-500 text-center">
+                <div className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-8">
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-olive-deep/30 bg-white p-10 transition-colors hover:border-olive-deep/50">
+                        <Icon name="camera" width={48} height={48} className="text-olive-deep" />
+                        <span className="font-semibold text-ink">Take photo or choose file</span>
+                        <span className="text-center text-sm text-muted">
                             Handwritten and printed forms supported
                         </span>
                         <input
@@ -252,16 +241,16 @@ export default function FormImportPage() {
                         />
                     </label>
                     {uploadError && (
-                        <p role="alert" className="text-sm font-semibold text-red-600 text-center">
+                        <p role="alert" className="text-center text-sm font-semibold text-rust">
                             {uploadError}
                         </p>
                     )}
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center justify-center gap-2 w-full bg-[#043F2E] text-white py-4 rounded-xl font-bold"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep py-4 font-bold text-bone-light hover:bg-olive-deep/90"
                     >
-                        <Upload className="w-5 h-5" />
+                        <Icon name="upload" width={20} height={20} />
                         Upload image
                     </button>
                 </div>
@@ -271,19 +260,19 @@ export default function FormImportPage() {
 
     if (step === 'digitize') {
         return (
-            <div className="min-h-screen bg-[#F5F8F2]">
+            <div className="min-h-screen bg-canvas">
                 {header}
-                <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-                    <Loader2 className="w-10 h-10 animate-spin text-[#043F2E] mb-4" />
-                    <p className="font-semibold">Digitizing form with AI…</p>
-                    <p className="text-sm mt-1">This may take 15–30 seconds</p>
+                <div className="flex flex-col items-center justify-center py-24 text-muted">
+                    <span className="mb-4 h-2 w-2 animate-blink rounded-full bg-rust" />
+                    <p className="font-semibold text-ink">Digitizing form with AI…</p>
+                    <p className="mt-1 text-sm">This may take 15–30 seconds</p>
                     {digitizeErrorMessage && (
-                        <div className="mt-6 max-w-md rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm">
-                            <AlertCircle className="w-5 h-5 inline mr-2" />
+                        <div className="mt-6 max-w-md rounded-xl border border-rust/30 bg-rust/10 p-4 text-sm text-rust">
+                            <Icon name="thermo" width={20} height={20} className="mr-2 inline" />
                             {digitizeErrorMessage}
                             <button
                                 type="button"
-                                className="block mt-3 underline"
+                                className="mt-3 block underline"
                                 onClick={() => {
                                     setDigitizeJobId(null);
                                     setStep('capture');
@@ -300,13 +289,13 @@ export default function FormImportPage() {
 
     if (step === 'verify' && draft && imageDataUrl) {
         return (
-            <div className="min-h-screen bg-[#F5F8F2]">
+            <div className="min-h-screen bg-canvas">
                 {header}
-                <div className="px-4 py-6 max-w-6xl mx-auto flex flex-col gap-4 lg:grid lg:grid-cols-2">
-                    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm order-2 lg:order-1">
-                        <p className="text-xs font-bold uppercase text-gray-500 mb-2">Paper form (original)</p>
+                <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 lg:grid lg:grid-cols-2">
+                    <div className="order-2 rounded-2xl border border-edge/70 bg-white p-4 shadow-card lg:order-1">
+                        <p className="mb-2 kicker">Paper form (original)</p>
                         <div
-                            className="relative select-none touch-none"
+                            className="relative touch-none select-none"
                             onMouseDown={(e) => {
                                 if (!selectingRegion) return;
                                 setDragStart(getRelativePoint(e));
@@ -329,11 +318,11 @@ export default function FormImportPage() {
                                 ref={imageRef}
                                 src={imageDataUrl}
                                 alt="Paper form"
-                                className="w-full rounded-lg border border-gray-100"
+                                className="w-full rounded-lg border border-edge/60"
                             />
                             {region && (
                                 <div
-                                    className="absolute border-2 border-amber-400 bg-amber-400/20 pointer-events-none"
+                                    className="pointer-events-none absolute border-2 border-warn bg-warn/20"
                                     style={{
                                         left: `${region.x * 100}%`,
                                         top: `${region.y * 100}%`,
@@ -350,18 +339,18 @@ export default function FormImportPage() {
                                     setSelectingRegion((v) => !v);
                                     setRegion(null);
                                 }}
-                                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border ${
+                                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
                                     selectingRegion
-                                        ? 'bg-amber-100 border-amber-400 text-amber-900'
-                                        : 'border-gray-300 text-gray-700'
+                                        ? 'border-warn bg-warn/15 text-warn'
+                                        : 'border-edge text-ink'
                                 }`}
                             >
-                                <Highlighter className="w-3.5 h-3.5" />
+                                <Icon name="form" width={14} height={14} />
                                 {selectingRegion ? 'Drag to highlight wrong area' : 'Mark wrong region'}
                             </button>
                         </div>
                         <textarea
-                            className="mt-2 w-full text-sm border border-gray-200 rounded-lg p-2"
+                            className="mt-2 w-full rounded-lg border border-edge p-2 text-sm text-ink"
                             placeholder="Optional note for AI (e.g. fix section 3 labels)"
                             rows={2}
                             value={refineNote}
@@ -371,15 +360,13 @@ export default function FormImportPage() {
                             type="button"
                             disabled={refine.isPending || (!region && !refineNote.trim())}
                             onClick={() => void handleRefine()}
-                            className="mt-2 w-full text-sm font-semibold py-2 rounded-lg border border-[#043F2E] text-[#043F2E] disabled:opacity-40"
+                            className="mt-2 w-full rounded-lg border border-olive-deep py-2 text-sm font-semibold text-olive-deep disabled:opacity-40"
                         >
                             {refine.isPending ? 'Refining…' : 'Re-run AI on highlighted area'}
                         </button>
                     </div>
-                    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm order-1 lg:order-2">
-                        <p className="text-xs font-bold uppercase text-gray-500 mb-2">
-                            Live preview (matches saved form layout)
-                        </p>
+                    <div className="order-1 rounded-2xl border border-edge/70 bg-white p-4 shadow-card lg:order-2">
+                        <p className="mb-2 kicker">Live preview (matches saved form layout)</p>
                         {draft.warnings && draft.warnings.length > 0 && (
                             <div className="mb-3">
                                 <DraftWarningsBanner warnings={draft.warnings} />
@@ -388,14 +375,14 @@ export default function FormImportPage() {
                         <FormDraftLivePreview draft={draft} compact />
                     </div>
                 </div>
-                <div className="px-4 pb-8 max-w-xl mx-auto">
+                <div className="mx-auto max-w-xl px-4 pb-8">
                     <button
                         type="button"
                         onClick={() => setStep('workflow')}
-                        className="w-full flex items-center justify-center gap-2 bg-[#043F2E] text-white py-4 rounded-xl font-bold"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep py-4 font-bold text-bone-light hover:bg-olive-deep/90"
                     >
                         Looks good — continue
-                        <ChevronRight className="w-5 h-5" />
+                        <Icon name="arrow" width={20} height={20} />
                     </button>
                 </div>
             </div>
@@ -404,13 +391,11 @@ export default function FormImportPage() {
 
     if (step === 'workflow' && draft) {
         return (
-            <div className="min-h-screen bg-[#F5F8F2]">
+            <div className="min-h-screen bg-canvas">
                 {header}
-                <div className="px-4 py-6 max-w-5xl mx-auto flex flex-col gap-5">
-                    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-                        <p className="text-xs font-bold uppercase text-gray-500 mb-3">
-                            Final preview before save
-                        </p>
+                <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6">
+                    <div className="rounded-2xl border border-edge/70 bg-white p-5 shadow-card">
+                        <p className="mb-3 kicker">Final preview before save</p>
                         {draft.warnings && draft.warnings.length > 0 && (
                             <div className="mb-4">
                                 <DraftWarningsBanner warnings={draft.warnings} />
@@ -419,13 +404,13 @@ export default function FormImportPage() {
                         <FormDraftLivePreview draft={draft} />
                     </div>
 
-                    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+                    <div className="space-y-4 rounded-2xl border border-edge/70 bg-white p-5 shadow-card">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            <label className="mb-1 block text-sm font-semibold text-olive-deep">
                                 Facility area (stage)
                             </label>
                             <select
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"
+                                className="w-full rounded-lg border border-edge px-3 py-2.5 text-sm text-ink"
                                 value={stage}
                                 onChange={(e) => setStage(e.target.value)}
                             >
@@ -437,11 +422,11 @@ export default function FormImportPage() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            <label className="mb-1 block text-sm font-semibold text-olive-deep">
                                 When is this form triggered?
                             </label>
                             <select
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"
+                                className="w-full rounded-lg border border-edge px-3 py-2.5 text-sm text-ink"
                                 value={triggerType}
                                 onChange={(e) =>
                                     setTriggerType(e.target.value as FormTriggerTypeValue)
@@ -455,11 +440,11 @@ export default function FormImportPage() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            <label className="mb-1 block text-sm font-semibold text-olive-deep">
                                 How often is it filled?
                             </label>
                             <select
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"
+                                className="w-full rounded-lg border border-edge px-3 py-2.5 text-sm text-ink"
                                 value={fillFrequency}
                                 onChange={(e) =>
                                     setFillFrequency(e.target.value as FormFillFrequencyValue)
@@ -473,18 +458,18 @@ export default function FormImportPage() {
                             </select>
                         </div>
                     </div>
-                    <p className="text-xs text-gray-500 text-center">
+                    <p className="text-center text-xs text-muted">
                         If tables look wrong, go back and re-upload or use &ldquo;Mark wrong region&rdquo; to
                         fix with AI before saving.
                     </p>
                     {createForm.error && (
-                        <p className="text-sm text-red-600">{createForm.error.message}</p>
+                        <p className="text-sm text-rust">{createForm.error.message}</p>
                     )}
                     <button
                         type="button"
                         disabled={createForm.isPending}
                         onClick={handleSave}
-                        className="w-full bg-[#043F2E] text-white py-4 rounded-xl font-bold disabled:opacity-50"
+                        className="w-full rounded-xl bg-olive-deep py-4 font-bold text-bone-light disabled:opacity-50"
                     >
                         {createForm.isPending ? 'Saving…' : 'Save form'}
                     </button>
@@ -495,12 +480,14 @@ export default function FormImportPage() {
 
     if (step === 'done') {
         return (
-            <div className="min-h-screen bg-[#F5F8F2]">
+            <div className="min-h-screen bg-canvas">
                 {header}
-                <div className="flex flex-col items-center py-16 px-4 max-w-md mx-auto text-center">
-                    <CheckCircle2 className="w-16 h-16 text-green-600 mb-4" />
-                    <h2 className="text-xl font-bold text-gray-900">Form created</h2>
-                    <p className="text-gray-600 text-sm mt-2">
+                <div className="mx-auto flex max-w-md flex-col items-center px-4 py-16 text-center">
+                    <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-live/15 text-live">
+                        <Icon name="check" width={32} height={32} />
+                    </span>
+                    <h2 className="font-display text-xl font-extrabold text-olive-deep">Form created</h2>
+                    <p className="mt-2 text-sm text-muted">
                         Workers can fill it from the Forms list. Voice input is on for text fields.
                     </p>
                     <button
@@ -509,7 +496,7 @@ export default function FormImportPage() {
                             void utils.form.listByStage.invalidate();
                             navigate('/app/forms');
                         }}
-                        className="mt-8 w-full bg-[#043F2E] text-white py-4 rounded-xl font-bold"
+                        className="mt-8 w-full rounded-xl bg-olive-deep py-4 font-bold text-bone-light"
                     >
                         Go to Forms
                     </button>

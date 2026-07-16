@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useVoiceRecorder } from './useVoiceRecorder';
+import { Card } from '../../components/ui/primitives';
+import { Icon } from '../../components/ui/Icon';
 
 interface VoiceRecorderProps {
     onAudioReady: (audioBase64: string, mimeType: 'audio/webm' | 'audio/mp4') => void;
@@ -19,47 +20,48 @@ export function VoiceRecorder({ onAudioReady, isProcessing }: VoiceRecorderProps
     }, [audioBase64]);
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                    Voice Recording
-                </h3>
-                <p className="mb-4 text-sm text-gray-600">
-                    Speak all your animal details in one go.
-                </p>
+        <Card className="h-fit p-6">
+            <p className="kicker">voice_recording</p>
+            <p className="mt-2 text-sm text-muted">Speak all your animal details in one go.</p>
 
-                {status === 'idle' && (
-                    <button
-                        onClick={startRecording}
-                        disabled={isProcessing}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
-                    >
-                        <Mic className="h-4 w-4" />
-                        Start Recording
-                    </button>
-                )}
+            {status === 'idle' && (
+                <button
+                    onClick={startRecording}
+                    disabled={isProcessing}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rust px-4 py-3 text-sm font-semibold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
+                >
+                    <Icon name="mic" width={16} height={16} />
+                    Start Recording
+                </button>
+            )}
 
-                {status === 'recording' && (
+            {status === 'recording' && (
+                <>
                     <button
                         onClick={stopRecording}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep px-4 py-3 text-sm font-semibold text-bone-light transition-colors hover:bg-olive-deep/90"
                     >
-                        <MicOff className="h-4 w-4 animate-pulse" />
+                        <Icon name="mic" width={16} height={16} className="animate-blink" />
                         Stop Recording
                     </button>
-                )}
-
-                {(status === 'processing' || isProcessing) && (
-                    <div className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-3 text-sm text-gray-600">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Processing...
+                    <div className="mt-5 flex h-8 items-end justify-center gap-1">
+                        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                            <span key={i} className="w-1.5 origin-bottom rounded-full bg-olive animate-bar-eq" style={{ height: '100%', animationDelay: `${i * 0.08}s` }} />
+                        ))}
                     </div>
-                )}
-            </div>
+                </>
+            )}
+
+            {(status === 'processing' || isProcessing) && (
+                <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-bone-light/60 px-4 py-3 text-sm text-muted">
+                    <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+                    Processing…
+                </div>
+            )}
 
             {error && (
-                <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+                <p className="mt-4 rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">{error}</p>
             )}
-        </div>
+        </Card>
     );
 }

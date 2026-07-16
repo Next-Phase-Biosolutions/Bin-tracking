@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { LayoutDashboard, AlertTriangle, PackageCheck, Box, RefreshCw, X, Clock, Truck, CheckCircle2, Calendar, ClipboardList, Factory, PlusCircle, UserPlus, PawPrint, ScanLine, Package } from 'lucide-react';
 import { setAuthToken } from '../../lib/trpc';
-import { Link } from 'react-router-dom';
+import { PageHeader } from '../../components/app/PageHeader';
+import { Icon } from '../../components/ui/Icon';
+import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
+import { CountValue } from '../../components/app/LiveValue';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { useSubscription } from '../../context/SubscriptionContext';
@@ -27,7 +29,7 @@ function getPresetRange(preset: DatePreset): { from: Date | null; to: Date | nul
     return { from: null, to: null };
 }
 
-const TEST_ADMIN_TOKEN = import.meta.env.VITE_TEST_ADMIN_TOKEN || "";
+const TEST_ADMIN_TOKEN = import.meta.env.VITE_TEST_ADMIN_TOKEN || '';
 
 type CycleItem = {
     id: string;
@@ -60,19 +62,18 @@ function statusLabel(s: string) {
     return 'Active';
 }
 
-function statusBadge(s: string) {
-    const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
-    if (s === 'ACTIVE') return `${base} bg-amber-100 text-amber-800`;
-    if (s === 'IN_TRANSIT') return `${base} bg-blue-100 text-blue-800`;
-    return `${base} bg-green-100 text-green-800`;
+function statusTone(s: string): 'pending' | 'good' | 'complete' {
+    if (s === 'ACTIVE') return 'pending';
+    if (s === 'IN_TRANSIT') return 'good';
+    return 'complete';
 }
 
 /* ─────────────────────────── Details slide-over ─────────────────────────── */
 function DetailsSlideover({ cycle, onClose }: { cycle: CycleItem; onClose: () => void }) {
     const icons: Record<string, React.ReactNode> = {
-        BIN_STARTED: <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center"><Clock className="w-4 h-4" /></div>,
-        PICKED_UP: <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center"><Truck className="w-4 h-4" /></div>,
-        DELIVERED: <div className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center"><CheckCircle2 className="w-4 h-4" /></div>,
+        BIN_STARTED: <Icon name="clock" width={16} height={16} />,
+        PICKED_UP: <Icon name="truck" width={16} height={16} />,
+        DELIVERED: <Icon name="check" width={16} height={16} />,
     };
     const eventLabels: Record<string, string> = {
         BIN_STARTED: 'Bin Started at Facility',
@@ -80,28 +81,32 @@ function DetailsSlideover({ cycle, onClose }: { cycle: CycleItem; onClose: () =>
         DELIVERED: 'Delivered to Rendering',
     };
     const urg = cycle.bin.binType.urgency;
-    const urgBadge = urg === 'CRITICAL' ? 'text-red-600 bg-red-50' : urg === 'MEDIUM' ? 'text-orange-600 bg-orange-50' : 'text-green-700 bg-green-50';
+    const urgTone = urg === 'CRITICAL' ? 'alert' : urg === 'MEDIUM' ? 'warn' : 'good';
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="fixed inset-0 bg-olive-deep/40 backdrop-blur-sm" />
             <div
-                className="relative bg-white w-full max-w-md h-full shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300"
+                className="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-canvas shadow-panel"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="sticky top-0 bg-[#043F2E] text-white p-5 flex items-start justify-between z-10">
-                    <div>
-                        <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1">Cycle Details</p>
-                        <h2 className="text-xl font-bold truncate max-w-[260px]">{cycle.bin.qrCode}</h2>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className={statusBadge(cycle.status)}>{statusLabel(cycle.status)}</span>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${urgBadge}`}>{urg}</span>
+                <div className="sticky top-0 z-10 bg-olive-deep p-5 text-bone">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="kicker text-bone/50">Cycle Details</p>
+                            <h2 className="mt-1 max-w-[260px] truncate font-display text-xl font-extrabold">{cycle.bin.qrCode}</h2>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge tone={statusTone(cycle.status)}>{statusLabel(cycle.status)}</Badge>
+                                <Badge tone={urgTone as never}>{urg}</Badge>
+                            </div>
                         </div>
+                        <button onClick={onClose} className="mt-1 shrink-0 text-bone/50 hover:text-bone">
+                            <Icon name="arrow" width={20} height={20} className="rotate-45" />
+                        </button>
                     </div>
-                    <button onClick={onClose} className="text-white/60 hover:text-white p-1 mt-1 flex-shrink-0"><X className="w-6 h-6" /></button>
                 </div>
 
-                <div className="p-5 space-y-6">
+                <div className="space-y-6 p-5">
                     <div className="grid grid-cols-2 gap-3">
                         {[
                             { label: 'Organ Type', value: cycle.bin.binType.organType.toLowerCase() },
@@ -111,57 +116,38 @@ function DetailsSlideover({ cycle, onClose }: { cycle: CycleItem; onClose: () =>
                             ...(cycle.driver ? [{ label: 'Driver', value: cycle.driver.name }] : []),
                             ...(cycle.destination ? [{ label: 'Destination', value: cycle.destination.name }] : []),
                         ].map((info) => (
-                            <div key={info.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                <p className="text-xs text-gray-500 mb-1">{info.label}</p>
-                                <p className="font-semibold text-gray-900 text-sm capitalize break-words">{info.value}</p>
+                            <div key={info.label} className="rounded-xl border border-edge/70 bg-white p-3">
+                                <p className="kicker">{info.label}</p>
+                                <p className="mt-1 break-words text-sm font-semibold capitalize text-ink">{info.value}</p>
                             </div>
                         ))}
                     </div>
 
                     {cycle.status !== 'COMPLETED' && (
-                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-600">Time Remaining</p>
+                        <div className="flex items-center justify-between rounded-xl border border-edge/70 bg-white p-4">
+                            <p className="text-sm font-medium text-muted">Time Remaining</p>
                             <CountdownTimer deadline={cycle.deadline} />
                         </div>
                     )}
 
                     <div>
-                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Event Timeline</h3>
+                        <h3 className="kicker mb-4">Event Timeline</h3>
                         {cycle.events.length === 0 ? (
-                            <p className="text-sm text-gray-400 text-center py-4">No events recorded yet.</p>
+                            <p className="py-4 text-center text-sm text-muted">No events recorded yet.</p>
                         ) : (
-                            <ol className="relative border-l border-gray-200 ml-4 space-y-6">
+                            <ol className="ml-4 space-y-6 border-l border-edge">
                                 {cycle.events.map((ev) => (
-                                    <li key={ev.id} className="ml-6">
-                                        <div className="absolute -left-4">{icons[ev.eventType] || <div className="w-8 h-8 bg-gray-100 rounded-full" />}</div>
-                                        <p className="font-semibold text-gray-900 text-sm">{eventLabels[ev.eventType] || ev.eventType}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{fmt(ev.timestamp)}</p>
+                                    <li key={ev.id} className="relative ml-6">
+                                        <div className="absolute -left-9 flex h-7 w-7 items-center justify-center rounded-full bg-bone-light text-olive-deep">
+                                            {icons[ev.eventType] || <Icon name="grid" width={14} height={14} />}
+                                        </div>
+                                        <p className="text-sm font-semibold text-ink">{eventLabels[ev.eventType] || ev.eventType}</p>
+                                        <p className="mt-0.5 text-xs text-muted">{fmt(ev.timestamp)}</p>
                                     </li>
                                 ))}
-                                {cycle.status !== 'COMPLETED' && (
-                                    <li className="ml-6 opacity-40">
-                                        <div className="absolute -left-4">
-                                            <div className="w-8 h-8 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300">
-                                                <CheckCircle2 className="w-4 h-4" />
-                                            </div>
-                                        </div>
-                                        <p className="font-semibold text-gray-500 text-sm">Awaiting Delivery</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">Pending...</p>
-                                    </li>
-                                )}
                             </ol>
                         )}
                     </div>
-
-                    {cycle.status === 'COMPLETED' && (cycle as any).complianceResult && (
-                        <div className={`p-4 rounded-xl flex items-center gap-3 ${(cycle as any).complianceResult === 'ON_TIME' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                            <CheckCircle2 className={`w-5 h-5 ${(cycle as any).complianceResult === 'ON_TIME' ? 'text-green-600' : 'text-red-500'}`} />
-                            <div>
-                                <p className="font-bold text-sm">{(cycle as any).complianceResult === 'ON_TIME' ? 'On Time' : 'Late Delivery'}</p>
-                                <p className="text-xs text-gray-500">Delivered {fmt(cycle.deliveredAt)}</p>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         </div>
@@ -171,7 +157,7 @@ function DetailsSlideover({ cycle, onClose }: { cycle: CycleItem; onClose: () =>
 /* ─────────────────────────── Shared countdown cell ─────────────────────────── */
 function CycleCountdown({ item }: { item: CycleItem }) {
     if (item.status === 'COMPLETED') {
-        return <span className="font-mono px-2 py-1 rounded text-center text-green-700 font-bold bg-green-50 ring-1 ring-inset ring-green-600/20 text-sm">DONE</span>;
+        return <Badge tone="complete">DONE</Badge>;
     }
     return <CountdownTimer deadline={item.deadline} isOverdue={item.isOverdue} />;
 }
@@ -190,7 +176,6 @@ export function DashboardPage() {
 
     useState(() => { setAuthToken(TEST_ADMIN_TOKEN); });
 
-    // Close calendar when clicking outside
     useEffect(() => {
         function handleClick(e: MouseEvent) {
             if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
@@ -207,7 +192,6 @@ export function DashboardPage() {
     );
     const { data: stats } = trpc.dashboard.stats.useQuery();
 
-    // Compute effective date range
     const dateRange = datePreset === 'custom'
         ? { from: customFrom ? new Date(customFrom + 'T00:00:00') : null, to: customTo ? new Date(customTo + 'T23:59:59') : null }
         : getPresetRange(datePreset);
@@ -224,310 +208,213 @@ export function DashboardPage() {
     );
 
     const statsCards = [
-        { label: 'Active Bins', value: stats?.totalActiveBins || 0, icon: <Box className="w-5 h-5 md:w-6 md:h-6" />, color: 'bg-blue-50 text-blue-600', textColor: 'text-gray-900' },
-        { label: 'Overdue', value: stats?.totalOverdue || 0, icon: <AlertTriangle className="w-5 h-5 md:w-6 md:h-6" />, color: 'bg-red-50 text-red-600', textColor: 'text-red-600', pulse: (stats?.totalOverdue ?? 0) > 0 },
-        { label: 'Done Today', value: stats?.totalCompletedToday || 0, icon: <PackageCheck className="w-5 h-5 md:w-6 md:h-6" />, color: 'bg-green-50 text-green-600', textColor: 'text-gray-900' },
-        { label: 'Compliance', value: `${stats?.complianceRate || 100}%`, icon: <span className="text-xs font-bold">CR</span>, color: 'bg-green-50 text-green-600', textColor: 'text-gray-900' },
+        { label: 'active_bins', value: stats?.totalActiveBins || 0, icon: <Icon name="box" width={18} height={18} /> },
+        { label: 'overdue', value: stats?.totalOverdue || 0, icon: <Icon name="thermo" width={18} height={18} />, pulse: (stats?.totalOverdue ?? 0) > 0 },
+        { label: 'done_today', value: stats?.totalCompletedToday || 0, icon: <Icon name="check" width={18} height={18} /> },
+        { label: 'compliance', value: stats?.complianceRate ?? 100, unit: '%', icon: <Icon name="chain" width={18} height={18} /> },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
-
-            {/* ── Sidebar ── */}
-            <aside className="bg-[#043F2E] text-white w-full md:w-64 md:shrink-0 md:h-screen md:sticky md:top-0 flex flex-col p-4 shadow-md overflow-y-auto">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="bg-white/10 p-2 rounded-lg"><LayoutDashboard className="w-6 h-6" /></div>
-                    <h1 className="text-lg font-bold tracking-tight">Ops Dashboard</h1>
-                </div>
-
-                <nav className="flex flex-col gap-1.5">
-                    {/* Core tracking — never module-gated */}
-                    <Link to="/app/driver" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <Truck className="w-4 h-4" /><span>Driver</span>
-                    </Link>
-                    <Link to="/app/bin" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <Box className="w-4 h-4" /><span>Bin</span>
-                    </Link>
-
-                    {!isSubscriptionLoading && hasModule('ANIMAL_INTAKE') && (
-                        <Link to="/app/animalregistration" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                            <PawPrint className="w-4 h-4" /><span>Animal Registration</span>
-                        </Link>
-                    )}
-                    {!isSubscriptionLoading && hasModule('WORKFORCE') && (
-                        <>
-                            <Link to="/app/employees/register" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                                <UserPlus className="w-4 h-4" /><span>Register Employee</span>
-                            </Link>
-                            <Link to="/app/timesheet" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                                <Clock className="w-4 h-4" /><span>Timesheet</span>
-                            </Link>
-                            <Link to="/app/guard" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                                <ScanLine className="w-4 h-4" /><span>Guard Scanner</span>
-                            </Link>
-                        </>
-                    )}
-                    {!isSubscriptionLoading && hasModule('SHIPMENTS') && (
-                        <>
-                            <Link to="/app/shipments" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                                <Package className="w-4 h-4" /><span>Shipments</span>
-                            </Link>
-                            <Link to="/app/shipments/new" className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                                <PlusCircle className="w-4 h-4" /><span>Record Shipment</span>
-                            </Link>
-                        </>
-                    )}
-                    {!isSubscriptionLoading && hasModule('FORMS') && (
-                        <Link to="/app/forms" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                            <ClipboardList className="w-4 h-4" /><span>Fill Form</span>
-                        </Link>
-                    )}
-                    {!isSubscriptionLoading && hasModule('FORMS_AI_DIGITIZE') && (
-                        <Link to="/app/forms/import" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                            <PlusCircle className="w-4 h-4" /><span>Create a Form</span>
-                        </Link>
-                    )}
-
-                    {/* Core tracking — never module-gated */}
-                    <Link to="/app/facility" className="text-white/90 hover:bg-white/10 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <Factory className="w-4 h-4" /><span>Facility Dashboard</span>
-                    </Link>
-                </nav>
-
-                <div className="my-4 border-t border-white/10" />
-
-                <div className="flex flex-col gap-1.5 md:mt-auto">
-                    <button
-                        onClick={() => setAnchorModalOpen(true)}
-                        className="bg-purple-500 hover:bg-purple-400 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5"
-                        title="Post today's operations on Cardano blockchain"
-                    >
-                        <span>⛓</span><span>Post on Blockchain</span>
-                    </button>
-                    <button onClick={() => refetch()} className="bg-white/10 hover:bg-white/20 text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2.5">
-                        <RefreshCw className="w-4 h-4" /><span>Refresh</span>
-                    </button>
-                </div>
-            </aside>
-
-            <main className="flex-1 w-full max-w-7xl mx-auto p-3 md:p-6 lg:p-8">
-
-                {/* ── Stats cards: 2-col mobile, 4-col lg ── */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
-                    {statsCards.map((c) => (
-                        <div key={c.label} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">{c.label}</p>
-                                <p className={`text-2xl md:text-3xl font-bold mt-1 md:mt-2 ${c.textColor}`}>{c.value}</p>
-                            </div>
-                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center relative ${c.color}`}>
-                                {c.pulse && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse" />}
-                                {c.icon}
-                            </div>
+        <div className="mx-auto max-w-7xl">
+            <PageHeader
+                title="Facility Dashboard"
+                subtitle="Daily workflow and operations, one unified view."
+                icon={<Icon name="grid" width={22} height={22} />}
+                actions={
+                    <>
+                        <div className="hidden items-center gap-1 rounded-full border border-edge bg-white p-1 sm:flex">
+                            {(['all', '2d', '7d', 'custom'] as DatePreset[]).map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => { setDatePreset(p); setCalendarOpen(p === 'custom'); }}
+                                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${datePreset === p ? 'bg-olive-deep text-bone-light' : 'text-muted hover:text-olive-deep'}`}
+                                >
+                                    {p === 'all' ? 'All Time' : p === '2d' ? '2 Days' : p === '7d' ? '7 Days' : 'Custom'}
+                                </button>
+                            ))}
                         </div>
-                    ))}
-                </div>
-
-                {/* ── Priority Queue container ── */}
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-
-                    {/* Queue header */}
-                    <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-                            All Cycles
-                            <span className="bg-[#3d5aa8] text-white text-xs font-bold px-2 py-0.5 rounded-full">{filteredBins.length}</span>
-                        </h2>
-                        <div className="flex flex-wrap items-center gap-3">
-
-                            {/* ── Facility filter ── */}
-                            <select
-                                id="facility-filter"
-                                value={selectedFacility || ''}
-                                onChange={(e) => setSelectedFacility(e.target.value || undefined)}
-                                className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg p-2 pr-8 focus:ring-[#3d5aa8] focus:border-[#3d5aa8]"
-                            >
-                                <option value="">All Facilities</option>
-                                {uniqueFacilities.map(([fid, fac]) => (
-                                    <option key={fid} value={fid}>{fac?.name || fid}</option>
-                                ))}
-                            </select>
-
-                            {/* ── Date preset pills ── */}
-                            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                                {(['all', '2d', '7d', 'custom'] as DatePreset[]).map((p) => (
-                                    <button
-                                        key={p}
-                                        onClick={() => { setDatePreset(p); if (p === 'custom') setCalendarOpen(true); else setCalendarOpen(false); }}
-                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors flex items-center gap-1 ${datePreset === p ? 'bg-white text-[#3d5aa8] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                                    >
-                                        {p === 'custom' && <Calendar className="w-3 h-3" />}
-                                        {p === 'all' ? 'All Time' : p === '2d' ? '2 Days' : p === '7d' ? '7 Days' : 'Custom'}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* ── Custom calendar popover ── */}
-                            {datePreset === 'custom' && (
-                                <div className="relative" ref={calendarRef}>
-                                    <button
-                                        onClick={() => setCalendarOpen(o => !o)}
-                                        className="flex items-center gap-2 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg px-3 py-2 hover:bg-gray-100 transition-colors"
-                                    >
-                                        <Calendar className="w-4 h-4 text-[#3d5aa8]" />
-                                        <span>{customFrom || 'From'}</span>
-                                        <span className="text-gray-400">→</span>
-                                        <span>{customTo || 'To'}</span>
-                                    </button>
-                                    {calendarOpen && (
-                                        <div className="absolute right-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
-                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Select Date Range</p>
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="text-xs text-gray-500 font-medium mb-1 block">From</label>
-                                                    <input
-                                                        type="date"
-                                                        value={customFrom}
-                                                        max={customTo || toInputDate(new Date())}
-                                                        onChange={(e) => setCustomFrom(e.target.value)}
-                                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#3d5aa8] focus:border-transparent outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs text-gray-500 font-medium mb-1 block">To</label>
-                                                    <input
-                                                        type="date"
-                                                        value={customTo}
-                                                        min={customFrom}
-                                                        max={toInputDate(new Date())}
-                                                        onChange={(e) => setCustomTo(e.target.value)}
-                                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#3d5aa8] focus:border-transparent outline-none"
-                                                    />
-                                                </div>
-                                                <button
-                                                    onClick={() => setCalendarOpen(false)}
-                                                    className="w-full bg-[#3d5aa8] hover:bg-[#2d4898] text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-                                                >
-                                                    Apply
-                                                </button>
+                        {datePreset === 'custom' && (
+                            <div className="relative" ref={calendarRef}>
+                                <Button variant="secondary" onClick={() => setCalendarOpen((o) => !o)}>
+                                    <Icon name="clock" width={15} height={15} />
+                                    {customFrom || 'From'} → {customTo || 'To'}
+                                </Button>
+                                {calendarOpen && (
+                                    <Card className="absolute right-0 z-50 mt-2 w-72 p-4">
+                                        <p className="kicker mb-3">Select Date Range</p>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="mb-1 block text-xs font-medium text-muted">From</label>
+                                                <input
+                                                    type="date"
+                                                    value={customFrom}
+                                                    max={customTo || toInputDate(new Date())}
+                                                    onChange={(e) => setCustomFrom(e.target.value)}
+                                                    className="w-full rounded-lg border border-edge px-3 py-2 text-sm text-ink outline-none focus:border-rust"
+                                                />
                                             </div>
+                                            <div>
+                                                <label className="mb-1 block text-xs font-medium text-muted">To</label>
+                                                <input
+                                                    type="date"
+                                                    value={customTo}
+                                                    min={customFrom}
+                                                    max={toInputDate(new Date())}
+                                                    onChange={(e) => setCustomTo(e.target.value)}
+                                                    className="w-full rounded-lg border border-edge px-3 py-2 text-sm text-ink outline-none focus:border-rust"
+                                                />
+                                            </div>
+                                            <Button className="w-full" onClick={() => setCalendarOpen(false)}>Apply</Button>
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ── MOBILE: card list (hidden md+) ── */}
-                    <div className="md:hidden divide-y divide-gray-100">
-                        {isBinsLoading ? (
-                            <div className="p-8 flex items-center justify-center gap-3 text-gray-500 text-sm">
-                                <div className="w-5 h-5 border-4 border-[#3d5aa8] border-t-transparent rounded-full animate-spin" />
-                                Loading...
-                            </div>
-                        ) : filteredBins.length > 0 ? (
-                            filteredBins.map((item) => (
-                                <div key={item.id} className="p-4 space-y-3 active:bg-gray-50">
-                                    {/* Countdown + status */}
-                                    <div className="flex items-center justify-between gap-2">
-                                        <CycleCountdown item={item as unknown as CycleItem} />
-                                        <span className={statusBadge(item.status)}>{statusLabel(item.status)}</span>
-                                    </div>
-                                    {/* Bin ID + organ */}
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-gray-900 text-sm truncate">{item.bin.qrCode}</p>
-                                            <p className="text-xs text-gray-400 font-mono">#{item.id.slice(0, 8)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-sm text-gray-700 flex-shrink-0">
-                                            <div className={`w-2 h-2 rounded-full ${item.bin.binType.urgency === 'CRITICAL' ? 'bg-red-500' : 'bg-green-500'}`} />
-                                            <span className="capitalize font-medium">{item.bin.binType.organType.toLowerCase()}</span>
-                                        </div>
-                                    </div>
-                                    {/* Facility + started + details */}
-                                    <div className="flex items-end justify-between gap-2">
-                                        <div>
-                                            <p className="text-sm font-semibold text-gray-700">{(item as any).facility?.name || item.facilityId}</p>
-                                            <p className="text-xs text-gray-400">
-                                                Started {new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => setSelectedCycle(item as unknown as CycleItem)}
-                                            className="flex-shrink-0 text-[#3d5aa8] bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-                                        >
-                                            Details
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="p-8 text-center text-gray-500 text-sm">No cycles found.</div>
-                        )}
-                    </div>
-
-                    {/* ── DESKTOP: table (hidden below md) ── */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/50">
-                                    {['Countdown', 'Bin ID', 'Organ Type', 'Status', 'Facility', 'Started', 'Actions'].map((h) => (
-                                        <th key={h} className={`p-4 font-semibold text-gray-600 text-sm border-b border-gray-100 ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {isBinsLoading ? (
-                                    <tr><td colSpan={7} className="p-8 text-center text-gray-500">
-                                        <div className="flex items-center justify-center gap-3">
-                                            <div className="w-6 h-6 border-4 border-[#3d5aa8] border-t-transparent rounded-full animate-spin" />
-                                            Loading priority queue...
-                                        </div>
-                                    </td></tr>
-                                ) : filteredBins.length > 0 ? (
-                                    filteredBins.map((item) => (
-                                        <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="p-4 align-middle"><CycleCountdown item={item as unknown as CycleItem} /></td>
-                                            <td className="p-4 align-middle">
-                                                <p className="font-semibold text-gray-900 truncate max-w-[150px]" title={item.bin.qrCode}>{item.bin.qrCode}</p>
-                                                <p className="text-xs text-gray-400 font-mono mt-0.5">#{item.id.slice(0, 8)}</p>
-                                            </td>
-                                            <td className="p-4 align-middle">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.bin.binType.urgency === 'CRITICAL' ? 'bg-red-500' : 'bg-green-500'}`} />
-                                                    <span className="capitalize font-medium text-gray-700">{item.bin.binType.organType.toLowerCase()}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 align-middle"><span className={statusBadge(item.status)}>{statusLabel(item.status)}</span></td>
-                                            <td className="p-4 align-middle text-gray-600 text-sm font-medium">{(item as any).facility?.name || item.facilityId}</td>
-                                            <td className="p-4 align-middle text-gray-500 text-sm">
-                                                <p>{new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                                <p className="text-xs text-gray-400">{new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                            </td>
-                                            <td className="p-4 align-middle text-right">
-                                                <button
-                                                    onClick={() => setSelectedCycle(item as unknown as CycleItem)}
-                                                    className="text-[#3d5aa8] hover:bg-blue-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
-                                                >
-                                                    Details
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr><td colSpan={7} className="p-8 text-center text-gray-500 bg-gray-50/50">No cycles found.</td></tr>
+                                    </Card>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
+                            </div>
+                        )}
+                        <select
+                            value={selectedFacility || ''}
+                            onChange={(e) => setSelectedFacility(e.target.value || undefined)}
+                            className="rounded-xl border border-edge bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-rust"
+                        >
+                            <option value="">All Facilities</option>
+                            {uniqueFacilities.map(([fid, fac]) => (
+                                <option key={fid} value={fid}>{fac?.name || fid}</option>
+                            ))}
+                        </select>
+                        <Button variant="secondary" onClick={() => void refetch()}>
+                            <Icon name="refresh" width={15} height={15} />
+                            Refresh
+                        </Button>
+                        <Button variant="rust" onClick={() => setAnchorModalOpen(true)}>
+                            <Icon name="chain" width={15} height={15} />
+                            Post on Blockchain
+                        </Button>
+                    </>
+                }
+            />
 
+            {/* Stats cards */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {statsCards.map((c) => (
+                    <div key={c.label} className="relative">
+                        {c.pulse && <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full border-2 border-canvas bg-rust animate-blink" />}
+                        <Stat label={c.label} value={<CountValue value={c.value} />} unit={c.unit} icon={c.icon} accent={c.pulse} />
+                    </div>
+                ))}
+            </div>
+
+            {/* All Cycles */}
+            <Card className="mt-8 overflow-hidden">
+                <div className="flex flex-col gap-3 border-b border-edge/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="flex items-center gap-2 font-display text-lg font-bold text-olive-deep">
+                        All Cycles
+                        <Badge tone="pending">{filteredBins.length}</Badge>
+                    </h2>
                 </div>
-            </main>
+
+                {/* Mobile card list */}
+                <div className="divide-y divide-edge/50 md:hidden">
+                    {isBinsLoading ? (
+                        <div className="flex items-center justify-center gap-3 p-8 text-sm text-muted">
+                            <span className="h-2 w-2 animate-blink rounded-full bg-rust" /> Loading…
+                        </div>
+                    ) : filteredBins.length > 0 ? (
+                        filteredBins.map((item) => (
+                            <div key={item.id} className="space-y-3 p-4">
+                                <div className="flex items-center justify-between gap-2">
+                                    <CycleCountdown item={item as unknown as CycleItem} />
+                                    <Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge>
+                                </div>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-ink">{item.bin.qrCode}</p>
+                                        <p className="font-mono text-xs text-muted">#{item.id.slice(0, 8)}</p>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-1.5 text-sm text-ink">
+                                        <span className={`h-2 w-2 rounded-full ${item.bin.binType.urgency === 'CRITICAL' ? 'bg-rust' : 'bg-live'}`} />
+                                        <span className="font-medium capitalize">{item.bin.binType.organType.toLowerCase()}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-end justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-ink">{(item as { facility?: { name: string } }).facility?.name || item.facilityId}</p>
+                                        <p className="text-xs text-muted">
+                                            Started {new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedCycle(item as unknown as CycleItem)}
+                                        className="shrink-0 rounded-xl bg-bone-light px-4 py-2 text-sm font-bold text-rust hover:bg-bone-light/70"
+                                    >
+                                        Details
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-8 text-center text-sm text-muted">No cycles found.</div>
+                    )}
+                </div>
+
+                {/* Desktop table */}
+                <div className="scroll-thin hidden overflow-x-auto md:block">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="border-b border-edge/60">
+                                {['Countdown', 'Bin ID', 'Organ Type', 'Status', 'Facility', 'Started', 'Actions'].map((h) => (
+                                    <th key={h} className={`px-5 py-3 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-edge/40">
+                            {isBinsLoading ? (
+                                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted">
+                                    <span className="inline-flex items-center gap-3">
+                                        <span className="h-2 w-2 animate-blink rounded-full bg-rust" /> Loading priority queue…
+                                    </span>
+                                </td></tr>
+                            ) : filteredBins.length > 0 ? (
+                                filteredBins.map((item) => (
+                                    <tr key={item.id} className="hover:bg-bone-light/40">
+                                        <td className="px-5 py-3 align-middle"><CycleCountdown item={item as unknown as CycleItem} /></td>
+                                        <td className="px-5 py-3 align-middle">
+                                            <p className="max-w-[150px] truncate font-semibold text-ink" title={item.bin.qrCode}>{item.bin.qrCode}</p>
+                                            <p className="mt-0.5 font-mono text-xs text-muted">#{item.id.slice(0, 8)}</p>
+                                        </td>
+                                        <td className="px-5 py-3 align-middle">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`h-2 w-2 shrink-0 rounded-full ${item.bin.binType.urgency === 'CRITICAL' ? 'bg-rust' : 'bg-live'}`} />
+                                                <span className="font-medium capitalize text-ink">{item.bin.binType.organType.toLowerCase()}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-3 align-middle"><Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge></td>
+                                        <td className="px-5 py-3 align-middle text-sm font-medium text-muted">{(item as { facility?: { name: string } }).facility?.name || item.facilityId}</td>
+                                        <td className="px-5 py-3 align-middle text-sm text-muted">
+                                            <p>{new Date(item.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                            <p className="text-xs">{new Date(item.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                        </td>
+                                        <td className="px-5 py-3 text-right align-middle">
+                                            <button
+                                                onClick={() => setSelectedCycle(item as unknown as CycleItem)}
+                                                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-rust hover:bg-bone-light/60"
+                                            >
+                                                Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan={7} className="bg-bone-light/40 p-8 text-center text-sm text-muted">No cycles found.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
 
             {selectedCycle && <DetailsSlideover cycle={selectedCycle} onClose={() => setSelectedCycle(null)} />}
             {anchorModalOpen && !isSubscriptionLoading && hasModule('BLOCKCHAIN_ANCHOR') && <BlockchainAnchorModal onClose={() => setAnchorModalOpen(false)} />}
             {anchorModalOpen && !isSubscriptionLoading && !hasModule('BLOCKCHAIN_ANCHOR') && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setAnchorModalOpen(false)}>
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="fixed inset-0 bg-olive-deep/40 backdrop-blur-sm" />
                     <div className="relative" onClick={(e) => e.stopPropagation()}>
                         <UpgradePrompt module="BLOCKCHAIN_ANCHOR" />
                     </div>
