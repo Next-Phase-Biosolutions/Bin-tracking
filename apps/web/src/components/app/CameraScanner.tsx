@@ -23,15 +23,27 @@ export function CameraScanner({
     let scanner: Html5Qrcode | null = null;
 
     const teardown = (s: Html5Qrcode) => {
-      s.stop()
-        .then(() => s.clear())
-        .catch(() => {
-          try {
-            s.clear();
-          } catch {
-            /* not started — nothing to tear down */
-          }
-        });
+      // stop() THROWS SYNCHRONOUSLY (it doesn't return a rejected promise)
+      // when the scanner never reached the scanning state — e.g. the camera
+      // permission was denied. Without the outer try, unmounting in that
+      // state throws inside React's effect cleanup and crashes the tree.
+      try {
+        s.stop()
+          .then(() => s.clear())
+          .catch(() => {
+            try {
+              s.clear();
+            } catch {
+              /* not started — nothing to tear down */
+            }
+          });
+      } catch {
+        try {
+          s.clear();
+        } catch {
+          /* not started — nothing to tear down */
+        }
+      }
     };
 
     (async () => {
