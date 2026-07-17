@@ -4,7 +4,7 @@
 #
 # One-time VPS provisioning (before first `docker compose up` of caddy):
 #   echo "to localhost:3001" > upstream.caddy
-api.<your-domain> {
+api.nextphasebiosolutions.com {
     reverse_proxy {
         import upstream.caddy
         health_uri /health
