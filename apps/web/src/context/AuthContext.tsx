@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase.ts';
 import { setAuthToken } from '../lib/trpc.ts';
+import { clearCachedModules } from '../lib/moduleCache.ts';
 
 interface AuthUser {
     id: string;
@@ -27,6 +29,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+    const queryClient = useQueryClient();
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -77,7 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         setUser(null);
         setAuthToken(null);
-    }, []);
+        // Org-scoped data must not survive into the next session — without
+        // this, signing into a different account/org in the same tab briefly
+        // shows the previous org's dashboard, members, and billing data.
+        queryClient.clear();
+        clearCachedModules();
+    }, [queryClient]);
 
     return (
         <AuthContext.Provider value={{ user, loading, login, signup, logout }}>

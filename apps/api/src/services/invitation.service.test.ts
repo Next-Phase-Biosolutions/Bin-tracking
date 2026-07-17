@@ -81,12 +81,13 @@ vi.mock('@bin-tracker/db', () => {
         },
         findUnique: ({ where }: { where: { token: string } }) =>
             Promise.resolve(store.invitations.find((i) => i.token === where.token) ?? null),
-        // Models what createInvitation's pending-invite lookup needs:
-        // orgId + email + acceptedAt: null + expiresAt > now.
+        // Faithful to the where-clauses createInvitation may send: orgId +
+        // email + acceptedAt: null, with expiresAt > now applied only when
+        // the service actually filters on it.
         findFirst: ({
             where,
         }: {
-            where: { orgId: string; email: string; acceptedAt: null; expiresAt: { gt: Date } };
+            where: { orgId: string; email: string; acceptedAt: null; expiresAt?: { gt: Date } };
         }) =>
             Promise.resolve(
                 store.invitations.find(
@@ -94,7 +95,7 @@ vi.mock('@bin-tracker/db', () => {
                         i.orgId === where.orgId &&
                         i.email === where.email &&
                         i.acceptedAt === null &&
-                        i.expiresAt.getTime() > where.expiresAt.gt.getTime(),
+                        (!where.expiresAt || i.expiresAt.getTime() > where.expiresAt.gt.getTime()),
                 ) ?? null,
             ),
         update: ({ where, data }: { where: { id: string }; data: Partial<FakeInvitation> }) => {
@@ -241,6 +242,18 @@ describe('invitationService.createInvitation', () => {
         expect(store.invitations[0]!.role).toBe('OPS_MANAGER'); // latest role wins
         expect(second.expiresAt.getTime()).toBeGreaterThanOrEqual(first.expiresAt.getTime());
         expect(sendInvitationEmailMock).toHaveBeenCalledTimes(2); // resend still goes out
+    });
+
+    it('re-inviting after expiry rotates the expired row instead of stacking a second one', async () => {
+        await invitationService.createInvitation('org-1', 'new@example.com', 'DRIVER');
+        const expiredToken = store.invitations[0]!.token;
+        store.invitations[0]!.expiresAt = new Date(Date.now() - 1000); // force-expire
+
+        const fresh = await invitationService.createInvitation('org-1', 'new@example.com', 'DRIVER');
+
+        expect(store.invitations).toHaveLength(1); // rotated in place, no duplicate
+        expect(store.invitations[0]!.token).not.toBe(expiredToken); // fresh token
+        expect(fresh.expiresAt.getTime()).toBeGreaterThan(Date.now()); // live again
     });
 });
 
