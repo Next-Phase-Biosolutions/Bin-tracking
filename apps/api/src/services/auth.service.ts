@@ -127,7 +127,23 @@ export async function createOrganization(owner: { id: string; email: string }, n
     return { orgId, slug };
 }
 
+export interface UpdateProfileResult {
+    id: string;
+    name: string;
+    email: string;
+}
+
+/** Settings-page rename. userId is always ctx.user.id — never client input. */
+export async function updateProfile(userId: string, name: string): Promise<UpdateProfileResult> {
+    return prisma.user.update({
+        where: { id: userId },
+        data: { name },
+        select: { id: true, name: true, email: true },
+    });
+}
+
 export const authService = {
     bootstrap,
     createOrganization,
+    updateProfile,
 };

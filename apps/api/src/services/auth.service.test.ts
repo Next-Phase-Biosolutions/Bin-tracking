@@ -40,6 +40,12 @@ vi.mock('@bin-tracker/db', () => {
             store.users.push({ ...create });
             return Promise.resolve({ ...create });
         },
+        update: ({ where, data }: { where: { id: string }; data: { name: string } }) => {
+            const row = store.users.find((u) => u.id === where.id);
+            if (!row) return Promise.reject(new Error('not found'));
+            row.name = data.name;
+            return Promise.resolve({ id: row.id, name: row.name, email: row.email });
+        },
     };
     const organizationMember = {
         findFirst: ({ where }: { where: { userId: string } }) =>
@@ -154,5 +160,16 @@ describe('authService.createOrganization', () => {
         process.env['BILLING_ENABLED'] = 'true';
         await authService.createOrganization({ id: 'user-1', email: 'a@example.com' }, 'Acme Inc');
         expect(createTrialSubscriptionMock).toHaveBeenCalledWith('org-new', 'a@example.com');
+    });
+});
+
+describe('authService.updateProfile', () => {
+    it('updates the name and returns the trimmed-down profile', async () => {
+        store.users.push({ id: 'user-1', email: 'a@example.com', name: 'old', role: 'ADMIN' });
+
+        const result = await authService.updateProfile('user-1', 'New Name');
+
+        expect(result).toEqual({ id: 'user-1', name: 'New Name', email: 'a@example.com' });
+        expect(store.users[0]?.name).toBe('New Name');
     });
 });
