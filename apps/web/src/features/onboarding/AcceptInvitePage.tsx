@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { trpc } from '../../lib/trpc';
+import { Logo } from '../../components/app/Logo';
+import { Icon } from '../../components/ui/Icon';
 
 /**
  * Landing page for an invite link (`/invite/:token`, Task 19). The token is
@@ -80,78 +81,84 @@ export default function AcceptInvitePage() {
 
     if (!token) {
         return (
-            <CenteredCard>
-                <h1 className="text-xl font-bold text-gray-900">Invalid invitation link</h1>
-                <p className="mt-3 text-sm text-gray-600">This invite link is missing its token.</p>
-            </CenteredCard>
+            <ClearanceCard eyebrow="Invalid link">
+                <h1 className="font-display text-xl font-extrabold text-olive-deep">Invalid invitation link</h1>
+                <p className="mt-3 text-sm leading-relaxed text-muted">This invite link is missing its token.</p>
+            </ClearanceCard>
         );
     }
 
     if (loading || (user && !error)) {
-        return <CenteredCard>Joining your team…</CenteredCard>;
+        return (
+            <ClearanceCard eyebrow="Joining">
+                <p className="animate-pulse font-mono text-xs uppercase tracking-eyebrow text-muted">
+                    Joining your team…
+                </p>
+            </ClearanceCard>
+        );
     }
 
     // Already logged in but the accept call itself failed (expired/invalid/
     // already-accepted token) — no signup/login form applies here.
     if (user && error) {
         return (
-            <CenteredCard>
-                <h1 className="text-xl font-bold text-gray-900">Couldn&apos;t join</h1>
-                <p className="mt-3 text-sm text-red-700">{error}</p>
-            </CenteredCard>
+            <ClearanceCard eyebrow="Clearance failed">
+                <h1 className="font-display text-xl font-extrabold text-olive-deep">Couldn&apos;t join</h1>
+                <p className="mt-3 text-sm leading-relaxed text-rust">{error}</p>
+            </ClearanceCard>
         );
     }
 
     if (needsEmailConfirmation) {
         return (
-            <CenteredCard>
-                <h1 className="text-xl font-bold text-gray-900">Check your email</h1>
-                <p className="mt-3 text-sm text-gray-600">
-                    We sent a confirmation link to <span className="font-semibold">{email}</span>. Click it, then
-                    come back to this invite link to finish joining.
+            <ClearanceCard eyebrow="One more step">
+                <h1 className="font-display text-xl font-extrabold text-olive-deep">Check your email</h1>
+                <p className="mt-3 text-sm leading-relaxed text-muted">
+                    We sent a confirmation link to <span className="font-semibold text-olive-deep">{email}</span>.
+                    Click it, then come back to this invite link to finish joining.
                 </p>
-            </CenteredCard>
+            </ClearanceCard>
         );
     }
 
     return (
-        <CenteredCard>
-            <div className="mb-6 flex flex-col items-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#3d5aa8]/10">
-                    <UserPlus className="h-6 w-6 text-[#3d5aa8]" />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900">You've been invited</h1>
-                <p className="mt-1 text-sm text-gray-600">
-                    {mode === 'signup' ? 'Create an account to join the team.' : 'Log in to join the team.'}
-                </p>
-            </div>
+        <ClearanceCard eyebrow="Crew invitation">
+            <h1 className="font-display text-xl font-extrabold text-olive-deep">You&apos;ve been invited</h1>
+            <p className="mt-1.5 text-sm text-muted">
+                {mode === 'signup' ? 'Create an account to join the team.' : 'Log in to join the team.'}
+            </p>
 
-            <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 text-left">
+            <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4 text-left">
                 <Field label="Email" type="email" value={email} onChange={setEmail} required autoFocus />
                 <Field label="Password" type="password" value={password} onChange={setPassword} required />
 
-                {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+                {error && (
+                    <div className="rounded-lg border border-rust/25 bg-rust/10 px-4 py-3 text-sm text-rust">
+                        {error}
+                    </div>
+                )}
 
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full rounded-xl bg-[#3d5aa8] py-3 text-sm font-bold text-white transition-colors hover:bg-[#2d4898] disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rust py-3 text-sm font-semibold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
                 >
                     {isSubmitting ? 'Joining…' : mode === 'signup' ? 'Sign up & join' : 'Log in & join'}
+                    {!isSubmitting && <Icon name="arrow" width={15} height={15} />}
                 </button>
             </form>
 
-            <p className="mt-6 text-sm text-gray-600">
+            <p className="mt-6 text-sm text-muted">
                 {mode === 'signup' ? 'Already have an account?' : 'New to Bin Tracker?'}{' '}
                 <button
                     type="button"
                     onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
-                    className="font-semibold text-[#3d5aa8] hover:underline"
+                    className="font-semibold text-rust hover:underline"
                 >
                     {mode === 'signup' ? 'Log in' : 'Sign up'}
                 </button>
             </p>
-        </CenteredCard>
+        </ClearanceCard>
     );
 }
 
@@ -167,24 +174,39 @@ interface FieldProps {
 function Field({ label, value, onChange, type = 'text', required, autoFocus }: FieldProps) {
     return (
         <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+            <span className="mb-1.5 block font-mono text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-muted">
+                {label}
+            </span>
             <input
                 type={type}
                 value={value}
                 required={required}
                 autoFocus={autoFocus}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                className="w-full rounded-lg border border-edge/80 bg-canvas px-3.5 py-2.5 text-sm text-ink transition-colors focus:border-olive focus:bg-white focus:outline-none"
             />
         </label>
     );
 }
 
-function CenteredCard({ children }: { children: React.ReactNode }) {
+/**
+ * The invite "clearance card": olive header band carrying the brand (same
+ * treatment as the app sidebar), white body, on the canvas data-grid
+ * texture the rest of the product uses.
+ */
+function ClearanceCard({ eyebrow, children }: { eyebrow: string; children: ReactNode }) {
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-            <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-                {children}
+        <div className="relative flex min-h-screen items-center justify-center bg-canvas p-6">
+            <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg opacity-60" />
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-edge/70 bg-white shadow-panel">
+                <div className="relative border-b border-white/10 bg-olive-deep px-8 py-6">
+                    <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg-dark opacity-60" />
+                    <Logo variant="light" className="relative h-7 w-auto" />
+                    <p className="relative mt-2 font-mono text-[0.58rem] uppercase tracking-eyebrow text-bone/50">
+                        Facility OS · {eyebrow}
+                    </p>
+                </div>
+                <div className="px-8 py-7 text-center">{children}</div>
             </div>
         </div>
     );
