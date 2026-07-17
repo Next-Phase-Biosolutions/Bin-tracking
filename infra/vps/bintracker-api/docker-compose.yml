@@ -70,6 +70,12 @@ services:
     container_name: bintracker_worker
     restart: unless-stopped
     command: ['./node_modules/.bin/tsx', 'src/worker.ts']
+    healthcheck:
+      # The API image's HEALTHCHECK probes :3001/health, but worker.ts runs no
+      # HTTP server — the inherited check can never pass. restart: unless-stopped
+      # covers crashes; a hung-but-alive worker isn't detectable without adding
+      # a probe endpoint to worker.ts.
+      disable: true
     env_file: .env
     networks: [api_net]
     mem_limit: 1g
