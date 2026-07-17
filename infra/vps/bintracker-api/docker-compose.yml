@@ -20,7 +20,10 @@ services:
     restart: unless-stopped
     env_file: .env
     networks: [api_net]
-    ports: ['3001:3001']
+    # 127.0.0.1 binding: Docker published ports bypass UFW, so a bare
+    # '3001:3001' would expose the API publicly despite the firewall.
+    # Caddy runs with network_mode: host and reaches these via localhost.
+    ports: ['127.0.0.1:3001:3001']
     mem_limit: 2g
     cpus: 1.5
     depends_on:
@@ -44,7 +47,7 @@ services:
     restart: 'no' # only started explicitly by deploy.sh during a deploy
     env_file: .env
     networks: [api_net]
-    ports: ['3002:3001']
+    ports: ['127.0.0.1:3002:3001']
     mem_limit: 2g
     cpus: 1.5
     depends_on:
