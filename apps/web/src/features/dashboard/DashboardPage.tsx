@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { trpc } from '../../lib/trpc';
 import { CountdownTimer } from '../../components/CountdownTimer';
-import { setAuthToken } from '../../lib/trpc';
 import { PageHeader } from '../../components/app/PageHeader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
@@ -29,7 +28,6 @@ function getPresetRange(preset: DatePreset): { from: Date | null; to: Date | nul
     return { from: null, to: null };
 }
 
-const TEST_ADMIN_TOKEN = import.meta.env.VITE_TEST_ADMIN_TOKEN || '';
 
 type CycleItem = {
     id: string;
@@ -173,8 +171,6 @@ export function DashboardPage() {
     const [calendarOpen, setCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
     const { hasModule, isLoading: isSubscriptionLoading } = useSubscription();
-
-    useState(() => { setAuthToken(TEST_ADMIN_TOKEN); });
 
     useEffect(() => {
         function handleClick(e: MouseEvent) {
