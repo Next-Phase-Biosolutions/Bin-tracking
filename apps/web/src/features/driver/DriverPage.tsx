@@ -84,8 +84,8 @@ function ScanResult({
             );
             await trpcContext.bin.getActiveDynamicMatches.invalidate();
             setActionSuccess('PICKED_UP');
-        } catch (error) {
-            console.error(error);
+        } catch {
+            // Surfaced via pickupMutation.isError in the render below.
         }
     };
 
@@ -99,8 +99,8 @@ function ScanResult({
             setBinOptions((prev) => prev.map((b) => (b.id === selectedBinId ? { ...b, status: 'IDLE', activeCycle: null } : b)));
             await trpcContext.bin.getActiveDynamicMatches.invalidate();
             setActionSuccess('DELIVERED');
-        } catch (error) {
-            console.error(error);
+        } catch {
+            // Surfaced via deliverMutation.isError in the render below.
         }
     };
 

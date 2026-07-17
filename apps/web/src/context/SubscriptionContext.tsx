@@ -2,23 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ModuleKey, Plan, SubscriptionStatus } from '@bin-tracker/types';
 import { trpc } from '../lib/trpc';
-
-/**
- * Last-known module set, persisted so the sidebar renders its module-gated
- * links instantly on the next visit instead of popping in after three
- * billing queries resolve. Server data always overwrites it once loaded —
- * the cache only ever bridges the initial fetch.
- */
-const MODULES_CACHE_KEY = 'npb.enabledModules';
-
-function readCachedModules(): ModuleKey[] | null {
-    try {
-        const raw = localStorage.getItem(MODULES_CACHE_KEY);
-        return raw ? (JSON.parse(raw) as ModuleKey[]) : null;
-    } catch {
-        return null;
-    }
-}
+import { useAuth } from './AuthContext';
+import { readCachedModules, writeCachedModules } from '../lib/moduleCache';
 
 interface SubscriptionContextValue {
     /** Whether Stripe billing is turned on at all (`BILLING_ENABLED` env flag). */
@@ -42,23 +27,24 @@ interface SubscriptionContextValue {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-    // status is public. current/enabledModules are org-scoped (orgProcedure) —
-    // fired unconditionally like every other org-scoped query in this app
-    // (org/auth resolution, including the DISABLE_AUTH dev bypass, happens
-    // server-side in tRPC context; there is nothing more to gate on here).
+    // current/enabledModules are org-scoped (orgProcedure), so they must wait
+    // for the Supabase session restore to hand the JWT to the tRPC client —
+    // fired unconditionally they race it: the first request goes out with no
+    // Authorization header, 401s, and only the ~1s retry (or a refocus)
+    // recovers. Gating on `user` also stops them from firing at all on
+    // station-token kiosk routes, which have no user session to answer with.
+    // Under the DISABLE_AUTH dev bypass there is no Supabase user; the
+    // backend injects one, so the queries stay ungated there.
+    const { user } = useAuth();
+    const authed = import.meta.env.VITE_DISABLE_AUTH === 'true' || user !== null;
+    // status is public — safe to fire immediately.
     const statusQuery = trpc.billing.status.useQuery();
-    const currentQuery = trpc.billing.current.useQuery();
-    const modulesQuery = trpc.billing.enabledModules.useQuery();
+    const currentQuery = trpc.billing.current.useQuery(undefined, { enabled: authed });
+    const modulesQuery = trpc.billing.enabledModules.useQuery(undefined, { enabled: authed });
 
     const [cachedModules] = useState(readCachedModules);
     useEffect(() => {
-        if (modulesQuery.data) {
-            try {
-                localStorage.setItem(MODULES_CACHE_KEY, JSON.stringify(modulesQuery.data));
-            } catch {
-                // Private-mode/quota failures just lose the fast path.
-            }
-        }
+        if (modulesQuery.data) writeCachedModules(modulesQuery.data);
     }, [modulesQuery.data]);
 
     const enabledModules = useMemo(

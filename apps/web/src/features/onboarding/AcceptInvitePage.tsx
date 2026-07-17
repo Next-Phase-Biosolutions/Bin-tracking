@@ -61,6 +61,11 @@ export default function AcceptInvitePage() {
         }
 
         setIsSubmitting(true);
+        // login/signup below set `user`, which would ALSO fire the
+        // logged-in-already effect's accept() — claim the guard first so
+        // only this submit path accepts, not both in a race (the loser
+        // would flash "already accepted" for a join that just succeeded).
+        requested.current = true;
         try {
             if (mode === 'signup') {
                 const { needsEmailConfirmation: pending } = await signup(email.trim(), password);

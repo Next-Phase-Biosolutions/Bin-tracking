@@ -31,11 +31,13 @@ export async function createInvitation(orgId: string, email: string, role: UserR
 
     const normalizedEmail = email.toLowerCase();
 
-    // Re-inviting the same address rotates the existing pending invitation
-    // (fresh token + expiry) instead of accumulating rows — one live token
-    // per (org, email), and "resend" comes for free.
+    // Re-inviting the same address rotates the existing unaccepted invitation
+    // (fresh token + expiry) instead of accumulating rows — one token per
+    // (org, email), and "resend" comes for free. Expired rows are rotated
+    // too: the settings page tells admins "re-invite to send a fresh link",
+    // so an expired row must be revived, not left behind next to a new one.
     const pending = await prisma.invitation.findFirst({
-        where: { orgId, email: normalizedEmail, acceptedAt: null, expiresAt: { gt: new Date() } },
+        where: { orgId, email: normalizedEmail, acceptedAt: null },
     });
 
     // Stored hashed at rest (lib/token.ts); only the emailed link ever
