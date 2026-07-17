@@ -17,6 +17,26 @@ if (sentryDsn) {
     Sentry.init({ dsn: sentryDsn, environment: import.meta.env.MODE });
 }
 
+/**
+ * Last-resort crash screen — an unhandled render error must never leave a
+ * blank white page. Sentry.ErrorBoundary also reports the error when a DSN
+ * is configured; without one it still works as a plain React boundary.
+ */
+function CrashFallback() {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-6 text-center">
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-rust">System fault</p>
+            <h1 className="font-display text-xl font-extrabold text-olive-deep">Something went wrong</h1>
+            <button
+                onClick={() => window.location.reload()}
+                className="rounded-xl bg-olive-deep px-5 py-2.5 text-sm font-semibold text-bone-light transition-colors hover:bg-olive-deep/90"
+            >
+                Reload
+            </button>
+        </div>
+    );
+}
+
 function Root() {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -47,6 +67,8 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
 createRoot(root).render(
     <StrictMode>
-        <Root />
+        <Sentry.ErrorBoundary fallback={<CrashFallback />}>
+            <Root />
+        </Sentry.ErrorBoundary>
     </StrictMode>,
 );

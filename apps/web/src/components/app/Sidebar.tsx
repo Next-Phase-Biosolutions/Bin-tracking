@@ -59,7 +59,7 @@ function NavGroup({
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     const pathname = useLocation().pathname;
     const { user, logout } = useAuth();
-    const { hasModule, isLoading: subscriptionLoading } = useSubscription();
+    const { hasModule, modulesReady } = useSubscription();
 
     return (
         <div className="flex h-full flex-col bg-olive-deep text-bone" onClick={onNavigate}>
@@ -74,7 +74,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </div>
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
-                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={subscriptionLoading} />
+                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} />
             </nav>
 
             <ProfileChip email={user?.email} onLogout={() => void logout()} />

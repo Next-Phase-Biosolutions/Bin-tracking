@@ -6,13 +6,24 @@ import { Sidebar } from '../app/Sidebar';
 import { TopBar } from '../app/TopBar';
 import { MARKETING_URL } from '../../lib/marketingUrl';
 
-export function AppShellLayout() {
+/**
+ * `optional` is for the station-token kiosk routes (/app/bin, /app/guard, …):
+ * an unattended facility-floor tablet has no user session, so those routes
+ * must render WITHOUT the login redirect — but a signed-in user navigating
+ * to the same pages from the sidebar should keep the full shell around them.
+ */
+export function AppShellLayout({ optional = false }: { optional?: boolean }) {
     const { user, loading } = useAuth();
     const [drawer, setDrawer] = useState(false);
 
     useEffect(() => {
-        if (!loading && !user) window.location.href = `${MARKETING_URL}/login`;
-    }, [loading, user]);
+        if (!optional && !loading && !user) window.location.href = `${MARKETING_URL}/login`;
+    }, [optional, loading, user]);
+
+    // Kiosk mode: no session, no shell, no redirect — the page owns the screen.
+    if (optional && !loading && !user) {
+        return <Outlet />;
+    }
 
     if (loading || !user) {
         return (

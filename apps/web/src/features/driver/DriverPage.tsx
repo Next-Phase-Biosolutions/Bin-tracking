@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { trpc, setAuthToken, type RouterOutputs } from '../../lib/trpc';
+import { trpc, type RouterOutputs } from '../../lib/trpc';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge } from '../../components/ui/primitives';
 import { ScanPanel } from '../../components/app/ScanPanel';
 
 type BinOption = RouterOutputs['bin']['getActiveDynamicMatches'][number];
 
-const TEST_DRIVER_TOKEN = import.meta.env.VITE_TEST_DRIVER_TOKEN || '';
 
 function ScanResult({
     code,
@@ -251,10 +250,6 @@ function ScanResult({
 }
 
 export function DriverPage() {
-    useState(() => {
-        setAuthToken(TEST_DRIVER_TOKEN);
-    });
-
     return (
         <div className="mx-auto max-w-2xl">
             <header className="flex items-center justify-between rounded-2xl border border-edge/70 bg-white p-4 shadow-card">
