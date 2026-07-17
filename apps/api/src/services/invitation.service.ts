@@ -165,7 +165,46 @@ export async function acceptInvitation(
     return { orgId: invitation.orgId, role: invitation.role };
 }
 
+export interface PendingInvitationListItem {
+    id: string;
+    email: string;
+    role: UserRole;
+    createdAt: Date;
+    expiresAt: Date;
+}
+
+/**
+ * Unaccepted invitations for the org (newest first), including expired ones —
+ * the settings page marks those "Expired" so an admin can see who never
+ * joined and re-invite (createInvitation rotates the pending row).
+ */
+export async function listInvitations(orgId: string): Promise<PendingInvitationListItem[]> {
+    return prisma.invitation.findMany({
+        where: { orgId, acceptedAt: null },
+        select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
+        orderBy: { createdAt: 'desc' },
+    });
+}
+
+/**
+ * Revokes (deletes) an unaccepted invitation; the emailed link stops working.
+ * deleteMany scoped by orgId so an admin can only ever revoke invitations in
+ * their own org — a foreign id resolves to count 0, indistinguishable from
+ * a nonexistent one.
+ */
+export async function revokeInvitation(orgId: string, invitationId: string): Promise<{ id: string }> {
+    const result = await prisma.invitation.deleteMany({
+        where: { id: invitationId, orgId, acceptedAt: null },
+    });
+    if (result.count === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Invitation not found or already accepted' });
+    }
+    return { id: invitationId };
+}
+
 export const invitationService = {
     createInvitation,
     acceptInvitation,
+    listInvitations,
+    revokeInvitation,
 };

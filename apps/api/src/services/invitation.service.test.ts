@@ -19,6 +19,7 @@ interface FakeInvitation {
     token: string;
     expiresAt: Date;
     acceptedAt: Date | null;
+    createdAt: Date;
 }
 interface FakeUser {
     id: string;
@@ -58,10 +59,25 @@ vi.mock('@bin-tracker/db', () => {
     };
 
     const invitationModel = {
-        create: ({ data }: { data: Omit<FakeInvitation, 'id' | 'acceptedAt'> }) => {
-            const row: FakeInvitation = { id: nextId('inv'), acceptedAt: null, ...data };
+        create: ({ data }: { data: Omit<FakeInvitation, 'id' | 'acceptedAt' | 'createdAt'> }) => {
+            const row: FakeInvitation = { id: nextId('inv'), acceptedAt: null, createdAt: new Date(), ...data };
             store.invitations.push(row);
             return Promise.resolve(row);
+        },
+        findMany: ({ where }: { where: { orgId: string; acceptedAt: null } }) =>
+            Promise.resolve(
+                store.invitations
+                    .filter((i) => i.orgId === where.orgId && i.acceptedAt === where.acceptedAt)
+                    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+                    .map(({ id, email, role, createdAt, expiresAt }) => ({ id, email, role, createdAt, expiresAt })),
+            ),
+        deleteMany: ({ where }: { where: { id: string; orgId: string; acceptedAt: null } }) => {
+            const idx = store.invitations.findIndex(
+                (i) => i.id === where.id && i.orgId === where.orgId && i.acceptedAt === where.acceptedAt,
+            );
+            if (idx === -1) return Promise.resolve({ count: 0 });
+            store.invitations.splice(idx, 1);
+            return Promise.resolve({ count: 1 });
         },
         findUnique: ({ where }: { where: { token: string } }) =>
             Promise.resolve(store.invitations.find((i) => i.token === where.token) ?? null),
@@ -181,6 +197,7 @@ function makeInvitation(overrides: Partial<FakeInvitation> = {}): FakeInvitation
         role: 'OPS_MANAGER',
         expiresAt: new Date(Date.now() + 60_000),
         acceptedAt: null,
+        createdAt: new Date(),
         ...overrides,
         token: hashToken(overrides.token ?? rawToken),
     };
@@ -366,5 +383,46 @@ describe('invitationService.acceptInvitation', () => {
 
         expect(store.memberships).toHaveLength(1); // updated in place, not duplicated
         expect(store.memberships[0]?.role).toBe('DRIVER');
+    });
+});
+
+describe('invitationService.listInvitations', () => {
+    it('returns unaccepted invitations (including expired) newest first, scoped to the org', async () => {
+        makeInvitation({ email: 'old@example.com', createdAt: new Date('2026-01-01') });
+        makeInvitation({ email: 'new@example.com', createdAt: new Date('2026-02-01') });
+        makeInvitation({ email: 'expired@example.com', createdAt: new Date('2026-01-15'), expiresAt: new Date(Date.now() - 1) });
+        makeInvitation({ email: 'accepted@example.com', acceptedAt: new Date() });
+        makeInvitation({ email: 'foreign@example.com', orgId: 'org-2' });
+
+        const list = await invitationService.listInvitations('org-1');
+
+        expect(list.map((i) => i.email)).toEqual(['new@example.com', 'expired@example.com', 'old@example.com']);
+    });
+});
+
+describe('invitationService.revokeInvitation', () => {
+    it('deletes a pending invitation', async () => {
+        const inv = makeInvitation();
+
+        await invitationService.revokeInvitation('org-1', inv.id);
+
+        expect(store.invitations).toHaveLength(0);
+    });
+
+    it('rejects revoking an invitation from another org', async () => {
+        const foreign = makeInvitation({ orgId: 'org-2' });
+
+        await expect(invitationService.revokeInvitation('org-1', foreign.id)).rejects.toMatchObject({
+            code: 'NOT_FOUND',
+        });
+        expect(store.invitations).toHaveLength(1);
+    });
+
+    it('rejects revoking an already-accepted invitation', async () => {
+        const accepted = makeInvitation({ acceptedAt: new Date() });
+
+        await expect(invitationService.revokeInvitation('org-1', accepted.id)).rejects.toMatchObject({
+            code: 'NOT_FOUND',
+        });
     });
 });

@@ -1,5 +1,5 @@
 import { router, verifiedProcedure, protectedProcedure } from '../trpc/trpc.js';
-import { createOrganizationSchema } from '@bin-tracker/validators';
+import { createOrganizationSchema, updateProfileSchema } from '@bin-tracker/validators';
 import { authService } from '../services/auth.service.js';
 
 export const authRouter = router({
@@ -20,4 +20,21 @@ export const authRouter = router({
     createOrganization: protectedProcedure
         .input(createOrganizationSchema)
         .mutation(async ({ ctx, input }) => authService.createOrganization(ctx.user!, input.name)),
+
+    /**
+     * Who am I, for the settings page and sidebar: local profile plus the
+     * caller's ORG role (OrganizationMember.role via ctx — see org-context.ts;
+     * NOT the informational global user.role). Everything read from ctx.
+     */
+    me: protectedProcedure.query(({ ctx }) => ({
+        id: ctx.user!.id,
+        email: ctx.user!.email,
+        name: ctx.user!.name,
+        orgId: ctx.orgId,
+        orgRole: ctx.orgRole,
+    })),
+
+    updateProfile: protectedProcedure
+        .input(updateProfileSchema)
+        .mutation(async ({ ctx, input }) => authService.updateProfile(ctx.user!.id, input.name)),
 });

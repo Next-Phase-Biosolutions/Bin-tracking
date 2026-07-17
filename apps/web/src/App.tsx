@@ -14,6 +14,7 @@ import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage'
 import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
+import SettingsPage from './features/settings/SettingsPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
 import AcceptInvitePage from './features/onboarding/AcceptInvitePage';
 import AuthCallbackPage from './features/auth/AuthCallbackPage';
@@ -68,6 +69,7 @@ export function App() {
                 <Route path="/app/forms/new" element={<FormBuilderPage />} />
                 <Route path="/app/forms/import" element={<FormImportPage />} />
                 <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
+                <Route path="/app/settings" element={<SettingsPage />} />
                 <Route path="/app/settings/billing" element={<BillingSettingsPage />} />
             </Route>
         </Routes>

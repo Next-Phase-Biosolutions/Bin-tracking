@@ -44,16 +44,24 @@ export {
     loginSchema,
     stationAuthSchema,
     createOrganizationSchema,
+    updateProfileSchema,
     type LoginInput,
     type StationAuthInput,
     type CreateOrganizationInput,
+    type UpdateProfileInput,
 } from './auth.schema.js';
 
 export {
     createInvitationSchema,
     acceptInvitationSchema,
+    revokeInvitationSchema,
+    updateMemberRoleSchema,
+    removeMemberSchema,
     type CreateInvitationInput,
     type AcceptInvitationInput,
+    type RevokeInvitationInput,
+    type UpdateMemberRoleInput,
+    type RemoveMemberInput,
 } from './invitation.schema.js';
 
 export {
