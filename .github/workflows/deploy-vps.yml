@@ -14,7 +14,7 @@ name: Deploy to VPS
 #   VPS_DEPLOY_SSH_KEY   — dedicated deploy-only key pair (not a personal key),
 #                          public half added to the deploy user's authorized_keys on the box
 #   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET — Tailscale OAuth client (scope: auth_keys,
-#                          tag tag:ci) so the runner can join the tailnet as an
+#                          tag tag:cli) so the runner can join the tailnet as an
 #                          ephemeral node that disappears after the job
 
 on:
@@ -45,7 +45,7 @@ jobs:
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          tags: tag:cli
 
       - uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
         with:
