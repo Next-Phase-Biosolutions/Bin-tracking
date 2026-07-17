@@ -74,3 +74,67 @@ describe('verifySupabaseToken — network fallback (no SUPABASE_JWT_SECRET)', ()
         expect(await verifySupabaseToken('bad-token')).toBeNull();
     });
 });
+
+describe('verifySupabaseToken — asymmetric tokens (ES256) verified via JWKS', () => {
+    const realFetch = globalThis.fetch;
+    let publicJwk: Record<string, unknown>;
+    let privateKey: Awaited<ReturnType<typeof import('jose').generateKeyPair>>['privateKey'];
+
+    beforeEach(async () => {
+        // Even with the shared secret set (as in production), ES256 tokens
+        // must route to JWKS — this is the exact prod-incident scenario.
+        process.env['SUPABASE_JWT_SECRET'] = SECRET;
+        process.env['SUPABASE_URL'] = 'https://test-project.supabase.co';
+        getUserMock.mockReset();
+
+        const { generateKeyPair, exportJWK } = await import('jose');
+        const pair = await generateKeyPair('ES256');
+        privateKey = pair.privateKey;
+        publicJwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-kid', alg: 'ES256', use: 'sig' };
+
+        globalThis.fetch = vi.fn(async () =>
+            new Response(JSON.stringify({ keys: [publicJwk] }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            }),
+        ) as typeof fetch;
+    });
+
+    afterEach(() => {
+        globalThis.fetch = realFetch;
+        delete process.env['SUPABASE_JWT_SECRET'];
+        delete process.env['SUPABASE_URL'];
+    });
+
+    async function signEs256(claims: Record<string, unknown>, expiresIn = '1h'): Promise<string> {
+        return new SignJWT(claims)
+            .setProtectedHeader({ alg: 'ES256', kid: 'test-kid' })
+            .setIssuedAt()
+            .setExpirationTime(expiresIn)
+            .sign(privateKey);
+    }
+
+    it('verifies a valid ES256 token against the project JWKS, not the shared secret', async () => {
+        const token = await signEs256({ sub: 'user-3', email: 'c@example.com' });
+        const payload = await verifySupabaseToken(token);
+        expect(payload).toMatchObject({ sub: 'user-3', email: 'c@example.com' });
+        expect(getUserMock).not.toHaveBeenCalled();
+        expect(globalThis.fetch).toHaveBeenCalled();
+    });
+
+    it('rejects an ES256 token signed by a different key', async () => {
+        const { generateKeyPair } = await import('jose');
+        const rogue = await generateKeyPair('ES256');
+        const token = await new SignJWT({ sub: 'user-3' })
+            .setProtectedHeader({ alg: 'ES256', kid: 'test-kid' })
+            .setIssuedAt()
+            .setExpirationTime('1h')
+            .sign(rogue.privateKey);
+        expect(await verifySupabaseToken(token)).toBeNull();
+    });
+
+    it('rejects an expired ES256 token', async () => {
+        const token = await signEs256({ sub: 'user-3' }, '-1h');
+        expect(await verifySupabaseToken(token)).toBeNull();
+    });
+});
