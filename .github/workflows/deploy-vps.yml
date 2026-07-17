@@ -8,10 +8,14 @@ name: Deploy to VPS
 # the migration job and could serve new code against an un-migrated schema.
 #
 # Required GitHub environment: production (same gated-approval Environment as deploy-production.yml)
-# Required environment secrets:
-#   VPS_HOST            — VPS public IP or hostname
+# Required secrets:
+#   VPS_HOST             — VPS Tailscale IP (SSH is closed to the public internet;
+#                          the runner joins the tailnet via the step below)
 #   VPS_DEPLOY_SSH_KEY   — dedicated deploy-only key pair (not a personal key),
-#                          public half added to the `deploy` user's authorized_keys on the box
+#                          public half added to the deploy user's authorized_keys on the box
+#   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET — Tailscale OAuth client (scope: auth_keys,
+#                          tag tag:ci) so the runner can join the tailnet as an
+#                          ephemeral node that disappears after the job
 
 on:
   workflow_dispatch:
@@ -36,10 +40,17 @@ jobs:
     environment: production
     timeout-minutes: 15
     steps:
+      - name: Join tailnet (SSH to the VPS is Tailscale-only — no public port 22)
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: deploy
+          username: faizan
           key: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
           script: |
             cd /opt/bin-tracker
