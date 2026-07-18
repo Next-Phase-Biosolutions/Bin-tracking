@@ -7,6 +7,9 @@ import { FormRenderer } from './FormRenderer';
 import { FormBuilder } from './FormBuilder';
 import { Icon } from '../../components/ui/Icon';
 import { Badge } from '../../components/ui/primitives';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { UpgradePrompt } from '../../components/UpgradePrompt';
 
 // form.listByStage requires stationProcedure — scoped to this one call.
 const stationClient = createStationTRPCClient(STATION_TOKEN);
@@ -48,6 +51,9 @@ function FormCard({ form, onOpen }: { form: FormTemplate; onOpen: () => void }) 
 export function FormListPage() {
     const [openForm, setOpenForm] = useState<FormTemplate | null>(null);
     const [showBuilder, setShowBuilder] = useState(false);
+    // Direct-URL guard: the sidebar already hides this link for orgs without
+    // FORMS, but the page itself must refuse too (same pattern as GuardScannerPage).
+    const { hasModule, isLoading: modulesLoading } = useSubscription();
 
     const { data: forms, isLoading, error } = useQuery({
         queryKey: ['form.listByStage', STAGE],
@@ -55,6 +61,21 @@ export function FormListPage() {
         staleTime: 5 * 60 * 1000,
         retry: 2,
     });
+
+    if (modulesLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+                <FacilityLoader variant="inline" label="forms" />
+            </div>
+        );
+    }
+    if (!hasModule('FORMS')) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
+                <UpgradePrompt module="FORMS" />
+            </div>
+        );
+    }
 
     if (showBuilder) {
         return <FormBuilder onBack={() => setShowBuilder(false)} />;
@@ -100,9 +121,8 @@ export function FormListPage() {
 
             <div className="mx-auto max-w-xl px-4 py-6">
                 {isLoading && (
-                    <div className="flex flex-col items-center justify-center py-20 text-muted">
-                        <span className="mb-3 h-2 w-2 animate-blink rounded-full bg-rust" />
-                        <p className="text-sm">Loading forms…</p>
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <FacilityLoader variant="inline" label="forms" />
                     </div>
                 )}
 

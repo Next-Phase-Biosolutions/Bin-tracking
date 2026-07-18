@@ -58,6 +58,40 @@ export function useTicker(
   return value;
 }
 
+const SPLASH_DELAY_MS = 200;
+const SPLASH_MIN_VISIBLE_MS = 600;
+
+/**
+ * Anti-flash gate for a loading splash. Given an async "is loading" flag,
+ * returns whether the splash should render right now:
+ * - waits {@link SPLASH_DELAY_MS} before showing, so fast loads never flash a splash
+ * - once shown, stays up at least {@link SPLASH_MIN_VISIBLE_MS} to avoid a flicker
+ */
+export function useSplashGate(active: boolean): boolean {
+  const [shown, setShown] = useState(false);
+  const shownAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (active) {
+      if (shown) return; // already visible — nothing to schedule
+      const id = setTimeout(() => {
+        shownAt.current = Date.now();
+        setShown(true);
+      }, SPLASH_DELAY_MS);
+      return () => clearTimeout(id);
+    }
+    if (!shown) return; // never crossed the delay threshold — stay hidden
+    const elapsed = shownAt.current ? Date.now() - shownAt.current : SPLASH_MIN_VISIBLE_MS;
+    const id = setTimeout(() => {
+      shownAt.current = null;
+      setShown(false);
+    }, Math.max(0, SPLASH_MIN_VISIBLE_MS - elapsed));
+    return () => clearTimeout(id);
+  }, [active, shown]);
+
+  return shown;
+}
+
 /** Live clock string HH:MM:SS, updates every second. */
 export function useClock() {
   const [now, setNow] = useState<Date | null>(null);

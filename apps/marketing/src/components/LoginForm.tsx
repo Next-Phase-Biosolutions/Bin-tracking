@@ -1,20 +1,32 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { handoffToApp } from '@/lib/authHandoff';
+import { validateEmail } from '@/lib/validation';
 
 const field =
     'w-full rounded-xl border border-edge bg-white px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-rust focus:outline-none';
+
+const fieldErrorText = 'mt-1.5 text-xs text-rust';
 
 export function LoginForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setError(null);
+
+        const emailIssue = validateEmail(email);
+        const passwordIssue = password ? null : 'Password is required.';
+        setEmailError(emailIssue);
+        setPasswordError(passwordIssue);
+        if (emailIssue || passwordIssue) return;
+
         setIsSubmitting(true);
         try {
             const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -43,13 +55,15 @@ export function LoginForm() {
                     name="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
                     required
                     autoFocus
                     autoComplete="email"
                     placeholder="you@yourplant.com"
+                    aria-invalid={emailError ? true : undefined}
                     className={field}
                 />
+                {emailError && <p className={fieldErrorText}>{emailError}</p>}
             </div>
 
             <div>
@@ -64,10 +78,11 @@ export function LoginForm() {
                         name="password"
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
                         required
                         autoComplete="current-password"
                         placeholder="Enter your password"
+                        aria-invalid={passwordError ? true : undefined}
                         className={`${field} pr-12`}
                     />
                     <button
@@ -79,6 +94,7 @@ export function LoginForm() {
                         {showPassword ? 'Hide' : 'Show'}
                     </button>
                 </div>
+                {passwordError && <p className={fieldErrorText}>{passwordError}</p>}
             </div>
 
             {error && <div className="rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">{error}</div>}

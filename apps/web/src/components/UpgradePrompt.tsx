@@ -1,17 +1,8 @@
 import { useState } from 'react';
+import { MODULE_LABELS } from '@bin-tracker/types';
 import type { ModuleKey, Plan } from '@bin-tracker/types';
 import { trpc } from '../lib/trpc';
 import { useSubscription } from '../context/SubscriptionContext';
-
-const MODULE_LABELS: Record<ModuleKey, string> = {
-    ANIMAL_INTAKE: 'Animal Intake',
-    WORKFORCE: 'Workforce',
-    SHIPMENTS: 'Shipments',
-    FORMS: 'Forms',
-    FORMS_AI_DIGITIZE: 'Forms AI Digitize',
-    BLOCKCHAIN_ANCHOR: 'Blockchain Anchor',
-    PAYROLL: 'Payroll',
-};
 
 const UPGRADE_PLANS: Plan[] = ['STARTER', 'PRO', 'ENTERPRISE'];
 

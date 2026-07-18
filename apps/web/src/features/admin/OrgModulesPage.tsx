@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { ALL_MODULE_KEYS } from '@bin-tracker/types';
+import { ALL_MODULE_KEYS, MODULE_LABELS, MODULE_SUBLABELS } from '@bin-tracker/types';
 import type { ModuleKey } from '@bin-tracker/types';
 import { trpc, type RouterOutputs } from '../../lib/trpc';
 import { PageHeader } from '../../components/app/PageHeader';
@@ -8,16 +8,6 @@ import { Icon } from '../../components/ui/Icon';
 import { Card } from '../../components/ui/primitives';
 
 type OrgRow = RouterOutputs['admin']['listOrganizations'][number];
-
-const MODULE_LABELS: Record<ModuleKey, string> = {
-    ANIMAL_INTAKE: 'Animal Intake',
-    WORKFORCE: 'Workforce',
-    SHIPMENTS: 'Shipments',
-    FORMS: 'Forms',
-    FORMS_AI_DIGITIZE: 'Forms AI Digitize',
-    BLOCKCHAIN_ANCHOR: 'Blockchain Anchor',
-    PAYROLL: 'Payroll',
-};
 
 /**
  * Internal, operator-only tool: one row per org, one checkbox column per
@@ -96,6 +86,11 @@ function OrgModulesTable() {
                                 {ALL_MODULE_KEYS.map((key) => (
                                     <th key={key} className="px-3 py-3 text-center font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">
                                         {MODULE_LABELS[key]}
+                                        {MODULE_SUBLABELS[key] ? (
+                                            <span className="mt-0.5 block font-normal normal-case tracking-normal text-muted/70">
+                                                {MODULE_SUBLABELS[key]}
+                                            </span>
+                                        ) : null}
                                     </th>
                                 ))}
                             </tr>

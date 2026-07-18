@@ -7,6 +7,7 @@ import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 
 // This is a kiosk-style page with no user session — both calls it makes
 // (register, facilityOptions) are stationProcedure, so a single scoped
@@ -71,8 +72,8 @@ export default function ShipmentRegisterPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
-                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+                <FacilityLoader variant="inline" label="shipment" />
             </div>
         );
     }

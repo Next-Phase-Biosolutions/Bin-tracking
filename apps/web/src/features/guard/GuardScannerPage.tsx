@@ -6,6 +6,7 @@ import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { CameraScanner } from '../../components/app/CameraScanner';
 
 // attendance.scan requires stationProcedure — scoped to this one call so it
@@ -75,8 +76,8 @@ export default function GuardScannerPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
-                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+                <FacilityLoader variant="inline" label="access log" />
             </div>
         );
     }

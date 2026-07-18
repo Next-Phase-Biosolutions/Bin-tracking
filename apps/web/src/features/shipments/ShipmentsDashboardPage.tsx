@@ -3,6 +3,7 @@ import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { PageHeader } from '../../components/app/PageHeader';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 
@@ -21,8 +22,8 @@ export default function ShipmentsDashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-[60vh] items-center justify-center text-muted">
-                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <FacilityLoader variant="inline" label="shipments" />
             </div>
         );
     }
@@ -87,7 +88,11 @@ export default function ShipmentsDashboardPage() {
                         </thead>
                         <tbody className="divide-y divide-edge/40">
                             {listQuery.isLoading ? (
-                                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">Loading…</td></tr>
+                                <tr><td colSpan={6} className="px-5 py-8 text-center">
+                                    <span className="inline-flex justify-center">
+                                        <FacilityLoader variant="inline" label="shipments" />
+                                    </span>
+                                </td></tr>
                             ) : rows.length === 0 ? (
                                 <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No shipments recorded yet.</td></tr>
                             ) : (

@@ -1,20 +1,11 @@
 import type { ReactNode } from 'react';
+import { MODULE_LABELS } from '@bin-tracker/types';
 import type { ModuleKey } from '@bin-tracker/types';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { PageHeader } from '../../components/app/PageHeader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge } from '../../components/ui/primitives';
-
-const MODULE_LABELS: Record<ModuleKey, string> = {
-    ANIMAL_INTAKE: 'Animal Intake',
-    WORKFORCE: 'Workforce',
-    SHIPMENTS: 'Shipments',
-    FORMS: 'Forms',
-    FORMS_AI_DIGITIZE: 'Forms AI Digitize',
-    BLOCKCHAIN_ANCHOR: 'Blockchain Anchor',
-    PAYROLL: 'Payroll',
-};
 
 function formatDate(date: Date | null | undefined): string {
     if (!date) return '—';

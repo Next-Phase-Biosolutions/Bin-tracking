@@ -7,6 +7,7 @@ import { FormDraftLivePreview } from './FormDraftLivePreview';
 import { useSubscription } from '../../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../../components/UpgradePrompt';
 import { Icon } from '../../../components/ui/Icon';
+import { FacilityLoader } from '../../../components/app/FacilityLoader';
 
 const STAGES = ['RECEIVING', 'KILL_FLOOR', 'WET_AGING', 'VALUE_ADD', 'SHIPPING'] as const;
 
@@ -131,9 +132,8 @@ export default function FormImportPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="flex min-h-screen flex-col items-center justify-center bg-canvas py-24 text-muted">
-                <span className="mb-4 h-2 w-2 animate-blink rounded-full bg-rust" />
-                <p className="font-semibold">Loading…</p>
+            <div className="flex min-h-screen flex-col items-center justify-center bg-canvas py-24">
+                <FacilityLoader variant="inline" label="forms" />
             </div>
         );
     }

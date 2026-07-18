@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/app/PageHeader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 import { CountValue } from '../../components/app/LiveValue';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { BlockchainAnchorModal } from './BlockchainAnchorModal';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { useSubscription } from '../../context/SubscriptionContext';
@@ -310,8 +311,8 @@ export function DashboardPage() {
                 {/* Mobile card list */}
                 <div className="divide-y divide-edge/50 md:hidden">
                     {isBinsLoading ? (
-                        <div className="flex items-center justify-center gap-3 p-8 text-sm text-muted">
-                            <span className="h-2 w-2 animate-blink rounded-full bg-rust" /> Loading…
+                        <div className="flex items-center justify-center p-8">
+                            <FacilityLoader variant="inline" label="cycles" />
                         </div>
                     ) : filteredBins.length > 0 ? (
                         filteredBins.map((item) => (
@@ -363,9 +364,9 @@ export function DashboardPage() {
                         </thead>
                         <tbody className="divide-y divide-edge/40">
                             {isBinsLoading ? (
-                                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted">
-                                    <span className="inline-flex items-center gap-3">
-                                        <span className="h-2 w-2 animate-blink rounded-full bg-rust" /> Loading priority queue…
+                                <tr><td colSpan={7} className="p-8 text-center">
+                                    <span className="inline-flex justify-center">
+                                        <FacilityLoader variant="inline" label="priority queue" />
                                     </span>
                                 </td></tr>
                             ) : filteredBins.length > 0 ? (
