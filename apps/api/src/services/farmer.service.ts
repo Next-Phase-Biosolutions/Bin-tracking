@@ -192,9 +192,7 @@ Transcript: "${transcript}"`;
 
     /** Delete a registration. Cross-org ids report NOT_FOUND, same discipline as employee.service.ts */
     async remove(orgId: string, id: string): Promise<{ id: string }> {
-        const { count } = await prisma.animalRegistration.deleteMany({
-            where: { id, organizationId: orgId },
-        });
+        const { count } = await prisma.animalRegistration.deleteMany({ where: { id, organizationId: orgId } });
         if (count === 0) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
         }
