@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
+import { useSplashGate } from '../../lib/hooks';
+import { FacilityLoader } from '../app/FacilityLoader';
 import { Sidebar } from '../app/Sidebar';
 import { TopBar } from '../app/TopBar';
 import { MARKETING_URL } from '../../lib/marketingUrl';
@@ -12,9 +14,20 @@ import { MARKETING_URL } from '../../lib/marketingUrl';
  * must render WITHOUT the login redirect — but a signed-in user navigating
  * to the same pages from the sidebar should keep the full shell around them.
  */
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
+
 export function AppShellLayout({ optional = false }: { optional?: boolean }) {
     const { user, loading } = useAuth();
     const [drawer, setDrawer] = useState(false);
+    const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
+    const showSplash = useSplashGate(loading || !user);
+
+    const toggleCollapsed = () => {
+        setCollapsed((v) => {
+            localStorage.setItem(SIDEBAR_COLLAPSED_KEY, v ? '0' : '1');
+            return !v;
+        });
+    };
 
     useEffect(() => {
         if (!optional && !loading && !user) window.location.href = `${MARKETING_URL}/login`;
@@ -26,20 +39,13 @@ export function AppShellLayout({ optional = false }: { optional?: boolean }) {
     }
 
     if (loading || !user) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-canvas">
-                <div className="flex items-center gap-3 text-muted">
-                    <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
-                    <span className="font-mono text-xs uppercase tracking-[0.16em]">Loading facility…</span>
-                </div>
-            </div>
-        );
+        return showSplash ? <FacilityLoader variant="splash" /> : null;
     }
 
     return (
-        <div className="min-h-screen bg-canvas lg:grid lg:grid-cols-[16rem_1fr]">
+        <div className={`min-h-screen bg-canvas lg:grid ${collapsed ? 'lg:grid-cols-[4.25rem_1fr]' : 'lg:grid-cols-[16rem_1fr]'}`}>
             <aside className="sticky top-0 hidden h-screen lg:block">
-                <Sidebar />
+                <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
             </aside>
 
             <AnimatePresence>

@@ -4,6 +4,7 @@ import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { PageHeader } from '../../components/app/PageHeader';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 
@@ -35,8 +36,8 @@ export default function TimesheetDashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-[60vh] items-center justify-center text-muted">
-                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <FacilityLoader variant="inline" label="timesheets" />
             </div>
         );
     }

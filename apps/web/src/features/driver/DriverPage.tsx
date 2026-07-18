@@ -4,6 +4,7 @@ import { trpc, type RouterOutputs } from '../../lib/trpc';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge } from '../../components/ui/primitives';
 import { ScanPanel } from '../../components/app/ScanPanel';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 
 type BinOption = RouterOutputs['bin']['getActiveDynamicMatches'][number];
 
@@ -133,9 +134,8 @@ function ScanResult({
 
             <div className="p-5">
                 {isFetching && (
-                    <div className="flex flex-col items-center py-8 text-muted">
-                        <span className="mb-3 h-2 w-2 animate-blink rounded-full bg-rust" />
-                        <p className="text-sm">Fetching bin details…</p>
+                    <div className="flex flex-col items-center py-8">
+                        <FacilityLoader variant="inline" label="bin details" />
                     </div>
                 )}
 

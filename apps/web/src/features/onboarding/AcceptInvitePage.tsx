@@ -6,6 +6,9 @@ import { trpc } from '../../lib/trpc';
 import { Logo } from '../../components/app/Logo';
 import { Icon } from '../../components/ui/Icon';
 
+// Something before @, a domain, a dot, and a 2+ char TLD — rejects "@mmail.com".
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 /**
  * Landing page for an invite link (`/invite/:token`, Task 19). The token is
  * the sole credential the accept call needs — this page's only job is to get
@@ -25,6 +28,8 @@ export default function AcceptInvitePage() {
     const [mode, setMode] = useState<'signup' | 'login'>('signup');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,10 +60,15 @@ export default function AcceptInvitePage() {
             setError('This invitation link is invalid.');
             return;
         }
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters.');
-            return;
-        }
+        // Format checks only — Supabase email confirmation is the real
+        // defense against well-formed fake addresses.
+        const emailIssue = !EMAIL_RE.test(email.trim())
+            ? 'Enter a valid email address (e.g. you@yourplant.com).'
+            : null;
+        const passwordIssue = password.length < 8 ? 'Password must be at least 8 characters.' : null;
+        setEmailError(emailIssue);
+        setPasswordError(passwordIssue);
+        if (emailIssue || passwordIssue) return;
 
         setIsSubmitting(true);
         // login/signup below set `user`, which would ALSO fire the
@@ -134,8 +144,8 @@ export default function AcceptInvitePage() {
             </p>
 
             <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4 text-left">
-                <Field label="Email" type="email" value={email} onChange={setEmail} required autoFocus />
-                <Field label="Password" type="password" value={password} onChange={setPassword} required />
+                <Field label="Email" type="email" value={email} onChange={(v) => { setEmail(v); setEmailError(null); }} error={emailError} required autoFocus />
+                <Field label="Password" type="password" value={password} onChange={(v) => { setPassword(v); setPasswordError(null); }} error={passwordError} required />
 
                 {error && (
                     <div className="rounded-lg border border-rust/25 bg-rust/10 px-4 py-3 text-sm text-rust">
@@ -174,9 +184,10 @@ interface FieldProps {
     type?: string;
     required?: boolean;
     autoFocus?: boolean;
+    error?: string | null;
 }
 
-function Field({ label, value, onChange, type = 'text', required, autoFocus }: FieldProps) {
+function Field({ label, value, onChange, type = 'text', required, autoFocus, error }: FieldProps) {
     return (
         <label className="block">
             <span className="mb-1.5 block font-mono text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -187,9 +198,11 @@ function Field({ label, value, onChange, type = 'text', required, autoFocus }: F
                 value={value}
                 required={required}
                 autoFocus={autoFocus}
+                aria-invalid={error ? true : undefined}
                 onChange={(e) => onChange(e.target.value)}
                 className="w-full rounded-lg border border-edge/80 bg-canvas px-3.5 py-2.5 text-sm text-ink transition-colors focus:border-olive focus:bg-white focus:outline-none"
             />
+            {error && <span className="mt-1.5 block text-xs text-rust">{error}</span>}
         </label>
     );
 }

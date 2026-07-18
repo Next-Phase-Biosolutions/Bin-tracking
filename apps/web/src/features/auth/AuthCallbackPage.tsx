@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { setAuthToken, trpc } from '../../lib/trpc';
 import { MARKETING_URL } from '../../lib/marketingUrl';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 
 /**
  * Lands here after a real login/signup on the marketing site's own origin
@@ -68,9 +69,5 @@ export default function AuthCallbackPage() {
         );
     }
 
-    return (
-        <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
-            <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
-        </div>
-    );
+    return <FacilityLoader variant="splash" />;
 }

@@ -7,6 +7,7 @@ import type { ExtractedAnimalFields } from '@bin-tracker/validators';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { PageHeader } from '../../components/app/PageHeader';
+import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { Icon } from '../../components/ui/Icon';
 
 // farmer.transcribe/register both require stationProcedure — scoped to
@@ -74,8 +75,8 @@ export default function FarmerRegistrationPage() {
     const { hasModule, isLoading } = useSubscription();
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-canvas text-muted">
-                <span className="h-2 w-2 animate-blink rounded-full bg-rust" />
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+                <FacilityLoader variant="inline" label="registration" />
             </div>
         );
     }

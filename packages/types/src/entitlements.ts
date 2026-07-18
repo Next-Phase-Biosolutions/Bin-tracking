@@ -28,6 +28,27 @@ const MODULE_KEY_SET: Record<ModuleKey, true> = {
 /** Every gateable module key, in display order — used by the platform-admin panel (Task 16) to render one checkbox column per module. */
 export const ALL_MODULE_KEYS: ModuleKey[] = Object.keys(MODULE_KEY_SET) as ModuleKey[];
 
+/**
+ * Human-readable module names, matched 1:1 to the sidebar nav labels so the
+ * platform-admin panel, billing page, and upgrade prompts speak the same
+ * language as the app's navigation. Single source — do not redefine locally.
+ */
+export const MODULE_LABELS: Record<ModuleKey, string> = {
+    ANIMAL_INTAKE: 'Animal Registration',
+    WORKFORCE: 'Workforce',
+    SHIPMENTS: 'Shipments',
+    FORMS: 'Forms',
+    FORMS_AI_DIGITIZE: 'Create a Form',
+    BLOCKCHAIN_ANCHOR: 'Blockchain Anchor',
+    PAYROLL: 'Payroll',
+};
+
+/** For umbrella modules that gate multiple app surfaces: which sidebar items / features they control. */
+export const MODULE_SUBLABELS: Partial<Record<ModuleKey, string>> = {
+    WORKFORCE: 'Employee Reg · Scanner · Timesheet',
+    BLOCKCHAIN_ANCHOR: 'Dashboard anchor',
+};
+
 export interface PlanLimits {
     maxFacilities: number;    // -1 = unlimited
     maxEmployees: number;

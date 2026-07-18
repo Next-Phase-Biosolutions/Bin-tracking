@@ -1,15 +1,21 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { handoffToApp } from '@/lib/authHandoff';
+import { validateEmail, validatePassword } from '@/lib/validation';
 
 const field =
     'w-full rounded-xl border border-edge bg-white px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-rust focus:outline-none';
+
+const fieldErrorText = 'mt-1.5 text-xs text-rust';
 
 export function SignupForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [confirmError, setConfirmError] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
@@ -18,14 +24,13 @@ export function SignupForm() {
         e.preventDefault();
         setError(null);
 
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters.');
-            return;
-        }
-        if (password !== confirmPassword) {
-            setError('Passwords do not match.');
-            return;
-        }
+        const emailIssue = validateEmail(email);
+        const passwordIssue = validatePassword(password);
+        const confirmIssue = password !== confirmPassword ? 'Passwords do not match.' : null;
+        setEmailError(emailIssue);
+        setPasswordError(passwordIssue);
+        setConfirmError(confirmIssue);
+        if (emailIssue || passwordIssue || confirmIssue) return;
 
         setIsSubmitting(true);
         try {
@@ -72,13 +77,15 @@ export function SignupForm() {
                     name="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
                     required
                     autoFocus
                     autoComplete="email"
                     placeholder="you@yourplant.com"
+                    aria-invalid={emailError ? true : undefined}
                     className={field}
                 />
+                {emailError && <p className={fieldErrorText}>{emailError}</p>}
             </div>
 
             <div>
@@ -91,10 +98,12 @@ export function SignupForm() {
                         name="password"
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
                         required
+                        minLength={8}
                         autoComplete="new-password"
                         placeholder="At least 8 characters"
+                        aria-invalid={passwordError ? true : undefined}
                         className={`${field} pr-12`}
                     />
                     <button
@@ -106,6 +115,7 @@ export function SignupForm() {
                         {showPassword ? 'Hide' : 'Show'}
                     </button>
                 </div>
+                {passwordError && <p className={fieldErrorText}>{passwordError}</p>}
             </div>
 
             <div>
@@ -117,12 +127,14 @@ export function SignupForm() {
                     name="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setConfirmError(null); }}
                     required
                     autoComplete="new-password"
                     placeholder="Re-enter your password"
+                    aria-invalid={confirmError ? true : undefined}
                     className={field}
                 />
+                {confirmError && <p className={fieldErrorText}>{confirmError}</p>}
             </div>
 
             {error && <div className="rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">{error}</div>}
