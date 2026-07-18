@@ -63,9 +63,13 @@ export {
 export {
     transcribeAudioSchema,
     animalRegistrationSchema,
+    animalListSchema,
+    animalDeleteSchema,
     extractedAnimalFieldsSchema,
     type TranscribeAudioInput,
     type AnimalRegistrationInput,
+    type AnimalListInput,
+    type AnimalDeleteInput,
     type ExtractedAnimalFields,
 } from './farmer.schema.js';
 

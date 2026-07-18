@@ -17,6 +17,7 @@ export const operationsNav: NavItem[] = [
     { label: 'Bin Scanner', href: '/app/bin', icon: 'scan' },
     { label: 'Shipments', href: '/app/shipments', icon: 'box', module: 'SHIPMENTS' },
     { label: 'Animal Registration', href: '/app/animalregistration', icon: 'cow', module: 'ANIMAL_INTAKE' },
+    { label: 'Animal Records', href: '/app/animals', icon: 'form', module: 'ANIMAL_INTAKE' },
     { label: 'Employee Registration', href: '/app/employees/register', icon: 'users', module: 'WORKFORCE' },
     { label: 'Employee Scanner', href: '/app/guard', icon: 'badge', module: 'WORKFORCE' },
     { label: 'Timesheet', href: '/app/timesheet', icon: 'clock', module: 'WORKFORCE' },

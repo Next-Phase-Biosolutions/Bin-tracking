@@ -25,6 +25,20 @@ export const animalRegistrationSchema = z.object({
 
 export type AnimalRegistrationInput = z.infer<typeof animalRegistrationSchema>;
 
+export const animalListSchema = z.object({
+    /** Case-insensitive match against animalType, breed, and ownerName */
+    search: z.string().max(200).optional(),
+    limit: z.number().int().min(1).max(200).default(100),
+});
+
+export type AnimalListInput = z.infer<typeof animalListSchema>;
+
+export const animalDeleteSchema = z.object({
+    id: z.string().cuid(),
+});
+
+export type AnimalDeleteInput = z.infer<typeof animalDeleteSchema>;
+
 export const extractedAnimalFieldsSchema = z.object({
     animalType: z.string().nullable(),
     breed: z.string().nullable(),
