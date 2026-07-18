@@ -1,10 +1,10 @@
-import { router, stationOrgProcedure, stationProcedure, requireModule } from '../trpc/trpc.js';
+import { router, orgProcedure, requireModule } from '../trpc/trpc.js';
 import { transcribeAudioSchema, animalRegistrationSchema } from '@bin-tracker/validators';
 import { farmerService } from '../services/farmer.service.js';
 
 export const farmerRouter = router({
-    /** Transcribe audio and extract animal fields (requireModule guarantees ctx.orgId is set) */
-    transcribe: stationProcedure
+    /** Transcribe audio and extract animal fields */
+    transcribe: orgProcedure
         .use(requireModule('ANIMAL_INTAKE'))
         .input(transcribeAudioSchema)
         .mutation(async ({ input, ctx }) => {
@@ -12,7 +12,7 @@ export const farmerRouter = router({
         }),
 
     /** Save the reviewed animal registration */
-    register: stationOrgProcedure
+    register: orgProcedure
         .use(requireModule('ANIMAL_INTAKE'))
         .input(animalRegistrationSchema)
         .mutation(async ({ input, ctx }) => {

@@ -33,26 +33,20 @@ export function createUserTRPCClient() {
     });
 }
 
-// Test-station-token convention shared by every kiosk-style page/component
-// that needs a per-call station-authenticated client (see createStationTRPCClient
-// below). Real per-device station provisioning is Phase 4.
-export const STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
-
-// ─── Station tRPC client (station token auth) ──────────────────────────────
-// Used for bin.start which requires "Authorization: Station <token>"
-// Returns a vanilla (non-React) client for one-off mutation calls
-export function createStationTRPCClient(stationToken: string) {
-    return createTRPCClient<AppRouter>({
-        links: [
-            httpBatchLink({
-                url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
-                transformer: superjson,
-                // When auth is disabled, send no header — backend injects the station automatically
-                headers: () =>
-                    import.meta.env.VITE_DISABLE_AUTH === 'true'
-                        ? {}
-                        : { Authorization: `Station ${stationToken}` },
-            }),
-        ],
-    });
-}
+// ─── Vanilla tRPC client (same JWT auth as the React client) ───────────────
+// For pages that need one-off imperative calls outside the React hooks tree
+// (scanner mutations, voice transcription, etc.). The headers() closure reads
+// the token at call time, so a module-level instance stays valid across
+// login/logout.
+export const apiClient = createTRPCClient<AppRouter>({
+    links: [
+        httpBatchLink({
+            url: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/trpc` : '/trpc',
+            transformer: superjson,
+            headers: () => {
+                if (import.meta.env.VITE_DISABLE_AUTH === 'true') return {};
+                return _authToken ? { Authorization: `Bearer ${_authToken}` } : {};
+            },
+        }),
+    ],
+});

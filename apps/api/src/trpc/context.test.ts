@@ -1,25 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FastifyRequest } from 'fastify';
-import { hashToken } from '../lib/token.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────
-// Station lookup is the only path exercised here, so a minimal
-// prisma.station fake is enough (mirrors attendance.service.test.ts style).
-
-interface FakeStation {
-    id: string;
-    token: string;
-    revokedAt: Date | null;
-    facility: { id: string; name: string };
-}
-
-// Tokens are stored HASHED at rest — the fixtures hold the digest, and the
-// requests below present the raw value, proving context.ts hashes before
-// lookup (a raw-token lookup against these rows would find nothing).
-const stations: FakeStation[] = [
-    { id: 'st-active', token: hashToken('token-active'), revokedAt: null, facility: { id: 'f1', name: 'Facility 1' } },
-    { id: 'st-revoked', token: hashToken('token-revoked'), revokedAt: new Date('2020-01-01'), facility: { id: 'f1', name: 'Facility 1' } },
-];
 
 // Mutable, per-test-controllable: lets the Bearer-branch tests below choose
 // whether prisma.user.findUnique resolves an existing User row or null,
@@ -35,23 +17,13 @@ const membershipStore = vi.hoisted(() => ({
 
 vi.mock('@bin-tracker/db', () => ({
     prisma: {
-        station: {
-            findUnique: ({ where }: { where: { token: string } }) =>
-                Promise.resolve(stations.find((s) => s.token === where.token) ?? null),
-        },
         user: {
             findUnique: () => Promise.resolve(userStore.byId),
             findFirst: () => Promise.resolve(null),
         },
         // Org resolution runs at the end of createContext for every request.
-        // facility 'f1' resolves to 'org-1' so the station branch can exercise
-        // both ctx.orgId and the log-enrichment behavior below.
         organizationMember: {
             findFirst: () => Promise.resolve(membershipStore.byUserId),
-        },
-        facility: {
-            findUnique: ({ where }: { where: { id: string } }) =>
-                Promise.resolve(where.id === 'f1' ? { organizationId: 'org-1' } : null),
         },
     },
 }));
@@ -84,19 +56,6 @@ beforeEach(() => {
     userStore.byId = null;
     jwtStore.payload = null;
     membershipStore.byUserId = null;
-});
-
-describe('createContext — station token revocation', () => {
-    it('resolves station to null for a revoked station token', async () => {
-        const ctx = await createContext(fakeRequest('Station token-revoked'));
-        expect(ctx.station).toBeNull();
-    });
-
-    it('resolves station to the record for a non-revoked station token', async () => {
-        const ctx = await createContext(fakeRequest('Station token-active'));
-        expect(ctx.station).not.toBeNull();
-        expect(ctx.station?.id).toBe('st-active');
-    });
 });
 
 // This is the load-bearing wiring for Task 18's trust-boundary fix:
@@ -165,22 +124,18 @@ describe('createContext — Bearer JWT: ctx.orgRole from membership, not global 
         expect(ctx.orgId).toBeNull();
         expect(ctx.orgRole).toBeNull();
     });
-
-    it('sets ctx.orgRole to null for station-resolved orgId (no ctx.user)', async () => {
-        const ctx = await createContext(fakeRequest('Station token-active'));
-
-        expect(ctx.user).toBeNull();
-        expect(ctx.orgId).toBe('org-1');
-        expect(ctx.orgRole).toBeNull();
-    });
 });
 
 // Task 21: request log context should carry orgId once resolved, so
 // per-tenant log filtering works without threading orgId through every
 // call site. See context.ts's `req.log = req.log.child({ orgId })`.
 describe('createContext — request log enrichment with orgId', () => {
-    it('childs the request logger with orgId once an org resolves (station branch)', async () => {
-        const req = fakeRequest('Station token-active');
+    it('childs the request logger with orgId once an org resolves', async () => {
+        jwtStore.payload = { sub: 'supabase-user-5', email: 'member@example.com' };
+        userStore.byId = { id: 'supabase-user-5', email: 'member@example.com', role: 'WORKER' };
+        membershipStore.byUserId = { orgId: 'org-1', role: 'WORKER' };
+
+        const req = fakeRequest('Bearer valid-token');
         // createContext reassigns req.log to the child logger it returns, so
         // the original logger (and its `child` spy) must be captured first.
         const originalLog = req.log;
@@ -191,8 +146,8 @@ describe('createContext — request log enrichment with orgId', () => {
         expect(vi.mocked(originalLog.child)).toHaveBeenCalledWith({ orgId: 'org-1' });
     });
 
-    it('does not child the request logger when no org resolves (revoked station)', async () => {
-        const req = fakeRequest('Station token-revoked');
+    it('does not child the request logger when no org resolves', async () => {
+        const req = fakeRequest();
         const originalLog = req.log;
 
         const ctx = await createContext(req);

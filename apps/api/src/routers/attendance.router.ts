@@ -1,4 +1,4 @@
-import { router, orgProcedure, stationOrgProcedure, requireModule } from '../trpc/trpc.js';
+import { router, orgProcedure, requireModule } from '../trpc/trpc.js';
 import {
     attendanceScanSchema,
     attendanceSummarySchema,
@@ -8,7 +8,7 @@ import { attendanceService } from '../services/attendance.service.js';
 
 export const attendanceRouter = router({
     /** Guard scan — toggles check-in / check-out for the scanned badge */
-    scan: stationOrgProcedure
+    scan: orgProcedure
         .use(requireModule('WORKFORCE'))
         .input(attendanceScanSchema)
         .mutation(async ({ input, ctx }) => {

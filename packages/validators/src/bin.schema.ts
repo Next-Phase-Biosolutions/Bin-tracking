@@ -20,6 +20,8 @@ export const binStartDynamicSchema = z.object({
         .string()
         .min(1, 'Master QR code is required')
         .max(50, 'Master QR code too long'),
+    /** Which facility the bin is at — optional; single-facility orgs resolve automatically */
+    facilityId: z.string().cuid().optional(),
 });
 
 export type BinStartDynamicInput = z.infer<typeof binStartDynamicSchema>;

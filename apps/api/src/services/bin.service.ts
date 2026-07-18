@@ -12,7 +12,7 @@ export const binService = {
      * - Transaction with Serializable isolation prevents TOCTOU
      * - @@unique([binId, status]) prevents duplicate active cycles at DB level
      */
-    async start(orgId: string, input: BinStartInput, stationId: string) {
+    async start(orgId: string, input: BinStartInput, userId: string) {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find bin by QR code (with bin type for DK hours)
@@ -69,7 +69,7 @@ export const binService = {
                     data: {
                         cycleId: cycle.id,
                         eventType: 'BIN_STARTED',
-                        stationId,
+                        metadata: { userId },
                         timestamp: now,
                     },
                 });
@@ -99,7 +99,7 @@ export const binService = {
      * 
      * Creates a new generic Bin on the fly from a Master QR Code and immediately starts a cycle for it.
      */
-    async startDynamic(orgId: string, input: import('@bin-tracker/validators').BinStartDynamicInput, stationId: string) {
+    async startDynamic(orgId: string, input: import('@bin-tracker/validators').BinStartDynamicInput, userId: string) {
         return prisma.$transaction(
             async (tx: Prisma.TransactionClient) => {
                 // 1. Find the parent BinType by the scanned Master QR code (normailze case/spaces for fuzzy matching)
@@ -116,17 +116,34 @@ export const binService = {
                     });
                 }
 
-                // Get the physical facility location of the station scanning the QR
-                const station = await tx.station.findUnique({
-                    where: { id: stationId },
-                    select: { facilityId: true }
-                });
-
-                if (!station) {
-                    throw new TRPCError({
-                        code: 'NOT_FOUND',
-                        message: `Scanning station not found`,
+                // Resolve which facility the bin is being started at: explicit
+                // input wins; otherwise a single-facility org needs no picker.
+                // ponytail: multi-facility orgs must send facilityId — add a
+                // facility picker to TabletPage when a client actually has >1.
+                let facilityId = input.facilityId ?? null;
+                if (facilityId) {
+                    const facility = await tx.facility.findFirst({
+                        where: { id: facilityId, organizationId: orgId, deletedAt: null },
+                        select: { id: true },
                     });
+                    if (!facility) {
+                        throw new TRPCError({ code: 'NOT_FOUND', message: 'Facility not found' });
+                    }
+                } else {
+                    const facilities = await tx.facility.findMany({
+                        where: { organizationId: orgId, deletedAt: null },
+                        select: { id: true },
+                        take: 2,
+                    });
+                    if (facilities.length !== 1) {
+                        throw new TRPCError({
+                            code: 'BAD_REQUEST',
+                            message: facilities.length === 0
+                                ? 'No facility exists for this organization yet — create one first'
+                                : 'Multiple facilities exist — specify which facility this bin is at',
+                        });
+                    }
+                    facilityId = facilities[0]!.id;
                 }
 
                 const now = new Date();
@@ -142,7 +159,7 @@ export const binService = {
                     data: {
                         qrCode: dynamicQrCode,
                         binTypeId: binType.id,
-                        currentFacilityId: station.facilityId,
+                        currentFacilityId: facilityId,
                         status: 'ACTIVE',
                         organizationId: orgId,
                     }
@@ -164,7 +181,7 @@ export const binService = {
                     data: {
                         cycleId: cycle.id,
                         eventType: 'BIN_STARTED',
-                        stationId,
+                        metadata: { userId },
                         timestamp: now,
                     },
                 });

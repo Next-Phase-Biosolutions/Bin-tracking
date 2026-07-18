@@ -1,16 +1,9 @@
 import { useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
-import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
+import { apiClient } from '../../lib/trpc';
 import { useVoiceRecorder } from '../farmer-registration/useVoiceRecorder';
 import type { FieldType } from '@bin-tracker/types';
-
-// form.transcribeField requires stationProcedure. Scoped here (not to the
-// surrounding page) so this component works correctly wherever it's
-// rendered — the tablet form-fill tree (station-gated) or the ops-manager
-// form-creation live preview (bearer-gated) — without depending on any
-// ambient page-level auth state.
-const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 interface VoiceFieldButtonProps {
     fieldId: string;
@@ -31,8 +24,8 @@ export function VoiceFieldButton({
         useVoiceRecorder();
 
     const transcribe = useMutation({
-        mutationFn: (input: Parameters<typeof stationClient.form.transcribeField.mutate>[0]) =>
-            stationClient.form.transcribeField.mutate(input),
+        mutationFn: (input: Parameters<typeof apiClient.form.transcribeField.mutate>[0]) =>
+            apiClient.form.transcribeField.mutate(input),
         onSuccess: (data) => {
             if (data.value) onValue(data.value);
             clearAudio();

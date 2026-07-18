@@ -1,22 +1,19 @@
 import type { FastifyRequest } from 'fastify';
 import { prisma } from '@bin-tracker/db';
-import type { User, Station, UserRole } from '@prisma/client';
+import type { User, UserRole } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
-import { hashToken } from '../lib/token.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 import { resolveOrgId } from './org-context.js';
 
 export interface Context {
     prisma: typeof prisma;
     user: User | null;
-    station: (Station & { facility: { id: string; name: string } }) | null;
     orgId: string | null;
     /**
      * The caller's ORG-SCOPED role in `orgId` — their OrganizationMember.role,
      * resolved by the same query as orgId (see org-context.ts). NOT the
      * global `user.role`; those can differ (Task 25). `null` whenever orgId
-     * is station-resolved (no ctx.user) or unresolved, exactly like orgId
-     * itself follows `user`/`station` resolution.
+     * is unresolved.
      */
     orgRole: UserRole | null;
     /**
@@ -33,11 +30,10 @@ export interface Context {
 
 /**
  * Create tRPC context from Fastify request.
- * Auth is resolved here — routers get pre-resolved user/station.
+ * Auth is resolved here — routers get a pre-resolved user.
  */
 export async function createContext(req: FastifyRequest): Promise<Context> {
     let user: User | null = null;
-    let station: (Station & { facility: { id: string; name: string } }) | null = null;
 
     // ─── AUTH BYPASS (DISABLE_AUTH=true) ─────────────────────────────────────
     // Set DISABLE_AUTH=true in your environment to skip all token checks.
@@ -46,24 +42,19 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         try {
             // Inject the first ADMIN user as the acting user
             user = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-            // Inject the first available station for tablet endpoints
-            station = await prisma.station.findFirst({
-                include: { facility: { select: { id: true, name: true } } },
-            });
         } catch {
-            // DB unreachable in dev — proceed with null user/station.
-            // stationProcedure and protectedProcedure will still pass
-            // because DISABLE_AUTH=true bypasses the null checks in their middleware.
+            // DB unreachable in dev — proceed with null user.
+            // protectedProcedure will still pass because DISABLE_AUTH=true
+            // bypasses the null check in its middleware.
         }
         const { orgId: bypassOrgId, orgRole: bypassOrgRole } = await resolveOrgId(prisma, {
             userId: user?.id ?? null,
-            facilityId: station?.facility.id ?? null,
         });
         // Enrich this request's pino logger so every subsequent log line
         // (including Fastify's own request-completion log) carries orgId —
         // per-tenant log filtering without threading orgId through every call site.
         if (bypassOrgId) req.log = req.log.child({ orgId: bypassOrgId });
-        return { prisma, user, station, orgId: bypassOrgId, orgRole: bypassOrgRole, jwtPayload: null, req };
+        return { prisma, user, orgId: bypassOrgId, orgRole: bypassOrgRole, jwtPayload: null, req };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -92,18 +83,6 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         } else {
             req.log.warn('Invalid or expired JWT token');
         }
-    } else if (authHeader?.startsWith('Station ')) {
-        // Station token auth — resolve station
-        const token = authHeader.slice(8);
-        if (token) {
-            // Tokens are stored hashed at rest (lib/token.ts) — hash the
-            // presented credential and match on the digest.
-            station = await prisma.station.findUnique({
-                where: { token: hashToken(token) },
-                include: { facility: { select: { id: true, name: true } } },
-            });
-            if (station?.revokedAt) station = null; // revoked tokens are dead tokens
-        }
     }
 
     // Optional explicit org selection for multi-org users (see org-context.ts
@@ -113,7 +92,6 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
 
     const { orgId, orgRole } = await resolveOrgId(prisma, {
         userId: user?.id ?? null,
-        facilityId: station?.facility.id ?? null,
         requestedOrgId,
     });
 
@@ -123,7 +101,6 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
     return {
         prisma,
         user,
-        station,
         orgId,
         orgRole,
         jwtPayload,

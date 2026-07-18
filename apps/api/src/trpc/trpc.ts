@@ -74,27 +74,6 @@ const isVerified = middleware(async ({ ctx, next }) => {
 export const verifiedProcedure = t.procedure.use(isVerified);
 
 /**
- * Station procedure — requires station token auth (tablets)
- */
-const isStation = middleware(async ({ ctx, next }) => {
-    // AUTH BYPASS: skip check entirely when DISABLE_AUTH=true
-    if (isAuthDisabled()) {
-        return next({ ctx });
-    }
-    if (!ctx.station) {
-        throw new TRPCError({
-            code: 'UNAUTHORIZED',
-            message: 'Station authentication required',
-        });
-    }
-    return next({
-        ctx: { ...ctx, station: ctx.station },
-    });
-});
-
-export const stationProcedure = t.procedure.use(isStation);
-
-/**
  * Role-based procedures
  *
  * GLOBAL-ROLE ONLY, NOT ORG-AWARE (Task 25) — see the doc comment on
@@ -150,7 +129,6 @@ export const orgProcedure = protectedProcedure.use(hasOrg);
  */
 export const orgAdminProcedure = t.procedure.use(requireOrgRole('ADMIN')).use(hasOrg);
 export const orgOpsProcedure = t.procedure.use(requireOrgRole('ADMIN', 'OPS_MANAGER')).use(hasOrg);
-export const stationOrgProcedure = stationProcedure.use(hasOrg);
 /**
  * Backed by `requireAssignedDriver()`, which checks the caller's org-scoped
  * `ctx.orgRole` (DRIVER or ADMIN) — resolved eagerly at context-creation

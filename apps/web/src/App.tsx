@@ -50,20 +50,12 @@ export function App() {
             <Route path="/app/onboarding" element={<OnboardingWizard />} />
             <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
 
-            {/* Station-token kiosk routes: unattended facility-floor devices
-                authenticate via STATION_TOKEN, not a user session, so the
-                shell is optional here — no login redirect, and a kiosk with
-                no session renders bare. A signed-in user reaching these pages
-                from the sidebar keeps the full shell. */}
-            <Route element={<AppShellLayout optional />}>
+            <Route element={<AppShellLayout />}>
                 <Route path="/app/bin" element={<TabletPage />} />
                 <Route path="/app/guard" element={<GuardScannerPage />} />
                 <Route path="/app/forms" element={<FormListPage />} />
                 <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
                 <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
-            </Route>
-
-            <Route element={<AppShellLayout />}>
                 <Route path="/app/driver" element={<DriverPage />} />
                 <Route path="/app/dashboard" element={<DashboardPage />} />
                 <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />

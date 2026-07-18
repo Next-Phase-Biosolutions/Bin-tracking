@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { router, orgProcedure, stationOrgProcedure, stationProcedure, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
+import { router, orgProcedure, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
 import { aiRateLimit } from '../trpc/rate-limit.js';
 import {
     formListByStageSchema,
@@ -15,14 +15,14 @@ import { getHeavyJobsQueue, FORM_DIGITIZE_JOB } from '../lib/queue.js';
 import type { FormDigitizeDraft } from '@bin-tracker/types';
 
 export const formRouter = router({
-    listByStage: stationOrgProcedure
+    listByStage: orgProcedure
         .use(requireModule('FORMS'))
         .input(formListByStageSchema)
         .query(async ({ input, ctx }) => {
             return formService.listByStage(ctx.prisma, ctx.orgId, input.stage);
         }),
 
-    getById: stationOrgProcedure
+    getById: orgProcedure
         .use(requireModule('FORMS'))
         .input(formGetByIdSchema)
         .query(async ({ input, ctx }) => {
@@ -119,7 +119,7 @@ export const formRouter = router({
             return formService.create(ctx.prisma, input, ctx.orgId);
         }),
 
-    transcribeField: stationProcedure
+    transcribeField: orgProcedure
         .use(requireModule('FORMS'))
         .input(formTranscribeFieldSchema)
         .mutation(async ({ input, ctx }) => {

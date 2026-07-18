@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
+import { apiClient } from '../../lib/trpc';
 import { AnimalForm } from './AnimalForm';
 import { VoiceRecorder } from './VoiceRecorder';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
@@ -9,10 +9,6 @@ import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { PageHeader } from '../../components/app/PageHeader';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { Icon } from '../../components/ui/Icon';
-
-// farmer.transcribe/register both require stationProcedure — scoped to
-// these two calls rather than a page-level auth flag.
-const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 const EMPTY_FIELDS: ExtractedAnimalFields = {
     animalType: null,
@@ -32,12 +28,12 @@ export default function FarmerRegistrationPage() {
     const [submitSuccess, setSubmitSuccess] = useState(false);
 
     const transcribeMutation = useMutation({
-        mutationFn: (input: Parameters<typeof stationClient.farmer.transcribe.mutate>[0]) =>
-            stationClient.farmer.transcribe.mutate(input),
+        mutationFn: (input: Parameters<typeof apiClient.farmer.transcribe.mutate>[0]) =>
+            apiClient.farmer.transcribe.mutate(input),
     });
     const registerMutation = useMutation({
-        mutationFn: (input: Parameters<typeof stationClient.farmer.register.mutate>[0]) =>
-            stationClient.farmer.register.mutate(input),
+        mutationFn: (input: Parameters<typeof apiClient.farmer.register.mutate>[0]) =>
+            apiClient.farmer.register.mutate(input),
     });
 
     // Called by VoiceRecorder once audio blob is base64-encoded and ready

@@ -1,17 +1,17 @@
-import { router, stationOrgProcedure, orgProcedure } from '../trpc/trpc.js';
+import { router, orgProcedure } from '../trpc/trpc.js';
 import { binStartSchema, binStartDynamicSchema, binGetByIdSchema, binGetByQrCodeSchema, binGetActiveDynamicSchema, binListSchema } from '@bin-tracker/validators';
 import { binService } from '../services/bin.service.js';
 import { getUserFacilityIds } from '../trpc/middleware.js';
 
 export const binRouter = router({
     /** Start a pre-associated bin cycle (Option A) */
-    start: stationOrgProcedure.input(binStartSchema).mutation(async ({ input, ctx }) => {
-        return binService.start(ctx.orgId, input, ctx.station!.id);
+    start: orgProcedure.input(binStartSchema).mutation(async ({ input, ctx }) => {
+        return binService.start(ctx.orgId, input, ctx.user!.id);
     }),
 
     /** Start a dynamic bin cycle from a Master QR (Option B MVP) */
-    startDynamic: stationOrgProcedure.input(binStartDynamicSchema).mutation(async ({ input, ctx }) => {
-        return binService.startDynamic(ctx.orgId, input, ctx.station!.id);
+    startDynamic: orgProcedure.input(binStartDynamicSchema).mutation(async ({ input, ctx }) => {
+        return binService.startDynamic(ctx.orgId, input, ctx.user!.id);
     }),
 
     /** Get bin details by ID */
