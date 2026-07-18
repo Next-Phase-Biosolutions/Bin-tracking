@@ -78,6 +78,13 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #   cycle.service.ts      prisma.binCycle.findMany({                 x2
 #   bin.service.ts        const binType = await prisma.binType.findUnique({  x2
 #   bin.service.ts        const activeBins = await prisma.bin.findMany({     x2
+#
+# Animal Records dashboard (farmer.service.ts) entries:
+#   [FILTER] return prisma.animalRegistration.findMany({ — `where` object is
+#            built inline directly below the call with organizationId: orgId
+#            unconditionally present; only the search OR-block is conditional.
+#   [FILTER] prisma.animalRegistration.groupBy({ — `where: { organizationId:
+#            orgId }` is the entire filter, on the line below the call.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
@@ -118,6 +125,8 @@ apps/api/src/services/facility.service.ts	prisma.facility.findMany({
 apps/api/src/services/facility.service.ts	return await prisma.facility.update({ where: { id }, data });
 apps/api/src/services/facility.service.ts	return prisma.facility.update({
 apps/api/src/services/farmer.service.ts	const record = await prisma.animalRegistration.create({
+apps/api/src/services/farmer.service.ts	return prisma.animalRegistration.findMany({
+apps/api/src/services/farmer.service.ts	prisma.animalRegistration.groupBy({
 apps/api/src/services/form.service.ts	const maxSort = await prisma.formTemplate.aggregate({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.create({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.findUnique({ where: { id } });

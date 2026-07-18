@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { ExtractedAnimalFields } from '@bin-tracker/validators';
 import { Card } from '../../components/ui/primitives';
 
@@ -55,7 +56,10 @@ export function AnimalForm({ fields, onChange, onSubmit, isSubmitting, submitSuc
 
             {submitSuccess && (
                 <p className="mt-3 rounded-xl border border-live/30 bg-live/10 px-4 py-3 text-sm text-live">
-                    Animal registration saved successfully.
+                    Animal registration saved successfully.{' '}
+                    <Link to="/app/animals" className="font-semibold underline hover:no-underline">
+                        View all records
+                    </Link>
                 </p>
             )}
         </Card>

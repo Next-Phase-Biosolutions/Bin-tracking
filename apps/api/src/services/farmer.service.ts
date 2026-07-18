@@ -3,7 +3,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import { PLAN_LIMITS } from '@bin-tracker/types';
-import type { TranscribeAudioInput, AnimalRegistrationInput, ExtractedAnimalFields } from '@bin-tracker/validators';
+import type {
+    TranscribeAudioInput,
+    AnimalRegistrationInput,
+    AnimalListInput,
+    ExtractedAnimalFields,
+} from '@bin-tracker/validators';
 import { usageService } from './usage.service.js';
 
 const assemblyai = new AssemblyAI({
@@ -142,5 +147,55 @@ Transcript: "${transcript}"`;
         });
 
         return { id: record.id };
+    },
+
+    /** Org-scoped registration list, newest first, optional text search */
+    async list(orgId: string, input: AnimalListInput) {
+        const search = input.search?.trim();
+        return prisma.animalRegistration.findMany({
+            where: {
+                organizationId: orgId,
+                ...(search
+                    ? {
+                          OR: [
+                              { animalType: { contains: search, mode: 'insensitive' as const } },
+                              { breed: { contains: search, mode: 'insensitive' as const } },
+                              { ownerName: { contains: search, mode: 'insensitive' as const } },
+                          ],
+                      }
+                    : {}),
+            },
+            orderBy: { createdAt: 'desc' },
+            take: input.limit,
+        });
+    },
+
+    /** Summary numbers for the records dashboard: true totals, not capped by the list limit */
+    async stats(orgId: string) {
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const [total, thisWeek, byType] = await Promise.all([
+            prisma.animalRegistration.count({ where: { organizationId: orgId } }),
+            prisma.animalRegistration.count({ where: { organizationId: orgId, createdAt: { gte: weekAgo } } }),
+            prisma.animalRegistration.groupBy({
+                by: ['animalType'],
+                where: { organizationId: orgId },
+                _count: { _all: true },
+                orderBy: { _count: { animalType: 'desc' } },
+            }),
+        ]);
+        return {
+            total,
+            thisWeek,
+            byType: byType.map((t) => ({ animalType: t.animalType, count: t._count._all })),
+        };
+    },
+
+    /** Delete a registration. Cross-org ids report NOT_FOUND, same discipline as employee.service.ts */
+    async remove(orgId: string, id: string): Promise<{ id: string }> {
+        const { count } = await prisma.animalRegistration.deleteMany({ where: { id, organizationId: orgId } });
+        if (count === 0) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
+        }
+        return { id };
     },
 };

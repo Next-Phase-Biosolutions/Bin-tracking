@@ -3,6 +3,7 @@ import TabletPage from './features/tablet/TabletPage';
 import DriverPage from './features/driver/DriverPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistrationPage';
+import AnimalRecordsPage from './features/farmer-registration/AnimalRecordsPage';
 import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
 import FormImportPage from './features/forms/import/FormImportPage';
@@ -55,6 +56,7 @@ export function App() {
                 <Route path="/app/guard" element={<GuardScannerPage />} />
                 <Route path="/app/forms" element={<FormListPage />} />
                 <Route path="/app/animalregistration" element={<FarmerRegistrationPage />} />
+                <Route path="/app/animals" element={<AnimalRecordsPage />} />
                 <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
                 <Route path="/app/driver" element={<DriverPage />} />
                 <Route path="/app/dashboard" element={<DashboardPage />} />
