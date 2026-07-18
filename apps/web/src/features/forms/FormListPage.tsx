@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { createStationTRPCClient, STATION_TOKEN } from '../../lib/trpc';
+import { apiClient } from '../../lib/trpc';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
 import { FormRenderer } from './FormRenderer';
 import { FormBuilder } from './FormBuilder';
@@ -10,9 +10,6 @@ import { Badge } from '../../components/ui/primitives';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
-
-// form.listByStage requires stationProcedure — scoped to this one call.
-const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 const STAGE = import.meta.env.VITE_STATION_STAGE || 'ALL';
 
@@ -57,7 +54,7 @@ export function FormListPage() {
 
     const { data: forms, isLoading, error } = useQuery({
         queryKey: ['form.listByStage', STAGE],
-        queryFn: () => stationClient.form.listByStage.query({ stage: STAGE }),
+        queryFn: () => apiClient.form.listByStage.query({ stage: STAGE }),
         staleTime: 5 * 60 * 1000,
         retry: 2,
     });

@@ -2,17 +2,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+import { apiClient, type RouterOutputs } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 
-// This is a kiosk-style page with no user session — both calls it makes
-// (register, facilityOptions) are stationProcedure, so a single scoped
-// station client serves the whole page.
-const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 type Shipment = RouterOutputs['shipment']['register'];
 
@@ -60,12 +56,12 @@ export default function ShipmentRegisterPage() {
 
     const facilityQuery = useQuery({
         queryKey: ['station', 'shipment.facilityOptions'],
-        queryFn: () => stationClient.shipment.facilityOptions.query(),
+        queryFn: () => apiClient.shipment.facilityOptions.query(),
         staleTime: 60_000,
     });
     const registerMutation = useMutation({
-        mutationFn: (input: Parameters<typeof stationClient.shipment.register.mutate>[0]) =>
-            stationClient.shipment.register.mutate(input),
+        mutationFn: (input: Parameters<typeof apiClient.shipment.register.mutate>[0]) =>
+            apiClient.shipment.register.mutate(input),
         onSuccess: (shipment) => setRegistered(shipment),
     });
     const { hasModule, isLoading } = useSubscription();

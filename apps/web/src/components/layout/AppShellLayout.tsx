@@ -8,15 +8,9 @@ import { Sidebar } from '../app/Sidebar';
 import { TopBar } from '../app/TopBar';
 import { MARKETING_URL } from '../../lib/marketingUrl';
 
-/**
- * `optional` is for the station-token kiosk routes (/app/bin, /app/guard, …):
- * an unattended facility-floor tablet has no user session, so those routes
- * must render WITHOUT the login redirect — but a signed-in user navigating
- * to the same pages from the sidebar should keep the full shell around them.
- */
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
-export function AppShellLayout({ optional = false }: { optional?: boolean }) {
+export function AppShellLayout() {
     const { user, loading } = useAuth();
     const [drawer, setDrawer] = useState(false);
     const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
@@ -30,13 +24,8 @@ export function AppShellLayout({ optional = false }: { optional?: boolean }) {
     };
 
     useEffect(() => {
-        if (!optional && !loading && !user) window.location.href = `${MARKETING_URL}/login`;
-    }, [optional, loading, user]);
-
-    // Kiosk mode: no session, no shell, no redirect — the page owns the screen.
-    if (optional && !loading && !user) {
-        return <Outlet />;
-    }
+        if (!loading && !user) window.location.href = `${MARKETING_URL}/login`;
+    }, [loading, user]);
 
     if (loading || !user) {
         return showSplash ? <FacilityLoader variant="splash" /> : null;

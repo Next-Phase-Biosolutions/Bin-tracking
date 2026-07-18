@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { createStationTRPCClient, STATION_TOKEN, type RouterOutputs } from '../../lib/trpc';
+import { apiClient, type RouterOutputs } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { CameraScanner } from '../../components/app/CameraScanner';
-
-// attendance.scan requires stationProcedure — scoped to this one call so it
-// doesn't collide with any bearer-gated call elsewhere on the page.
-const stationClient = createStationTRPCClient(STATION_TOKEN);
 
 type ScanMode = 'handheld' | 'camera';
 
@@ -36,8 +32,8 @@ export default function GuardScannerPage() {
     const handheldRef = useRef<HTMLInputElement | null>(null);
 
     const scanMutation = useMutation({
-        mutationFn: (input: Parameters<typeof stationClient.attendance.scan.mutate>[0]) =>
-            stationClient.attendance.scan.mutate(input),
+        mutationFn: (input: Parameters<typeof apiClient.attendance.scan.mutate>[0]) =>
+            apiClient.attendance.scan.mutate(input),
     });
 
     const submitScan = (qrCode: string) => {

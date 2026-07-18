@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createStationTRPCClient } from '../../lib/trpc';
+import { apiClient } from '../../lib/trpc';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
 import { CameraScanner } from '../../components/app/CameraScanner';
 
 const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || 'Facility Scanner';
-const TABLET_STATION_TOKEN = import.meta.env.VITE_TEST_STATION_TOKEN || '';
 
 export function TabletPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
@@ -37,8 +36,7 @@ export function TabletPage() {
         setIsSuccess(false);
 
         try {
-            const stationClient = createStationTRPCClient(TABLET_STATION_TOKEN);
-            await stationClient.bin.startDynamic.mutate({
+            await apiClient.bin.startDynamic.mutate({
                 masterQrCode: scannedBinId,
             });
 

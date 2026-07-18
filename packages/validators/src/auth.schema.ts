@@ -9,17 +9,6 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
-// ─── Station Auth (Tablet) ────────────────────────────────────
-
-export const stationAuthSchema = z.object({
-    token: z
-        .string()
-        .min(1, 'Token is required')
-        .max(128, 'Token too long'),
-});
-
-export type StationAuthInput = z.infer<typeof stationAuthSchema>;
-
 // ─── Create Organization (self-serve signup wizard) ───────────
 
 export const createOrganizationSchema = z.object({

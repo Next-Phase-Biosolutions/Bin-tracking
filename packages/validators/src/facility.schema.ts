@@ -39,11 +39,3 @@ export const getFacilitySchema = z.object({
     id: z.string().cuid(),
 });
 
-// ─── Create Station (tablet provisioning) ─────────────────────
-
-export const createStationSchema = z.object({
-    facilityId: z.string().cuid(),
-    label: z.string().min(1).max(100).optional(),
-});
-
-export type CreateStationInput = z.infer<typeof createStationSchema>;

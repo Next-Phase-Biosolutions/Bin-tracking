@@ -5,37 +5,35 @@ describe('resolveOrgId', () => {
     it('resolves org and org-scoped role from user membership', async () => {
         const prisma = {
             organizationMember: { findFirst: vi.fn().mockResolvedValue({ orgId: 'org_1', role: 'DRIVER' }) },
-            facility: { findUnique: vi.fn() },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        expect(await resolveOrgId(prisma as any, { userId: 'u1', facilityId: null })).toEqual({
+        expect(await resolveOrgId(prisma as any, { userId: 'u1' })).toEqual({
             orgId: 'org_1',
             orgRole: 'DRIVER',
         });
     });
 
-    it('resolves org from station facility with a null orgRole (stations have no role)', async () => {
+    it('returns null orgId and null orgRole when the user has no membership', async () => {
         const prisma = {
-            organizationMember: { findFirst: vi.fn() },
-            facility: { findUnique: vi.fn().mockResolvedValue({ organizationId: 'org_2' }) },
+            organizationMember: { findFirst: vi.fn().mockResolvedValue(null) },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        expect(await resolveOrgId(prisma as any, { userId: null, facilityId: 'f1' })).toEqual({
-            orgId: 'org_2',
+        expect(await resolveOrgId(prisma as any, { userId: 'u1' })).toEqual({
+            orgId: null,
             orgRole: null,
         });
     });
 
-    it('returns null orgId and null orgRole when neither resolves', async () => {
+    it('returns null orgId and null orgRole for an unauthenticated caller', async () => {
         const prisma = {
-            organizationMember: { findFirst: vi.fn().mockResolvedValue(null) },
-            facility: { findUnique: vi.fn().mockResolvedValue(null) },
+            organizationMember: { findFirst: vi.fn() },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        expect(await resolveOrgId(prisma as any, { userId: 'u1', facilityId: 'f1' })).toEqual({
+        expect(await resolveOrgId(prisma as any, { userId: null })).toEqual({
             orgId: null,
             orgRole: null,
         });
+        expect(prisma.organizationMember.findFirst).not.toHaveBeenCalled();
     });
 
     // ─── x-org-id explicit org selection ───────────────────────────────
@@ -45,10 +43,9 @@ describe('resolveOrgId', () => {
                 findUnique: vi.fn().mockResolvedValue({ orgId: 'org_second', role: 'DRIVER' }),
                 findFirst: vi.fn(),
             },
-            facility: { findUnique: vi.fn() },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await resolveOrgId(prisma as any, { userId: 'u1', facilityId: null, requestedOrgId: 'org_second' });
+        const result = await resolveOrgId(prisma as any, { userId: 'u1', requestedOrgId: 'org_second' });
         expect(result).toEqual({ orgId: 'org_second', orgRole: 'DRIVER' });
         expect(prisma.organizationMember.findUnique).toHaveBeenCalledWith({
             where: { orgId_userId: { orgId: 'org_second', userId: 'u1' } },
@@ -63,10 +60,9 @@ describe('resolveOrgId', () => {
                 findUnique: vi.fn().mockResolvedValue(null), // not a member of the requested org
                 findFirst: vi.fn().mockResolvedValue({ orgId: 'org_default', role: 'ADMIN' }), // their real org
             },
-            facility: { findUnique: vi.fn() },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await resolveOrgId(prisma as any, { userId: 'u1', facilityId: null, requestedOrgId: 'org_other' });
+        const result = await resolveOrgId(prisma as any, { userId: 'u1', requestedOrgId: 'org_other' });
         expect(result).toEqual({ orgId: null, orgRole: null });
         expect(prisma.organizationMember.findFirst).not.toHaveBeenCalled(); // never falls back
     });
@@ -79,10 +75,9 @@ describe('resolveOrgId', () => {
     it('returns the membership role even when it differs from what a global role would be', async () => {
         const prisma = {
             organizationMember: { findFirst: vi.fn().mockResolvedValue({ orgId: 'org_3', role: 'WORKER' }) },
-            facility: { findUnique: vi.fn() },
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await resolveOrgId(prisma as any, { userId: 'u2', facilityId: null });
+        const result = await resolveOrgId(prisma as any, { userId: 'u2' });
         expect(result.orgRole).toBe('WORKER');
     });
 });

@@ -1,18 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import QRCode from 'qrcode';
-import { Building2, MapPin, QrCode as QrCodeIcon, Users, CheckCircle2 } from 'lucide-react';
+import { Building2, MapPin, Users, CheckCircle2 } from 'lucide-react';
 import { trpc } from '../../lib/trpc';
 import { useAuth } from '../../context/AuthContext';
 import { MARKETING_URL } from '../../lib/marketingUrl';
 
-type Step = 'org' | 'facility' | 'station' | 'invite';
+type Step = 'org' | 'facility' | 'invite';
 
 const STEPS: { key: Step; label: string }[] = [
     { key: 'org', label: 'Organization' },
     { key: 'facility', label: 'First facility' },
-    { key: 'station', label: 'Tablet setup' },
     { key: 'invite', label: 'Invite team' },
 ];
 
@@ -22,10 +20,11 @@ const STEPS: { key: Step; label: string }[] = [
  * account) — not just as a redirect target right after SignupPage. If the
  * account already has an org, this immediately bounces to the dashboard.
  *
- * Steps: create org -> create first facility -> show station token QR for
- * tablet setup -> invite teammates (invitation.create, Task 19). Sending an
- * invite is optional — "Skip for now" / "Done" always lets the user finish
- * onboarding without inviting anyone.
+ * Steps: create org -> create first facility -> invite teammates
+ * (invitation.create, Task 19). Sending an invite is optional — "Skip for
+ * now" / "Done" always lets the user finish onboarding without inviting
+ * anyone. Facility-floor tablets need no pairing step: they sign in with a
+ * normal member account like any other device.
  */
 export default function OnboardingWizard() {
     const navigate = useNavigate();
@@ -34,7 +33,6 @@ export default function OnboardingWizard() {
     const [checked, setChecked] = useState(false);
 
     const [step, setStep] = useState<Step>('org');
-    const [facilityId, setFacilityId] = useState<string | null>(null);
 
     useEffect(() => {
         if (loading) return;
@@ -64,17 +62,7 @@ export default function OnboardingWizard() {
                 <StepProgress currentIndex={stepIndex} />
 
                 {step === 'org' && <OrgStep onDone={() => setStep('facility')} />}
-                {step === 'facility' && (
-                    <FacilityStep
-                        onDone={(id) => {
-                            setFacilityId(id);
-                            setStep('station');
-                        }}
-                    />
-                )}
-                {step === 'station' && facilityId && (
-                    <StationStep facilityId={facilityId} onDone={() => setStep('invite')} />
-                )}
+                {step === 'facility' && <FacilityStep onDone={() => setStep('invite')} />}
                 {step === 'invite' && <InviteStep onDone={() => navigate('/app/dashboard', { replace: true })} />}
             </div>
         </div>
@@ -148,7 +136,7 @@ function OrgStep({ onDone }: { onDone: () => void }) {
 
 // ─── Step 2: First facility ────────────────────────────────────────────
 
-function FacilityStep({ onDone }: { onDone: (facilityId: string) => void }) {
+function FacilityStep({ onDone }: { onDone: () => void }) {
     const [name, setName] = useState('');
     const [type, setType] = useState<'PROCESSING' | 'RENDERING'>('PROCESSING');
     const [address, setAddress] = useState('');
@@ -156,7 +144,7 @@ function FacilityStep({ onDone }: { onDone: (facilityId: string) => void }) {
     const [lng, setLng] = useState('');
 
     const createFacility = trpc.facility.create.useMutation({
-        onSuccess: (facility) => facility && onDone(facility.id),
+        onSuccess: () => onDone(),
     });
 
     const handleSubmit = (e: FormEvent) => {
@@ -199,63 +187,7 @@ function FacilityStep({ onDone }: { onDone: (facilityId: string) => void }) {
     );
 }
 
-// ─── Step 3: Station QR ────────────────────────────────────────────────
-
-function StationStep({ facilityId, onDone }: { facilityId: string; onDone: () => void }) {
-    const createStation = trpc.facility.createStation.useMutation();
-    const requested = useRef(false);
-
-    useEffect(() => {
-        if (requested.current) return;
-        requested.current = true;
-        createStation.mutate({ facilityId });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [facilityId]);
-
-    const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-    const token = createStation.data?.token;
-
-    useEffect(() => {
-        if (!token) return;
-        let active = true;
-        QRCode.toDataURL(token, { width: 280, margin: 2, errorCorrectionLevel: 'M' }).then((url) => {
-            if (active) setQrDataUrl(url);
-        });
-        return () => {
-            active = false;
-        };
-    }, [token]);
-
-    return (
-        <Card>
-            <StepHeader icon={<QrCodeIcon className="h-5 w-5" />} title="Set up a tablet" />
-            <p className="mb-4 text-sm text-gray-600">
-                Scan this code from the tablet at your facility to pair it as a bin-tracking station.
-            </p>
-
-            {createStation.isError && <ErrorBanner message={createStation.error.message} />}
-
-            <div className="mb-6 flex h-[280px] w-[280px] items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white mx-auto">
-                {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="Station pairing QR code" className="h-full w-full" />
-                ) : (
-                    <span className="text-sm text-gray-400">{createStation.isPending ? 'Generating…' : ''}</span>
-                )}
-            </div>
-
-            <button
-                type="button"
-                onClick={onDone}
-                disabled={!token}
-                className="w-full rounded-xl bg-[#3d5aa8] py-3 text-sm font-bold text-white transition-colors hover:bg-[#2d4898] disabled:opacity-50"
-            >
-                Continue
-            </button>
-        </Card>
-    );
-}
-
-// ─── Step 4: Invite teammates ──────────────────────────────────────────
+// ─── Step 3: Invite teammates ──────────────────────────────────────────
 
 type InviteRole = 'ADMIN' | 'OPS_MANAGER' | 'DRIVER' | 'WORKER';
 
