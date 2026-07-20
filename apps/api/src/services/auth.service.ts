@@ -3,6 +3,7 @@ import { prisma } from '@bin-tracker/db';
 import type { User } from '@bin-tracker/db';
 import { provisionOrganization } from './org-provision.service.js';
 import { createTrialSubscription } from './billing.service.js';
+import { isEmailConflict, EMAIL_CONFLICT_MESSAGE } from '../lib/errors.js';
 
 export interface BootstrapUserView {
     id: string;
@@ -39,25 +40,32 @@ export async function bootstrap(
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'JWT is missing an email claim' });
         }
         const email = jwtPayload.email;
-        user = await prisma.user.upsert({
-            where: { id: jwtPayload.sub },
-            update: {},
-            create: {
-                id: jwtPayload.sub,
-                email,
-                // Supabase's JWT carries no display-name claim we surface here
-                // (see jwt.ts) — seed a placeholder from the email's local
-                // part. Renaming via a profile screen isn't in scope for this task.
-                name: email.split('@')[0] ?? email,
-                // Least privilege: the GLOBAL role is informational once org
-                // authorization reads OrganizationMember.role (Task 25) — a
-                // blanket global ADMIN here was the raw material for the
-                // privilege-escalation bug and stays a footgun for any future
-                // code that checks user.role. Real authority comes from the
-                // ADMIN membership provisionOrganization() grants the owner.
-                role: 'WORKER',
-            },
-        });
+        try {
+            user = await prisma.user.upsert({
+                where: { id: jwtPayload.sub },
+                update: {},
+                create: {
+                    id: jwtPayload.sub,
+                    email,
+                    // Supabase's JWT carries no display-name claim we surface here
+                    // (see jwt.ts) — seed a placeholder from the email's local
+                    // part. Renaming via a profile screen isn't in scope for this task.
+                    name: email.split('@')[0] ?? email,
+                    // Least privilege: the GLOBAL role is informational once org
+                    // authorization reads OrganizationMember.role (Task 25) — a
+                    // blanket global ADMIN here was the raw material for the
+                    // privilege-escalation bug and stays a footgun for any future
+                    // code that checks user.role. Real authority comes from the
+                    // ADMIN membership provisionOrganization() grants the owner.
+                    role: 'WORKER',
+                },
+            });
+        } catch (error: unknown) {
+            if (isEmailConflict(error)) {
+                throw new TRPCError({ code: 'CONFLICT', message: EMAIL_CONFLICT_MESSAGE });
+            }
+            throw error;
+        }
     } else if (fallbackUser) {
         user = fallbackUser;
     } else {

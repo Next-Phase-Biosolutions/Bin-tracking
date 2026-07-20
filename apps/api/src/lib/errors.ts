@@ -51,3 +51,22 @@ export function handlePrismaError(error: unknown): never {
         message: 'An unexpected error occurred',
     });
 }
+
+/**
+ * A `users` row already exists with a given email under a DIFFERENT id — the
+ * only way that happens is a Supabase Auth account for that email existed
+ * before, got deleted, and was re-created (Supabase hands out a brand-new
+ * `sub` on re-creation; the local row from the old one is still here since
+ * `email` is @unique but nothing deletes it when Supabase Auth changes out
+ * from under it). Used by both auth.service.ts's bootstrap() and
+ * invitation.service.ts's acceptInvitation() — both do a `user.upsert()`
+ * keyed on the Supabase-issued id and can hit this identical conflict.
+ * The caller can't fix this by retrying — surface it clearly instead of
+ * letting the raw Prisma constraint error reach the browser.
+ */
+export function isEmailConflict(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+export const EMAIL_CONFLICT_MESSAGE =
+    'An account already exists for this email under a different sign-in record. Contact support to resolve this — signing up again will not fix it.';
