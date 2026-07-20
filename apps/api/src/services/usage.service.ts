@@ -44,4 +44,45 @@ export const usageService = {
             }
         });
     },
+
+    /**
+     * Read-only limit check — throws TOO_MANY_REQUESTS if the org has ALREADY
+     * reached `limit` this month, without touching the counter. Pair with
+     * increment() after the metered work succeeds, so a failed operation (bad
+     * audio, upstream API error) never consumes a slot the way the atomic
+     * checkAndIncrement would.
+     */
+    async check(orgId: string, metric: string, limit: number): Promise<void> {
+        if (limit === -1) return;
+        const period = currentPeriod();
+        const row = await prisma.usageCounter.findUnique({
+            where: { orgId_metric_period: { orgId, metric, period } },
+            select: { count: true },
+        });
+        if ((row?.count ?? 0) >= limit) {
+            throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message: `Monthly limit for ${metric} reached (${limit}). Upgrade your plan for more.`,
+            });
+        }
+    },
+
+    /**
+     * Atomically +1 the org's monthly counter for `metric`. No limit check —
+     * call check() BEFORE the metered work and increment() only AFTER it
+     * succeeds.
+     *
+     * ponytail: check-then-increment is not atomic, so N concurrent calls that
+     * all pass check() at count=limit-1 can push the counter a few over the
+     * cap. Acceptable for a soft monthly cost guard; if a hard cap is ever
+     * needed, go back to the atomic checkAndIncrement and refund on failure.
+     */
+    async increment(orgId: string, metric: string): Promise<void> {
+        const period = currentPeriod();
+        await prisma.usageCounter.upsert({
+            where: { orgId_metric_period: { orgId, metric, period } },
+            create: { orgId, metric, period, count: 1 },
+            update: { count: { increment: 1 } },
+        });
+    },
 };

@@ -44,6 +44,9 @@ function BillingDetails({
     currentPeriodEnd: Date | null | undefined;
     enabledModules: ModuleKey[];
 }) {
+    const me = trpc.auth.me.useQuery(undefined, { staleTime: 300_000 });
+    const isAdmin = me.data?.orgRole === 'ADMIN';
+
     const portalMutation = trpc.billing.createPortalSession.useMutation({
         onSuccess: (result) => {
             window.location.href = result.url;
@@ -96,14 +99,23 @@ function BillingDetails({
                     <p className="mt-4 text-sm text-rust">{portalMutation.error.message}</p>
                 )}
 
-                <button
-                    type="button"
-                    onClick={() => portalMutation.mutate()}
-                    disabled={portalMutation.isPending}
-                    className="mt-6 w-full rounded-xl bg-rust py-3 text-sm font-bold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
-                >
-                    {portalMutation.isPending ? 'Redirecting…' : 'Manage billing'}
-                </button>
+                {/* Managing the subscription is an admin action — the server
+                    gates billing.createPortalSession by org role too; this just
+                    keeps a non-admin from clicking a button that would 403. */}
+                {isAdmin ? (
+                    <button
+                        type="button"
+                        onClick={() => portalMutation.mutate()}
+                        disabled={portalMutation.isPending}
+                        className="mt-6 w-full rounded-xl bg-rust py-3 text-sm font-bold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
+                    >
+                        {portalMutation.isPending ? 'Redirecting…' : 'Manage billing'}
+                    </button>
+                ) : (
+                    <p className="mt-6 text-sm text-muted">
+                        Contact an organization admin to change the subscription.
+                    </p>
+                )}
             </Card>
         </div>
     );

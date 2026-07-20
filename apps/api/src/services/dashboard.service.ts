@@ -86,7 +86,19 @@ export const dashboardService = {
                     INNER JOIN bin_types bt ON b."binTypeId" = bt.id
                     WHERE bc.status IN ('ACTIVE', 'IN_TRANSIT')
                     AND bc."organizationId" = ${orgId}
-                    ${userRole !== 'ADMIN' ? Prisma.sql`AND bc."facilityId" IN (${Prisma.join(facilityIds)})` : Prisma.empty}
+                    ${
+                        // A non-ADMIN with no assigned facilities sees nothing —
+                        // `AND false` returns zero rows, matching what the other
+                        // `facilityId: { in: [] }` queries above already do.
+                        // `Prisma.join([])` would otherwise THROW ("empty array"),
+                        // 500ing the whole dashboard for a freshly-invited member
+                        // who hasn't been assigned a facility yet.
+                        userRole === 'ADMIN'
+                            ? Prisma.empty
+                            : facilityIds.length > 0
+                              ? Prisma.sql`AND bc."facilityId" IN (${Prisma.join(facilityIds)})`
+                              : Prisma.sql`AND false`
+                    }
                     GROUP BY bt.urgency
                 `,
             ]);

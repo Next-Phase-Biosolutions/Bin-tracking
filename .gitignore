@@ -37,3 +37,6 @@ pnpm-debug.log*
 plans/*.pdf
 agentdb.rvf*
 ruvector.db
+# Local Claude Code config and Playwright MCP debug artifacts
+.claude/
+.playwright-mcp/

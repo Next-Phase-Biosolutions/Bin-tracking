@@ -39,10 +39,16 @@ vi.mock('@bin-tracker/db', () => {
             existing.count += update.count.increment;
             return Promise.resolve({ ...existing });
         },
+        findUnique: ({ where }: { where: { orgId_metric_period: { orgId: string; metric: string; period: string } } }) => {
+            const { orgId, metric, period } = where.orgId_metric_period;
+            const existing = store.counters.get(key(orgId, metric, period));
+            return Promise.resolve(existing ? { count: existing.count } : null);
+        },
     };
-    // usage.service.ts runs increment + limit-check in one transaction; model
-    // real rollback so "does not consume a slot when rejected" tests the same
-    // property the DB provides.
+    // transcribeField now checks the limit read-only (usageService.check) before
+    // transcribing and increments only after success — so an at-limit org is
+    // rejected before any AssemblyAI call, and a rejected call leaves the counter
+    // untouched (no rollback needed).
     interface FakePrisma {
         subscription: typeof subscription;
         usageCounter: typeof usageCounter;
