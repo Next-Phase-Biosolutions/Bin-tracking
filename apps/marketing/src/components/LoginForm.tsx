@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { handoffToApp } from '@/lib/authHandoff';
-import { validateEmail } from '@/lib/validation';
+import { validateEmail, suggestEmailDomain } from '@/lib/validation';
 
 const field =
     'w-full rounded-xl border border-edge bg-white px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-rust focus:outline-none';
@@ -10,6 +10,7 @@ const fieldErrorText = 'mt-1.5 text-xs text-rust';
 
 export function LoginForm() {
     const [email, setEmail] = useState('');
+    const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [emailError, setEmailError] = useState<string | null>(null);
@@ -55,7 +56,8 @@ export function LoginForm() {
                     name="email"
                     type="email"
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); setEmailSuggestion(null); }}
+                    onBlur={() => setEmailSuggestion(suggestEmailDomain(email))}
                     required
                     autoFocus
                     autoComplete="email"
@@ -64,6 +66,19 @@ export function LoginForm() {
                     className={field}
                 />
                 {emailError && <p className={fieldErrorText}>{emailError}</p>}
+                {!emailError && emailSuggestion && (
+                    <p className="mt-1.5 text-xs text-muted">
+                        Did you mean{' '}
+                        <button
+                            type="button"
+                            onClick={() => { setEmail(emailSuggestion); setEmailSuggestion(null); }}
+                            className="font-semibold text-rust underline-offset-2 hover:underline"
+                        >
+                            {emailSuggestion}
+                        </button>
+                        ?
+                    </p>
+                )}
             </div>
 
             <div>

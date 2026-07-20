@@ -34,6 +34,22 @@ export const authRouter = router({
         orgRole: ctx.orgRole,
     })),
 
+    /**
+     * Every organization the caller belongs to (oldest first), for the org
+     * switcher. Not org-scoped — reads the caller's own memberships directly,
+     * so it works regardless of which org `x-org-id` currently resolves to
+     * (and even if a stale selected org no longer applies). The frontend only
+     * shows a switcher when this returns more than one.
+     */
+    myOrgs: protectedProcedure.query(async ({ ctx }) => {
+        const memberships = await ctx.prisma.organizationMember.findMany({
+            where: { userId: ctx.user!.id },
+            select: { orgId: true, role: true, organization: { select: { name: true } } },
+            orderBy: { createdAt: 'asc' },
+        });
+        return memberships.map((m) => ({ orgId: m.orgId, name: m.organization.name, role: m.role }));
+    }),
+
     updateProfile: protectedProcedure
         .input(updateProfileSchema)
         .mutation(async ({ ctx, input }) => authService.updateProfile(ctx.user!.id, input.name)),
