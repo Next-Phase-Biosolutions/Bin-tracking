@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/ui/atoms";
 import { LoginForm } from "@/components/LoginForm";
 
@@ -6,6 +6,9 @@ import { LoginForm } from "@/components/LoginForm";
 const marquee = ["CFIA", "Vision AI", "Carbon Credits", "Blockchain Verified"];
 
 export default function LoginPage() {
+  const location = useLocation();
+  const passwordReset = Boolean((location.state as { passwordReset?: boolean } | null)?.passwordReset);
+
   return (
     <main className="min-h-screen lg:grid lg:grid-cols-2">
       {/* Brand panel */}
@@ -59,6 +62,12 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-muted">
             Access your facility dashboard and live records.
           </p>
+
+          {passwordReset && (
+            <div className="mt-6 rounded-xl border border-live/30 bg-live/10 px-4 py-3 text-sm text-live">
+              Your password has been updated. Sign in with your new password.
+            </div>
+          )}
 
           <div className="mt-7">
             <LoginForm />

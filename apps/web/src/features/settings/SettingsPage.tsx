@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { trpc } from '../../lib/trpc';
 import { supabase } from '../../lib/supabase.ts';
 import { useAuth } from '../../context/AuthContext';
+import { MARKETING_URL } from '../../lib/marketingUrl';
 import { PageHeader } from '../../components/app/PageHeader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button, Badge, LiveDot } from '../../components/ui/primitives';
@@ -87,7 +88,9 @@ function ProfileSection({ name }: { name?: string }) {
     const sendPasswordReset = async () => {
         if (!user?.email) return;
         setResetError(null);
-        const { error } = await supabase.auth.resetPasswordForEmail(user.email);
+        const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+            redirectTo: `${MARKETING_URL}/reset-password`,
+        });
         if (error) setResetError(error.message);
         else setResetSent(true);
     };
