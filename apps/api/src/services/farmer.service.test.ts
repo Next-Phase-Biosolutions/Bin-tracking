@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ─── Wiring test: metering runs before the AssemblyAI/Claude calls ─────────
+// ─── Wiring test: the limit check runs before the AssemblyAI/Claude calls ──
 // transcribeAndExtract must look up the org's plan and call
-// usageService.checkAndIncrement with the 'voice_transcribe' metric BEFORE
-// any AssemblyAI call — a pre-loaded counter at the plan limit must reject
-// with TOO_MANY_REQUESTS without ever reaching the network call (no
+// usageService.check with the 'voice_transcribe' metric BEFORE any AssemblyAI
+// call — a pre-loaded counter at the plan limit must reject with
+// TOO_MANY_REQUESTS without ever reaching the network call (no
 // ASSEMBLYAI_API_KEY is set in this test, so reaching the network call would
 // fail differently, which is how we know metering ran first).
 
@@ -52,10 +52,16 @@ vi.mock('@bin-tracker/db', () => {
             existing.count += update.count.increment;
             return Promise.resolve({ ...existing });
         },
+        findUnique: ({ where }: { where: { orgId_metric_period: { orgId: string; metric: string; period: string } } }) => {
+            const { orgId, metric, period } = where.orgId_metric_period;
+            const existing = store.counters.get(key(orgId, metric, period));
+            return Promise.resolve(existing ? { count: existing.count } : null);
+        },
     };
-    // usage.service.ts runs increment + limit-check in one transaction; model
-    // real rollback so "does not consume a slot when rejected" tests the same
-    // property the DB provides.
+    // transcribeAndExtract now checks the limit read-only (usageService.check)
+    // before transcribing and increments only after success — so an at-limit org
+    // is rejected before any AssemblyAI call, and a rejected call leaves the
+    // counter untouched (no rollback needed).
     // Minimal list/count/groupBy/deleteMany fake for the records-dashboard
     // methods. Search filtering mirrors Prisma's contains/insensitive OR.
     const matches = (r: { animalType: string; breed: string | null; ownerName: string }, search?: string) => {

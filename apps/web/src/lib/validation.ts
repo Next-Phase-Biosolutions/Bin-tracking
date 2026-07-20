@@ -14,8 +14,6 @@ mailcheck.domainThreshold = 3;
 // Rejects "@mmail.com", "a@b", values with spaces.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-export const PASSWORD_MIN_LENGTH = 8;
-
 export function validateEmail(email: string): string | null {
     const trimmed = email.trim();
     if (!trimmed) return 'Email is required.';
@@ -27,10 +25,4 @@ export function validateEmail(email: string): string | null {
 export function suggestEmailDomain(email: string): string | null {
     const result = mailcheck.run({ email: email.trim() });
     return result?.full ?? null;
-}
-
-export function validatePassword(password: string): string | null {
-    if (!password) return 'Password is required.';
-    if (password.length < PASSWORD_MIN_LENGTH) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
-    return null;
 }

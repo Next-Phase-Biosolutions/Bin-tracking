@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase.ts';
-import { setAuthToken } from '../lib/trpc.ts';
+import { setAuthToken, setSelectedOrgId } from '../lib/trpc.ts';
 import { clearCachedModules } from '../lib/moduleCache.ts';
 
 interface AuthUser {
@@ -17,12 +17,13 @@ interface AuthContextValue {
     /**
      * Returns { needsEmailConfirmation: true } when the Supabase project
      * requires confirming the email before a session is issued — signUp()
-     * still succeeds but data.session is null until the user clicks the
-     * confirmation link. Building that confirmation-link landing flow is out
-     * of scope here; the caller just needs to show a "check your email"
-     * message instead of proceeding into onboarding.
+     * still succeeds but data.session is null until the caller verifies the
+     * 6-digit code via verifySignupOtp.
      */
     signup: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
+    /** Verifies the signup OTP and establishes the session — no separate login step needed. */
+    verifySignupOtp: (email: string, code: string) => Promise<void>;
+    resendSignupOtp: (email: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 
@@ -76,6 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { needsEmailConfirmation: false };
     }, []);
 
+    const verifySignupOtp = useCallback(async (email: string, code: string) => {
+        const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'signup' });
+        if (error) throw new Error(error.message);
+        if (!data.session || !data.user) throw new Error('No session returned');
+        // onAuthStateChange also fires from this call, but setting here avoids
+        // a render where `user` is still null right after verification.
+        setUser({ id: data.user.id, email: data.user.email ?? '' });
+        setAuthToken(data.session.access_token);
+    }, []);
+
+    const resendSignupOtp = useCallback(async (email: string) => {
+        const { error } = await supabase.auth.resend({ type: 'signup', email });
+        if (error) throw new Error(error.message);
+    }, []);
+
     const logout = useCallback(async () => {
         await supabase.auth.signOut();
         setUser(null);
@@ -83,12 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Org-scoped data must not survive into the next session — without
         // this, signing into a different account/org in the same tab briefly
         // shows the previous org's dashboard, members, and billing data.
+        setSelectedOrgId(null); // stale org selection must not leak into the next login
         queryClient.clear();
         clearCachedModules();
     }, [queryClient]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, signup, verifySignupOtp, resendSignupOtp, logout }}>
             {children}
         </AuthContext.Provider>
     );

@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { trpc } from '../../lib/trpc';
 import { Logo } from '../../components/app/Logo';
 import { Icon } from '../../components/ui/Icon';
+import { OtpInput } from '../../components/app/OtpInput';
+import { validateEmail, suggestEmailDomain } from '../../lib/validation';
 
-// Something before @, a domain, a dot, and a 2+ char TLD — rejects "@mmail.com".
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 /**
  * Landing page for an invite link (`/invite/:token`, Task 19). The token is
@@ -22,17 +23,29 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export default function AcceptInvitePage() {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
-    const { user, loading, login, signup } = useAuth();
+    const { user, loading, login, signup, verifySignupOtp, resendSignupOtp } = useAuth();
     const acceptMutation = trpc.invitation.accept.useMutation();
 
     const [mode, setMode] = useState<'signup' | 'login'>('signup');
     const [email, setEmail] = useState('');
+    const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
     const [password, setPassword] = useState('');
     const [emailError, setEmailError] = useState<string | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [otpCode, setOtpCode] = useState('');
+    const [otpError, setOtpError] = useState<string | null>(null);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(0);
+
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [resendCooldown]);
 
     const accept = async () => {
         if (!token) return;
@@ -60,11 +73,9 @@ export default function AcceptInvitePage() {
             setError('This invitation link is invalid.');
             return;
         }
-        // Format checks only — Supabase email confirmation is the real
+        // Format checks only — the OTP verification step is the real
         // defense against well-formed fake addresses.
-        const emailIssue = !EMAIL_RE.test(email.trim())
-            ? 'Enter a valid email address (e.g. you@yourplant.com).'
-            : null;
+        const emailIssue = validateEmail(email);
         const passwordIssue = password.length < 8 ? 'Password must be at least 8 characters.' : null;
         setEmailError(emailIssue);
         setPasswordError(passwordIssue);
@@ -81,6 +92,7 @@ export default function AcceptInvitePage() {
                 const { needsEmailConfirmation: pending } = await signup(email.trim(), password);
                 if (pending) {
                     setNeedsEmailConfirmation(true);
+                    setResendCooldown(RESEND_COOLDOWN_SECONDS);
                     return;
                 }
             } else {
@@ -91,6 +103,48 @@ export default function AcceptInvitePage() {
             setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleVerifyOtp = async (event: FormEvent) => {
+        event.preventDefault();
+        setOtpError(null);
+
+        if (otpCode.length !== 6) {
+            setOtpError('Enter the 6-digit code from your email.');
+            return;
+        }
+
+        setIsVerifying(true);
+        try {
+            await verifySignupOtp(email.trim(), otpCode);
+        } catch (err: unknown) {
+            setOtpError(err instanceof Error ? err.message : 'That code is invalid or expired. Please try again.');
+            setIsVerifying(false);
+            return;
+        }
+
+        // Verification succeeded — `user` is now set, so a failure here must
+        // go through `error` (not `otpError`): the OTP screen below is no
+        // longer reachable once `user` is truthy, so an error stuck in
+        // `otpError` would never render — the page would just hang on
+        // "Joining your team…" forever instead of showing what went wrong.
+        try {
+            await accept();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Could not accept invitation.');
+            setIsVerifying(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setOtpError(null);
+        try {
+            await resendSignupOtp(email.trim());
+            setOtpCode('');
+            setResendCooldown(RESEND_COOLDOWN_SECONDS);
+        } catch (err: unknown) {
+            setOtpError(err instanceof Error ? err.message : 'Could not resend the code. Please try again.');
         }
     };
 
@@ -129,9 +183,31 @@ export default function AcceptInvitePage() {
             <ClearanceCard eyebrow="One more step">
                 <h1 className="font-display text-xl font-extrabold text-olive-deep">Check your email</h1>
                 <p className="mt-3 text-sm leading-relaxed text-muted">
-                    We sent a confirmation link to <span className="font-semibold text-olive-deep">{email}</span>.
-                    Click it, then come back to this invite link to finish joining.
+                    We sent a 6-digit code to <span className="font-semibold text-olive-deep">{email}</span>. Enter
+                    it below to finish joining.
                 </p>
+
+                <form onSubmit={(e) => void handleVerifyOtp(e)} className="mt-6 space-y-4 text-left">
+                    <OtpInput value={otpCode} onChange={(v) => { setOtpCode(v); setOtpError(null); }} disabled={isVerifying} />
+                    {otpError && <p className="text-xs text-rust">{otpError}</p>}
+
+                    <button
+                        type="submit"
+                        disabled={isVerifying}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rust py-3 text-sm font-semibold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
+                    >
+                        {isVerifying ? 'Verifying…' : 'Verify & join'}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => void handleResendOtp()}
+                        disabled={resendCooldown > 0}
+                        className="w-full text-center text-xs font-semibold text-muted hover:text-olive-deep disabled:opacity-50"
+                    >
+                        {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                    </button>
+                </form>
             </ClearanceCard>
         );
     }
@@ -144,7 +220,31 @@ export default function AcceptInvitePage() {
             </p>
 
             <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4 text-left">
-                <Field label="Email" type="email" value={email} onChange={(v) => { setEmail(v); setEmailError(null); }} error={emailError} required autoFocus />
+                <div>
+                    <Field
+                        label="Email"
+                        type="email"
+                        value={email}
+                        onChange={(v) => { setEmail(v); setEmailError(null); setEmailSuggestion(null); }}
+                        onBlur={() => setEmailSuggestion(suggestEmailDomain(email))}
+                        error={emailError}
+                        required
+                        autoFocus
+                    />
+                    {!emailError && emailSuggestion && (
+                        <p className="mt-1.5 text-xs text-muted">
+                            Did you mean{' '}
+                            <button
+                                type="button"
+                                onClick={() => { setEmail(emailSuggestion); setEmailSuggestion(null); }}
+                                className="font-semibold text-rust underline-offset-2 hover:underline"
+                            >
+                                {emailSuggestion}
+                            </button>
+                            ?
+                        </p>
+                    )}
+                </div>
                 <Field label="Password" type="password" value={password} onChange={(v) => { setPassword(v); setPasswordError(null); }} error={passwordError} required />
 
                 {error && (
@@ -181,13 +281,14 @@ interface FieldProps {
     label: string;
     value: string;
     onChange: (value: string) => void;
+    onBlur?: () => void;
     type?: string;
     required?: boolean;
     autoFocus?: boolean;
     error?: string | null;
 }
 
-function Field({ label, value, onChange, type = 'text', required, autoFocus, error }: FieldProps) {
+function Field({ label, value, onChange, onBlur, type = 'text', required, autoFocus, error }: FieldProps) {
     return (
         <label className="block">
             <span className="mb-1.5 block font-mono text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -200,6 +301,7 @@ function Field({ label, value, onChange, type = 'text', required, autoFocus, err
                 autoFocus={autoFocus}
                 aria-invalid={error ? true : undefined}
                 onChange={(e) => onChange(e.target.value)}
+                onBlur={onBlur}
                 className="w-full rounded-lg border border-edge/80 bg-canvas px-3.5 py-2.5 text-sm text-ink transition-colors focus:border-olive focus:bg-white focus:outline-none"
             />
             {error && <span className="mt-1.5 block text-xs text-rust">{error}</span>}

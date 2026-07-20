@@ -6,6 +6,7 @@ import { operationsNav, type NavItem } from '../../lib/nav';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { trpc } from '../../lib/trpc';
+import { OrgSwitcher } from './OrgSwitcher';
 
 const ROLE_LABELS: Record<string, string> = {
     ADMIN: 'Admin',
@@ -120,6 +121,7 @@ export function Sidebar({
             </div>
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
+                <OrgSwitcher collapsed={collapsed} />
                 <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} collapsed={collapsed} />
                 {platformNav.length > 0 ? (
                     <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} collapsed={collapsed} />

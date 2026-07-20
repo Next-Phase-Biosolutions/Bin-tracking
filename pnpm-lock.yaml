@@ -114,6 +114,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.49.1
         version: 2.95.3
+      mailcheck:
+        specifier: ^1.1.1
+        version: 1.1.1
       motion:
         specifier: ^12.40.0
         version: 12.40.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -130,6 +133,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.1.18(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
+      '@types/mailcheck':
+        specifier: ^1.1.37
+        version: 1.1.37
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.14
@@ -187,6 +193,9 @@ importers:
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.2.4)
+      mailcheck:
+        specifier: ^1.1.1
+        version: 1.1.1
       motion:
         specifier: ^12.40.0
         version: 12.40.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -215,6 +224,9 @@ importers:
       '@types/jsbarcode':
         specifier: ^3.11.4
         version: 3.11.4
+      '@types/mailcheck':
+        specifier: ^1.1.37
+        version: 1.1.37
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6
@@ -1579,11 +1591,17 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/jquery@4.0.1':
+    resolution: {integrity: sha512-9a59A/tycXgYuPABcp6/3spSShn0NT2UOM4EfHvMumjYi4lJWTsK5SZWjhx3yRm9IHGCeWXdV2YfNsrWrft/CA==}
+
   '@types/jsbarcode@3.11.4':
     resolution: {integrity: sha512-VBcpTAnEMH0Gbh8JpV14CgOtJjCYjsvR2FoDRyoYPE0gUxtApf8N4c+HKEOyz/iiIZkMzqrzBA3XX7+KgKxxsA==}
 
   '@types/json-bigint@1.0.4':
     resolution: {integrity: sha512-ydHooXLbOmxBbubnA7Eh+RpBzuaIiQjh8WGJYQB50JFGFrdxW7JzVlyEV7fAXw0T2sqJ1ysTneJbiyNLqZRAag==}
+
+  '@types/mailcheck@1.1.37':
+    resolution: {integrity: sha512-KNM2NLvjJB06hXfSrsOB30E7jC/yCzFCjuMLVlaiXt7/hIJUqjB1ShOi7K/T0uySy/au+7ST+cVGeGYoC7+rSA==}
 
   '@types/node@22.19.11':
     resolution: {integrity: sha512-BH7YwL6rA93ReqeQS1c4bsPpcfOmJasG+Fkr6Y59q83f9M1WcBRHR2vM+P9eOisYRcN3ujQoiZY8uk5W+1WL8w==}
@@ -2951,6 +2969,9 @@ packages:
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
+
+  mailcheck@1.1.1:
+    resolution: {integrity: sha512-3WjL8+ZDouZwKlyJBMp/4LeziLFXgleOdsYu87piGcMLqhBzCsy2QFdbtAwv757TFC/rtqd738fgJw1tFQCSgA==}
 
   main-event@1.0.1:
     resolution: {integrity: sha512-NWtdGrAca/69fm6DIVd8T9rtfDII4Q8NQbIbsKQq2VzS9eqOGYs8uaNQjcuaCq/d9H/o625aOTJX2Qoxzqw0Pw==}
@@ -5608,11 +5629,17 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/jquery@4.0.1': {}
+
   '@types/jsbarcode@3.11.4':
     dependencies:
       '@types/node': 22.19.11
 
   '@types/json-bigint@1.0.4': {}
+
+  '@types/mailcheck@1.1.37':
+    dependencies:
+      '@types/jquery': 4.0.1
 
   '@types/node@22.19.11':
     dependencies:
@@ -7109,6 +7136,8 @@ snapshots:
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  mailcheck@1.1.1: {}
 
   main-event@1.0.1: {}
 
