@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '@prisma/client';
 
 // ─── In-memory Prisma fake ──────────────────────────────────────────────
 // Covers what invitation.service.ts touches: organization lookup, invitation
@@ -122,6 +123,16 @@ vi.mock('@bin-tracker/db', () => {
         upsert: ({ where, create }: { where: { id: string }; update: Partial<FakeUser>; create: FakeUser }) => {
             const existing = store.users.find((u) => u.id === where.id);
             if (existing) return Promise.resolve(existing);
+            // Mirrors the real `email @unique` constraint — same Supabase Auth
+            // delete-and-recreate scenario as auth.service.ts's bootstrap().
+            if (store.users.some((u) => u.email === create.email)) {
+                return Promise.reject(
+                    new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+                        code: 'P2002',
+                        clientVersion: 'test',
+                    }),
+                );
+            }
             store.users.push({ ...create });
             return Promise.resolve({ ...create });
         },
@@ -349,6 +360,24 @@ describe('invitationService.acceptInvitation', () => {
         await expect(invitationService.acceptInvitation(invitation.token, null, null)).rejects.toMatchObject({
             code: 'UNAUTHORIZED',
         });
+    });
+
+    it('surfaces a clear CONFLICT error, not the raw Prisma error, when the invited email is already claimed by a different id', async () => {
+        // Same Supabase Auth delete-and-recreate scenario as auth.service.ts's
+        // bootstrap() — a `users` row already exists for this email under an
+        // old id; the invite is being accepted with a brand-new id.
+        store.users.push({ id: 'old-auth-id', email: 'invitee@example.com', name: 'old', role: 'WORKER' });
+        const invitation = makeInvitation({ email: 'invitee@example.com' });
+
+        await expect(
+            invitationService.acceptInvitation(invitation.token, { sub: 'new-auth-id', email: 'invitee@example.com' }, null),
+        ).rejects.toMatchObject({ code: 'CONFLICT', message: expect.stringContaining('different sign-in record') });
+
+        // Nothing else committed — the invitation must still be usable and no
+        // membership/duplicate row created by the failed attempt.
+        expect(store.invitations[0]!.acceptedAt).toBeNull();
+        expect(store.memberships).toHaveLength(0);
+        expect(store.users).toHaveLength(1);
     });
 
     // ─── Task 25 regression: the actual privilege-escalation hole ─────────

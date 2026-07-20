@@ -4,6 +4,7 @@ import { prisma } from '@bin-tracker/db';
 import type { User, UserRole } from '@prisma/client';
 import { sendInvitationEmail } from '../lib/email.js';
 import { hashToken } from '../lib/token.js';
+import { isEmailConflict, EMAIL_CONFLICT_MESSAGE } from '../lib/errors.js';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -128,16 +129,24 @@ export async function acceptInvitation(
     }
 
     await prisma.$transaction(async (tx) => {
-        const user = await tx.user.upsert({
-            where: { id: sub },
-            update: {},
-            create: {
-                id: sub,
-                email,
-                name: email.split('@')[0] ?? email,
-                role: invitation.role,
-            },
-        });
+        let user: User;
+        try {
+            user = await tx.user.upsert({
+                where: { id: sub },
+                update: {},
+                create: {
+                    id: sub,
+                    email,
+                    name: email.split('@')[0] ?? email,
+                    role: invitation.role,
+                },
+            });
+        } catch (error: unknown) {
+            if (isEmailConflict(error)) {
+                throw new TRPCError({ code: 'CONFLICT', message: EMAIL_CONFLICT_MESSAGE });
+            }
+            throw error;
+        }
 
         // Task 25: role must come from THIS invitation on both branches — a
         // re-invite of an existing member has to actually change their access,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '@prisma/client';
 
 // ─── In-memory Prisma fake ──────────────────────────────────────────────
 // Covers what auth.service.ts's bootstrap()/createOrganization() touch:
@@ -37,6 +38,18 @@ vi.mock('@bin-tracker/db', () => {
             store.upsertCallCount += 1;
             const existing = store.users.find((u) => u.id === where.id);
             if (existing) return Promise.resolve(existing);
+            // Mirrors the real `email @unique` constraint: creating a row for
+            // a new id but an email already claimed by a DIFFERENT id fails,
+            // same as Postgres would — this is the exact shape the Supabase
+            // Auth delete-and-recreate scenario produces.
+            if (store.users.some((u) => u.email === create.email)) {
+                return Promise.reject(
+                    new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+                        code: 'P2002',
+                        clientVersion: 'test',
+                    }),
+                );
+            }
             store.users.push({ ...create });
             return Promise.resolve({ ...create });
         },
@@ -125,6 +138,21 @@ describe('authService.bootstrap', () => {
 
     it('rejects when there is no jwtPayload and no fallback user', async () => {
         await expect(authService.bootstrap(null, null)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('surfaces a clear CONFLICT error, not the raw Prisma error, when the email is already claimed by a different id', async () => {
+        // Simulates the Supabase Auth delete-and-recreate scenario: a `users`
+        // row already exists for this email under an old id; the current JWT
+        // carries a NEW id for the same email (a fresh Supabase Auth account).
+        store.users.push({ id: 'old-auth-id', email: 'a@example.com', name: 'a', role: 'WORKER' });
+
+        await expect(authService.bootstrap({ sub: 'new-auth-id', email: 'a@example.com' }, null)).rejects.toMatchObject({
+            code: 'CONFLICT',
+            message: expect.stringContaining('different sign-in record'),
+        });
+        // The stale row must not be silently overwritten or duplicated.
+        expect(store.users).toHaveLength(1);
+        expect(store.users[0]?.id).toBe('old-auth-id');
     });
 });
 
