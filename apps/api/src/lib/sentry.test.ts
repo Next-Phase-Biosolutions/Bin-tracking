@@ -8,16 +8,20 @@ const originalDsn = process.env['SENTRY_DSN'];
 const sentryMock = vi.hoisted(() => ({
     init: vi.fn(),
     captureException: vi.fn(),
+    // Returns its config so the test can assert what initSentry asked for.
+    requestDataIntegration: vi.fn((options: unknown) => ({ name: 'RequestData', options })),
 }));
 
 vi.mock('@sentry/node', () => ({
     init: sentryMock.init,
     captureException: sentryMock.captureException,
+    requestDataIntegration: sentryMock.requestDataIntegration,
 }));
 
 beforeEach(() => {
     sentryMock.init.mockClear();
     sentryMock.captureException.mockClear();
+    sentryMock.requestDataIntegration.mockClear();
 });
 
 afterEach(() => {
@@ -46,6 +50,22 @@ describe('initSentry', () => {
         expect(sentryMock.init).toHaveBeenCalledWith(
             expect.objectContaining({ dsn: 'https://example@o0.ingest.sentry.io/1' }),
         );
+    });
+
+    it('never ships request bodies, headers or cookies to Sentry', async () => {
+        // Not a style preference — the default requestDataIntegration attaches
+        // request bodies, and these handlers carry employee bank details (R7),
+        // voice transcripts and Authorization bearer tokens. If this assertion
+        // ever fails, PII is leaving the building.
+        process.env['SENTRY_DSN'] = 'https://example@o0.ingest.sentry.io/1';
+        vi.resetModules();
+        const { initSentry } = await import('./sentry.js');
+
+        initSentry();
+
+        expect(sentryMock.requestDataIntegration).toHaveBeenCalledWith({
+            include: { data: false, headers: false, cookies: false },
+        });
     });
 });
 

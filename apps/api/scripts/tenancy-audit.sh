@@ -22,6 +22,18 @@
 #              `data`, not used to scope a read, so it isn't a leak vector.
 #   [VERIFIED-ID] a lookup by an id that was already verified against
 #              organizationId earlier in the same call chain.
+#   [TOKEN]    a lookup or mutation gated by a single-use, hashed credential
+#              token (e.g. bankLinkToken) rather than a caller-supplied
+#              organizationId. These are PUBLIC/unauthenticated endpoints by
+#              design — there is no caller org to check against, because the
+#              token itself is the sole credential. The org is derived from
+#              whichever row the token resolves to, never asserted by the
+#              caller, so there is no cross-org substitution vector: an
+#              attacker with someone else's token gets that person's data,
+#              not a choice of org. Same trust model as invitation.service.ts's
+#              token-based accept flow, which this script doesn't audit
+#              because `invitation` isn't in the tracked model list below —
+#              `employee` is, so these need an explicit entry instead.
 #
 # HOW THIS FAILS ON A REGRESSION: if a new prisma.<model>.<method>( call is
 # added anywhere in apps/api/src/services/ without organizationId on that
@@ -85,6 +97,18 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            unconditionally present; only the search OR-block is conditional.
 #   [FILTER] prisma.animalRegistration.groupBy({ — `where: { organizationId:
 #            orgId }` is the entire filter, on the line below the call.
+#
+# Employee bank-details self-serve link (employee.service.ts) entries:
+#   [VERIFIED-ID] await prisma.employee.update({ in requestBankDetails —
+#            updates the SAME row returned by getEmployeeInOrg(orgId, ...)
+#            two lines above, which already throws NOT_FOUND when
+#            employee.organizationId !== orgId.
+#   [TOKEN]  await prisma.employee.update({ in submitBankDetails, and
+#            const employee = await prisma.employee.findUnique({ in
+#            findEmployeeByBankLink — both operate on the row resolved by a
+#            single-use hashed bankLinkToken on a PUBLIC endpoint with no
+#            session and no caller-asserted org. See the [TOKEN] category
+#            above.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
@@ -116,6 +140,9 @@ apps/api/src/services/dashboard.service.ts	prisma.binCycle.count({ where }),
 apps/api/src/services/dashboard.service.ts	prisma.binCycle.findMany({
 apps/api/src/services/dashboard.service.ts	prisma.binCycle.findMany({
 apps/api/src/services/dashboard.service.ts	prisma.facility.findMany({
+apps/api/src/services/employee.service.ts	await prisma.employee.update({
+apps/api/src/services/employee.service.ts	await prisma.employee.update({
+apps/api/src/services/employee.service.ts	const employee = await prisma.employee.findUnique({
 apps/api/src/services/employee.service.ts	const employee = await prisma.employee.findUnique({ where: { id } });
 apps/api/src/services/employee.service.ts	return await prisma.employee.create({
 apps/api/src/services/employee.service.ts	return prisma.employee.findMany({

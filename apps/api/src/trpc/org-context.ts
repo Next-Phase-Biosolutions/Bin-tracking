@@ -1,4 +1,5 @@
-import type { PrismaClient, UserRole } from '@prisma/client';
+import type { UserRole } from '@prisma/client';
+import type { DbClient } from '@bin-tracker/db';
 
 interface OrgResolutionInput {
     userId: string | null;
@@ -29,7 +30,7 @@ export interface OrgResolution {
 /** Resolve the tenant for this request (and the caller's role within it)
  * from the user's org membership. */
 export async function resolveOrgId(
-    prisma: PrismaClient,
+    prisma: DbClient,
     { userId, requestedOrgId }: OrgResolutionInput,
 ): Promise<OrgResolution> {
     if (userId) {

@@ -6,10 +6,20 @@ import type { PayrollRunView, PayrollRunSummary } from '@bin-tracker/types';
 
 const MINUTES_PER_HOUR = 60;
 
+/**
+ * The payroll view needs exactly two employee fields (code + name), so the
+ * relation is SELECTED rather than included whole. That keeps whole employee
+ * rows — including the encrypted bank columns — out of every payroll query's
+ * result set entirely, rather than relying on the global omit in
+ * packages/db/src/client.ts to strip them afterwards. Defence in depth on the
+ * one endpoint that fans an employee record out per line item.
+ */
+const EMPLOYEE_REF_SELECT = { employeeCode: true, fullName: true } as const;
+
 type RunWithRelations = Prisma.PayrollRunGetPayload<{
     include: {
-        lineItems: { include: { employee: true } };
-        exceptions: { include: { employee: true } };
+        lineItems: { include: { employee: { select: typeof EMPLOYEE_REF_SELECT } } };
+        exceptions: { include: { employee: { select: typeof EMPLOYEE_REF_SELECT } } };
     };
 }>;
 
@@ -76,11 +86,11 @@ async function loadRunView(orgId: string, period: string): Promise<PayrollRunVie
         where: { organizationId_period: { organizationId: orgId, period } },
         include: {
             lineItems: {
-                include: { employee: true },
+                include: { employee: { select: EMPLOYEE_REF_SELECT } },
                 orderBy: { employee: { fullName: 'asc' } },
             },
             exceptions: {
-                include: { employee: true },
+                include: { employee: { select: EMPLOYEE_REF_SELECT } },
                 orderBy: { employee: { fullName: 'asc' } },
             },
         },

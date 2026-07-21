@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { middleware } from './trpc.js';
-import type { UserRole, PrismaClient } from '@prisma/client';
+import type { UserRole } from '@prisma/client';
+import type { DbClient } from '@bin-tracker/db';
 import { isAuthDisabled } from '../lib/auth-flags.js';
 
 /**
@@ -121,7 +122,7 @@ export function requireAssignedDriver() {
 export async function userCanAccessBin(
     userId: string,
     binId: string,
-    prisma: PrismaClient,
+    prisma: DbClient,
     userRole: UserRole,
 ): Promise<boolean> {
     // ADMIN always has access
@@ -158,7 +159,7 @@ export async function userCanAccessBin(
  */
 export async function getUserFacilityIds(
     userId: string,
-    prisma: PrismaClient,
+    prisma: DbClient,
     userRole: UserRole,
     orgId: string,
 ): Promise<string[]> {

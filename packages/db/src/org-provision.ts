@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import type { DbClient } from './client.js';
 import { Urgency } from '@prisma/client';
 import type { Plan } from '@bin-tracker/types';
 import { reconcileModulesForPlan } from './module-service.js';
@@ -63,7 +64,7 @@ export interface ProvisionOrganizationResult {
  * self-serve signup.
  */
 export async function provisionOrganization(
-    prisma: PrismaClient,
+    prisma: DbClient,
     { name, slug, ownerUserId }: ProvisionOrganizationInput,
 ): Promise<ProvisionOrganizationResult> {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {

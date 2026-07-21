@@ -77,9 +77,17 @@ export {
     employeeRegisterSchema,
     employeeGetByIdSchema,
     employeeListSchema,
+    employeeBankDetailsSchema,
+    employeeBankSubmitSchema,
+    employeeBankLinkSchema,
+    employeeRequestBankDetailsSchema,
     type EmployeeRegisterInput,
     type EmployeeGetByIdInput,
     type EmployeeListInput,
+    type EmployeeBankDetailsInput,
+    type EmployeeBankSubmitInput,
+    type EmployeeBankLinkInput,
+    type EmployeeRequestBankDetailsInput,
 } from './employee.schema.js';
 
 export {

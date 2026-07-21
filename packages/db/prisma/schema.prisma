@@ -435,6 +435,29 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  // ─── EFT payout details ────────────────────────────────────────────────
+  // Read by the payroll payout agent (separate repo, read-only on this table)
+  // to send direct deposits via Zum Rails. All nullable: an employee must be
+  // able to exist before submitting banking, and the payout agent treats
+  // missing details as HELD — never a failed or partial payment.
+  //
+  // The four PII values are AES-256-GCM ciphertext at rest
+  // (apps/api/src/lib/bank-crypto.ts), never logged and never returned by the
+  // API — packages/db/src/client.ts omits them from every Prisma read.
+  bankInstitution   String? // 3 digits, e.g. "004"
+  bankTransit       String? // 5 digits, e.g. "12345"
+  bankAccount       String? // 7-12 digits
+  accountHolderName String? // name exactly as printed on the bank account
+  accountType       String? // "CHEQUING" | "SAVINGS" — not PII, stored plain
+  bankAccountLast4  String? // display-only mask source; avoids a decrypt per list row
+  bankDetailsAt     DateTime? // when the employee submitted them
+
+  // One-time self-serve bank-details link. Stored HASHED (lib/token.ts), same
+  // discipline as invitation/station tokens: the raw token only ever exists in
+  // the emailed link, and is cleared on use so the link burns.
+  bankLinkToken     String?   @unique
+  bankLinkExpiresAt DateTime?
+
   organization Organization      @relation(fields: [organizationId], references: [id])
   sessions     WorkSession[]
   events       AttendanceEvent[]
@@ -657,4 +680,19 @@ model PayrollException {
   @@index([runId])
   @@index([employeeId])
   @@map("payroll_exceptions")
+}
+
+// Owned by the payroll payout agent (separate repo), declared here only so
+// `prisma migrate` doesn't report the live table as drift. bin-tracker never
+// reads or writes it — the payout agent stores the Zum Rails User id it
+// created for an employee on their first payout.
+model ZumPayee {
+  employeeId String   @id
+  zumUserId  String   @unique
+  // timestamptz(6), matching the table the payout agent already created — a
+  // bare DateTime would map to timestamp(3) and reintroduce the drift this
+  // model exists to remove.
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("zum_payees")
 }
