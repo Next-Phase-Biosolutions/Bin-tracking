@@ -225,11 +225,6 @@ export const formVoiceFillService = {
         orgId: string,
         mimeType = 'audio/webm',
     ): Promise<FormVoiceFillResult> {
-        // Same monthly meter as per-field transcribe; one slot per whole-form fill.
-        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
-        const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyTranscribe : -1;
-        await usageService.checkAndIncrement(orgId, 'voice_transcribe', limit);
-
         const catalog = flattenCatalog(schema);
         if (catalog.length === 0) {
             throw new TRPCError({
@@ -237,6 +232,14 @@ export const formVoiceFillService = {
                 message: 'This form type does not support voice fill',
             });
         }
+
+        // Same monthly meter as per-field transcribe; one slot per whole-form
+        // fill. Read-only check here; the slot is only consumed (increment)
+        // after a successful transcription below, so a failed recording never
+        // burns quota — matches transcribeField's discipline.
+        const subscription = await prisma.subscription.findUnique({ where: { orgId } });
+        const limit = subscription ? PLAN_LIMITS[subscription.plan].monthlyTranscribe : -1;
+        await usageService.check(orgId, 'voice_transcribe', limit);
 
         const audioBuffer = Buffer.from(audioBase64, 'base64');
         void mimeType; // AssemblyAI sniffs the container from the buffer
@@ -263,6 +266,9 @@ export const formVoiceFillService = {
                 message: `AssemblyAI transcription error: ${msg}`,
             });
         }
+
+        // Transcription succeeded and cost real money — consume the slot now.
+        await usageService.increment(orgId, 'voice_transcribe');
 
         try {
             const message = await anthropic.messages.create({

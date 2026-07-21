@@ -43,6 +43,7 @@ export function VoiceFieldButton({
             fieldId,
             fieldLabel,
             fieldType,
+            fieldOptions,
         });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [audioBase64]);

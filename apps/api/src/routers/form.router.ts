@@ -136,7 +136,7 @@ export const formRouter = router({
      * transcription + extraction to formVoiceFillService. Cost is bounded by
      * the same monthly `voice_transcribe` meter as transcribeField.
      */
-    fillByVoice: stationOrgProcedure
+    fillByVoice: orgProcedure
         .use(requireModule('FORMS'))
         .input(formFillByVoiceSchema)
         .mutation(async ({ input, ctx }) => {
