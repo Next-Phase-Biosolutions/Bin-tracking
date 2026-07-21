@@ -95,3 +95,55 @@ export function inviteRateLimit(limiter: SlidingWindowLimiter = inviteLimiter) {
         return next({ ctx: { ...ctx, orgId: ctx.orgId } });
     });
 }
+
+/**
+ * Per-org cap on bank-details request emails — same reasoning as
+ * inviteRateLimit: a real email to a real address, so an unbounded loop burns
+ * the Resend quota and the sending domain's reputation for every tenant.
+ */
+const BANK_LINKS_PER_DAY = 20;
+const BANK_LINK_WINDOW_MS = 24 * 60 * 60 * 1000;
+const bankLinkLimiter = new SlidingWindowLimiter(BANK_LINKS_PER_DAY, BANK_LINK_WINDOW_MS);
+
+export function bankLinkRateLimit(limiter: SlidingWindowLimiter = bankLinkLimiter) {
+    return middleware(async ({ ctx, next }) => {
+        if (!ctx.orgId) throw new TRPCError({ code: 'FORBIDDEN', message: 'No organization' });
+        if (!limiter.tryConsume(ctx.orgId)) {
+            throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message: 'Bank details request limit reached for your organization. Try again tomorrow.',
+            });
+        }
+        return next({ ctx: { ...ctx, orgId: ctx.orgId } });
+    });
+}
+
+/**
+ * Per-IP cap on the two UNAUTHENTICATED bank-link endpoints. These take a
+ * token as their sole credential, so they're the one guessable surface in this
+ * feature; the global @fastify/rate-limit plugin (100/min per IP) is far too
+ * loose to be the only guard on that. Keyed on IP rather than org because
+ * there is no org context until the token resolves — that's the whole point.
+ *
+ * A UUIDv4 is not realistically brute-forceable at any rate; this exists so an
+ * attempt is cheap to spot and impossible to run quietly.
+ */
+const BANK_TOKEN_ATTEMPTS_PER_HOUR = 20;
+const BANK_TOKEN_WINDOW_MS = 60 * 60 * 1000;
+const bankTokenLimiter = new SlidingWindowLimiter(BANK_TOKEN_ATTEMPTS_PER_HOUR, BANK_TOKEN_WINDOW_MS);
+
+export function bankTokenRateLimit(limiter: SlidingWindowLimiter = bankTokenLimiter) {
+    return middleware(async ({ ctx, next }) => {
+        // ponytail: ctx.req.ip trusts Fastify's own resolution; behind Caddy
+        // that means the proxy's view. Tighten with trustProxy config if these
+        // endpoints ever get abused from a single upstream.
+        const key = ctx.req.ip;
+        if (!limiter.tryConsume(key)) {
+            throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message: 'Too many attempts. Try again later.',
+            });
+        }
+        return next();
+    });
+}

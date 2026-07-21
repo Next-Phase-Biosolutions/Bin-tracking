@@ -483,7 +483,7 @@ describe('cross-organization tenancy isolation', () => {
             seedEmployee({ id: 'emp-a', organizationId: ORG_A });
             seedEmployee({ id: 'emp-b', organizationId: ORG_B });
 
-            const result = await employeeService.list(ORG_A, {});
+            const result = await employeeService.list(ORG_A, { limit: 100 });
 
             expect(result.map((e) => e.id)).toEqual(['emp-a']);
         });

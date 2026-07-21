@@ -11,7 +11,25 @@ let _initialized = false;
 export function initSentry(): void {
     const dsn = process.env['SENTRY_DSN'];
     if (!dsn) return;
-    Sentry.init({ dsn, environment: process.env['NODE_ENV'] ?? 'development' });
+    Sentry.init({
+        dsn,
+        environment: process.env['NODE_ENV'] ?? 'development',
+        /**
+         * Never ship request BODIES to Sentry. The default
+         * requestDataIntegration attaches them, and the SDK auto-instruments
+         * Fastify — so an error thrown anywhere in a handler would carry that
+         * request's payload offsite. This codebase routes employee bank
+         * details (R7), voice transcripts and form submissions through those
+         * handlers; a stack trace is worth having, the payload is not.
+         *
+         * Headers stay off too — they carry the Authorization bearer token.
+         */
+        integrations: [
+            Sentry.requestDataIntegration({
+                include: { data: false, headers: false, cookies: false },
+            }),
+        ],
+    });
     _initialized = true;
 }
 

@@ -8,6 +8,8 @@ import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
 import FormImportPage from './features/forms/import/FormImportPage';
 import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
+import EmployeesPage from './features/employees/EmployeesPage';
+import BankDetailsPage from './features/employees/BankDetailsPage';
 import GuardScannerPage from './features/guard/GuardScannerPage';
 import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage';
 import ShipmentRegisterPage from './features/shipments/ShipmentRegisterPage';
@@ -50,6 +52,8 @@ export function App() {
             <Route path="/app/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/app/onboarding" element={<OnboardingWizard />} />
             <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
+            {/* Public: the employee has no login — the link token is the sole credential. */}
+            <Route path="/app/bank-details/:token" element={<BankDetailsPage />} />
 
             <Route element={<AppShellLayout />}>
                 <Route path="/app/bin" element={<TabletPage />} />
@@ -60,6 +64,7 @@ export function App() {
                 <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
                 <Route path="/app/driver" element={<DriverPage />} />
                 <Route path="/app/dashboard" element={<DashboardPage />} />
+                <Route path="/app/employees" element={<EmployeesPage />} />
                 <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
                 <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
                 <Route path="/app/shipments" element={<ShipmentsDashboardPage />} />

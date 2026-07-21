@@ -1,7 +1,8 @@
 import { AssemblyAI } from 'assemblyai';
 import Anthropic from '@anthropic-ai/sdk';
 import { TRPCError } from '@trpc/server';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import type { DbClient } from '@bin-tracker/db';
 import { prisma } from '@bin-tracker/db';
 import type { FormTemplate, FormDigitizeDraft } from '@bin-tracker/types';
 import { PLAN_LIMITS } from '@bin-tracker/types';
@@ -54,7 +55,7 @@ function toFormTemplate(raw: {
 }
 
 export const formService = {
-    async listByStage(prisma: PrismaClient, orgId: string, stage: string): Promise<FormTemplate[]> {
+    async listByStage(prisma: DbClient, orgId: string, stage: string): Promise<FormTemplate[]> {
         const rows = await prisma.formTemplate.findMany({
             where: {
                 organizationId: orgId,
@@ -65,7 +66,7 @@ export const formService = {
         return rows.map(toFormTemplate);
     },
 
-    async getById(prisma: PrismaClient, orgId: string, id: string): Promise<FormTemplate | null> {
+    async getById(prisma: DbClient, orgId: string, id: string): Promise<FormTemplate | null> {
         const row = await prisma.formTemplate.findUnique({ where: { id } });
         // Cross-org mismatch reads as "not found" — same discipline as cycle.service.ts.
         if (!row || row.organizationId !== orgId) return null;
@@ -86,7 +87,7 @@ export const formService = {
         return formDigitizeService.refineFromRegion(imageBase64, draft, orgId, mimeType, userNote);
     },
 
-    async create(prisma: PrismaClient, input: FormCreateInput, organizationId: string): Promise<FormTemplate> {
+    async create(prisma: DbClient, input: FormCreateInput, organizationId: string): Promise<FormTemplate> {
         const parsed = formSchemaSchema.safeParse(input.schema);
         if (!parsed.success) {
             throw new TRPCError({
