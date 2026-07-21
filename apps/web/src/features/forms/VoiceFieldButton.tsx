@@ -9,6 +9,8 @@ interface VoiceFieldButtonProps {
     fieldId: string;
     fieldLabel: string;
     fieldType?: FieldType;
+    /** Allowed values for select/radio, so extraction snaps to an exact option. */
+    fieldOptions?: string[];
     onValue: (value: string) => void;
     disabled?: boolean;
 }
@@ -17,6 +19,7 @@ export function VoiceFieldButton({
     fieldId,
     fieldLabel,
     fieldType,
+    fieldOptions,
     onValue,
     disabled,
 }: VoiceFieldButtonProps) {

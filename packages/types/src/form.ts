@@ -135,3 +135,30 @@ export interface FormDigitizeDraft {
     schema: FormSchema;
     warnings?: string[];
 }
+
+// ─── Whole-form voice fill ────────────────────────────────────────────────────
+
+/** A single value extracted from speech, with the model's confidence in it. */
+export interface VoiceFilledValue {
+    value: string;
+    confidence: 'high' | 'low';
+}
+
+/**
+ * The single repeating-form table has no section id, so its appended row is
+ * keyed under this sentinel in `FormVoiceFillResult.tableRows`.
+ */
+export const VOICE_FILL_REPEATING_KEY = '__repeating__';
+
+/** Result of one whole-form voice fill: header field values + one row per table. */
+export interface FormVoiceFillResult {
+    transcript: string;
+    /** Flat field fills: fieldId -> value (standard sections' `fields`). */
+    fields: Record<string, VoiceFilledValue>;
+    /**
+     * One appended table row per table. Key = section id (standard table
+     * sections) or `VOICE_FILL_REPEATING_KEY` (the single repeating table).
+     * Inner map = columnId -> value.
+     */
+    tableRows: Record<string, Record<string, VoiceFilledValue>>;
+}

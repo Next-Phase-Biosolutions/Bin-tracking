@@ -118,6 +118,7 @@ export {
     formRefineFromRegionSchema,
     formCreateSchema,
     formTranscribeFieldSchema,
+    formFillByVoiceSchema,
     formTriggerTypeSchema,
     formFillFrequencySchema,
     formSchemaSchema,
@@ -131,4 +132,5 @@ export {
     type FormRefineFromRegionInput,
     type FormCreateInput,
     type FormTranscribeFieldInput,
+    type FormFillByVoiceInput,
 } from './form.schema.js';
