@@ -7,6 +7,8 @@ interface BaseProps {
     onChange: (value: string) => void;
     error?: string;
     showVoice?: boolean;
+    /** AI voice-fill wasn't confident about this value — highlight for review. */
+    flagged?: boolean;
 }
 
 function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
@@ -22,6 +24,7 @@ function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
                     fieldId={field.id}
                     fieldLabel={field.label}
                     fieldType={field.type}
+                    fieldOptions={field.options}
                     onValue={onChange}
                 />
             )}
@@ -32,91 +35,103 @@ function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
 const inputCls =
     'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#043F2E] focus:border-transparent disabled:bg-gray-50';
 const errorCls = 'text-red-600 text-xs mt-1';
+const flagRing = 'ring-2 ring-amber-400 border-amber-400';
 
-export function TextInput({ field, value, onChange, error, showVoice }: BaseProps) {
+/** Shows the required-field error, or (when clean) the amber voice-fill review hint. */
+function FieldHint({ flagged, error }: { flagged?: boolean; error?: string }) {
+    if (error) return <p className={errorCls}>{error}</p>;
+    if (flagged) return <p className="text-amber-600 text-xs mt-1">Check this — voice fill wasn&apos;t sure</p>;
+    return null;
+}
+
+function withFlag(base: string, flagged?: boolean): string {
+    return flagged ? `${base} ${flagRing}` : base;
+}
+
+export function TextInput({ field, value, onChange, error, showVoice, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
             <input
                 type="text"
-                className={inputCls}
+                className={withFlag(inputCls, flagged)}
                 placeholder={field.placeholder ?? ''}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             />
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function TextareaInput({ field, value, onChange, error, showVoice }: BaseProps) {
+export function TextareaInput({ field, value, onChange, error, showVoice, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
             <textarea
                 rows={3}
-                className={`${inputCls} resize-none`}
+                className={`${withFlag(inputCls, flagged)} resize-none`}
                 placeholder={field.placeholder ?? ''}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             />
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function NumberInput({ field, value, onChange, error }: BaseProps) {
+export function NumberInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="number"
-                className={inputCls}
+                className={withFlag(inputCls, flagged)}
                 placeholder={field.placeholder ?? ''}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             />
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function DateInput({ field, value, onChange, error }: BaseProps) {
+export function DateInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="date"
-                className={inputCls}
+                className={withFlag(inputCls, flagged)}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             />
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function TimeInput({ field, value, onChange, error }: BaseProps) {
+export function TimeInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
             <input
                 type="time"
-                className={inputCls}
+                className={withFlag(inputCls, flagged)}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             />
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function SelectInput({ field, value, onChange, error }: BaseProps) {
+export function SelectInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
             <select
-                className={inputCls}
+                className={withFlag(inputCls, flagged)}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
             >
@@ -127,16 +142,16 @@ export function SelectInput({ field, value, onChange, error }: BaseProps) {
                     </option>
                 ))}
             </select>
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function RadioInput({ field, value, onChange, error }: BaseProps) {
+export function RadioInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
-            <div className="flex flex-col gap-2 mt-1">
+            <div className={`flex flex-col gap-2 mt-1 rounded-lg ${flagged ? `${flagRing} p-2` : ''}`}>
                 {(field.options ?? []).map((opt) => (
                     <label key={opt} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -151,16 +166,16 @@ export function RadioInput({ field, value, onChange, error }: BaseProps) {
                     </label>
                 ))}
             </div>
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
-export function YesNoInput({ field, value, onChange, error }: BaseProps) {
+export function YesNoInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
             <FieldLabelRow field={field} value={value} onChange={onChange} />
-            <div className="flex gap-3 mt-1">
+            <div className={`flex gap-3 mt-1 rounded-lg ${flagged ? `${flagRing} p-2` : ''}`}>
                 {(['Yes', 'No'] as const).map((opt) => (
                     <button
                         key={opt}
@@ -178,13 +193,13 @@ export function YesNoInput({ field, value, onChange, error }: BaseProps) {
                     </button>
                 ))}
             </div>
-            {error && <p className={errorCls}>{error}</p>}
+            <FieldHint flagged={flagged} error={error} />
         </div>
     );
 }
 
 /** Renders the correct input component for any FormField */
-export function FieldInput({ field, value, onChange, error, showVoice = true }: BaseProps) {
+export function FieldInput({ field, value, onChange, error, showVoice = true, flagged }: BaseProps) {
     const voice = showVoice;
     switch (field.type) {
         case 'textarea':
@@ -195,20 +210,21 @@ export function FieldInput({ field, value, onChange, error, showVoice = true }: 
                     onChange={onChange}
                     error={error}
                     showVoice={voice}
+                    flagged={flagged}
                 />
             );
         case 'number':
-            return <NumberInput field={field} value={value} onChange={onChange} error={error} />;
+            return <NumberInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         case 'date':
-            return <DateInput field={field} value={value} onChange={onChange} error={error} />;
+            return <DateInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         case 'time':
-            return <TimeInput field={field} value={value} onChange={onChange} error={error} />;
+            return <TimeInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         case 'select':
-            return <SelectInput field={field} value={value} onChange={onChange} error={error} />;
+            return <SelectInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         case 'radio':
-            return <RadioInput field={field} value={value} onChange={onChange} error={error} />;
+            return <RadioInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         case 'yes_no':
-            return <YesNoInput field={field} value={value} onChange={onChange} error={error} />;
+            return <YesNoInput field={field} value={value} onChange={onChange} error={error} flagged={flagged} />;
         default:
             return (
                 <TextInput
@@ -217,6 +233,7 @@ export function FieldInput({ field, value, onChange, error, showVoice = true }: 
                     onChange={onChange}
                     error={error}
                     showVoice={voice}
+                    flagged={flagged}
                 />
             );
     }

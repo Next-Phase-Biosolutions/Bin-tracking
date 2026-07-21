@@ -9,8 +9,10 @@ import {
     formRefineFromRegionSchema,
     formCreateSchema,
     formTranscribeFieldSchema,
+    formFillByVoiceSchema,
 } from '@bin-tracker/validators';
 import { formService } from '../services/form.service.js';
+import { formVoiceFillService } from '../services/form-voice-fill.service.js';
 import { getHeavyJobsQueue, FORM_DIGITIZE_JOB } from '../lib/queue.js';
 import type { FormDigitizeDraft } from '@bin-tracker/types';
 
@@ -124,5 +126,35 @@ export const formRouter = router({
         .input(formTranscribeFieldSchema)
         .mutation(async ({ input, ctx }) => {
             return formService.transcribeField(input, ctx.orgId);
+        }),
+
+    /**
+     * Whole-form voice fill: one utterance fills every field on a standard/
+     * repeating form. Loads the template server-side from `formId` (trusted
+     * schema, cross-org mismatch reads as NOT_FOUND like getById), rejects
+     * form types the extractor can't route (checklist/matrix), and delegates
+     * transcription + extraction to formVoiceFillService. Cost is bounded by
+     * the same monthly `voice_transcribe` meter as transcribeField.
+     */
+    fillByVoice: orgProcedure
+        .use(requireModule('FORMS'))
+        .input(formFillByVoiceSchema)
+        .mutation(async ({ input, ctx }) => {
+            const form = await formService.getById(ctx.prisma, ctx.orgId, input.formId);
+            if (!form) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Form not found' });
+            }
+            if (form.formType !== 'standard' && form.formType !== 'repeating') {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: 'Voice fill is not supported for this form type',
+                });
+            }
+            return formVoiceFillService.fillFromVoice(
+                form.schema,
+                input.audioBase64,
+                ctx.orgId,
+                input.mimeType,
+            );
         }),
 });

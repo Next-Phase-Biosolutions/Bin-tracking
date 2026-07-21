@@ -29,6 +29,8 @@ interface Props {
     rowKeyPrefix: string;
     /** Pin first N columns while scrolling wide tables */
     stickyColumnCount?: number;
+    /** Cell keys (`${rowKeyPrefix}_${rowIdx}_${colId}`) the voice fill was unsure about. */
+    flaggedKeys?: Set<string>;
 }
 
 export function SectionRepeatingTable({
@@ -38,6 +40,7 @@ export function SectionRepeatingTable({
     errors,
     rowKeyPrefix,
     stickyColumnCount = 0,
+    flaggedKeys,
 }: Props) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const stickyCount = Math.min(stickyColumnCount, STICKY_LEFT.length, columns.length);
@@ -87,10 +90,11 @@ export function SectionRepeatingTable({
                                 {columns.map((col, colIdx) => {
                                     const errKey = `${rowKeyPrefix}_${rowIdx}_${col.id}`;
                                     const hasError = !!errors[errKey];
+                                    const flagged = flaggedKeys?.has(errKey) ?? false;
                                     return (
                                         <td
                                             key={col.id}
-                                            className={`${cellBorder} min-w-[4rem] p-0 align-top ${stickyCellClass(colIdx, stickyCount, false)}`}
+                                            className={`${cellBorder} min-w-[4rem] p-0 align-top ${stickyCellClass(colIdx, stickyCount, false)} ${flagged ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : ''}`}
                                         >
                                             {col.type === 'yes_no' ? (
                                                 <div className="flex gap-1">
