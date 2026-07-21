@@ -161,6 +161,11 @@ export const formService = {
         // failure below does NOT refund it (the transcription still happened).
         await usageService.increment(orgId, 'voice_transcribe');
 
+        const optionsLine =
+            input.fieldOptions && input.fieldOptions.length > 0
+                ? `\nAllowed values (the value MUST be exactly one of these): ${JSON.stringify(input.fieldOptions)}`
+                : '';
+
         // Instructions live in the system prompt; the spoken transcript is
         // passed as the user turn (data, not instructions) so it can't hijack
         // the extraction. fieldLabel/fieldType come from the org's own form
@@ -168,7 +173,7 @@ export const formService = {
         const systemPrompt = `Extract the value for a single form field from a spoken transcript.
 
 Field label: "${input.fieldLabel}"
-Field type: ${input.fieldType ?? 'text'}
+Field type: ${input.fieldType ?? 'text'}${optionsLine}
 
 Rules:
 - Return ONLY a valid JSON object: { "value": "..." }

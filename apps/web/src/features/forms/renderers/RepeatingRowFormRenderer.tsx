@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { RepeatingSchema } from '@bin-tracker/types';
+import {
+    VOICE_FILL_REPEATING_KEY,
+    type RepeatingSchema,
+    type FormVoiceFillResult,
+} from '@bin-tracker/types';
+import { VoiceFormFillButton } from '../VoiceFormFillButton';
 
 interface Props {
     schema: RepeatingSchema;
     onSubmit: () => void;
+    /** Form id — enables the whole-form voice fill button. Omit in preview. */
+    formId?: string;
     previewMode?: boolean;
 }
 
@@ -18,9 +25,11 @@ function emptyRow(schema: RepeatingSchema): Row {
     return row;
 }
 
-export function RepeatingRowFormRenderer({ schema, onSubmit, previewMode }: Props) {
+export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode }: Props) {
     const [rows, setRows] = useState<Row[]>([emptyRow(schema)]);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    // Cells (`${rowIdx}_${colId}`) the voice fill was unsure about.
+    const [flaggedCells, setFlaggedCells] = useState<Set<string>>(new Set());
 
     const setCellValue = (rowIdx: number, colId: string, value: string) => {
         setRows((prev) => {
@@ -32,6 +41,26 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, previewMode }: Prop
         if (errors[key]) {
             setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
         }
+        if (flaggedCells.has(key)) {
+            setFlaggedCells((prev) => { const n = new Set(prev); n.delete(key); return n; });
+        }
+    };
+
+    // Whole-form voice fill: append one row from the spoken reading, flagging
+    // low-confidence cells for review.
+    const applyVoiceFill = (result: FormVoiceFillResult) => {
+        const cols = result.tableRows[VOICE_FILL_REPEATING_KEY];
+        if (!cols) return;
+        const row = emptyRow(schema);
+        for (const [colId, filled] of Object.entries(cols)) row[colId] = filled.value;
+
+        const rowIdx = rows.length; // the appended row index
+        const newFlagged = new Set<string>();
+        for (const [colId, filled] of Object.entries(cols)) {
+            if (filled.confidence === 'low') newFlagged.add(`${rowIdx}_${colId}`);
+        }
+        setRows((prev) => [...prev, row]);
+        setFlaggedCells((prev) => new Set([...prev, ...newFlagged]));
     };
 
     const addRow = () => setRows((prev) => [...prev, emptyRow(schema)]);
@@ -65,6 +94,9 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, previewMode }: Prop
 
     return (
         <div className="flex flex-col gap-5">
+            {formId && !previewMode && (
+                <VoiceFormFillButton formId={formId} onFill={applyVoiceFill} />
+            )}
             {/* Instructions banner */}
             {schema.instructions && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -99,8 +131,9 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, previewMode }: Prop
                                     {schema.columns.map((col) => {
                                         const errKey = `${rowIdx}_${col.id}`;
                                         const hasError = !!errors[errKey];
+                                        const flagged = flaggedCells.has(errKey);
                                         return (
-                                            <td key={col.id} className={`${cellBorder} min-w-[4rem] p-0 align-top`}>
+                                            <td key={col.id} className={`${cellBorder} min-w-[4rem] p-0 align-top ${flagged ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : ''}`}>
                                                 {col.type === 'select' ? (
                                                     <select
                                                         className={inputCls(hasError)}

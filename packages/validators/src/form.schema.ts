@@ -193,6 +193,19 @@ export const formTranscribeFieldSchema = z.object({
     fieldId: z.string(),
     fieldLabel: z.string(),
     fieldType: fieldTypeSchema.optional(),
+    /** Allowed values for select/radio, so Claude snaps the spoken value to an exact option. */
+    fieldOptions: z.array(z.string()).optional(),
+});
+
+/**
+ * Whole-form voice fill: one utterance fills every field on a standard/repeating
+ * form. The schema is loaded server-side from `formId` (trusted), so only the
+ * audio crosses the wire here.
+ */
+export const formFillByVoiceSchema = z.object({
+    formId: z.string().cuid(),
+    audioBase64: z.string().min(1),
+    mimeType: z.string().default('audio/webm'),
 });
 
 export type FormListByStageInput = z.infer<typeof formListByStageSchema>;
@@ -202,3 +215,4 @@ export type FormDigitizeJobStatusInput = z.infer<typeof formDigitizeJobStatusSch
 export type FormRefineFromRegionInput = z.infer<typeof formRefineFromRegionSchema>;
 export type FormCreateInput = z.infer<typeof formCreateSchema>;
 export type FormTranscribeFieldInput = z.infer<typeof formTranscribeFieldSchema>;
+export type FormFillByVoiceInput = z.infer<typeof formFillByVoiceSchema>;

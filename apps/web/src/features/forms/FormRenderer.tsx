@@ -28,6 +28,7 @@ export function FormRenderer({ form, onBack }: Props) {
                         schema={form.schema}
                         instructions={form.description}
                         onSubmit={() => setSubmitted(true)}
+                        formId={form.id}
                         showInstructions={false}
                     />
                 );
@@ -36,7 +37,7 @@ export function FormRenderer({ form, onBack }: Props) {
             case 'matrix':
                 return <MatrixFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} />;
             case 'repeating':
-                return <RepeatingRowFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} />;
+                return <RepeatingRowFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
         }
     };
 
