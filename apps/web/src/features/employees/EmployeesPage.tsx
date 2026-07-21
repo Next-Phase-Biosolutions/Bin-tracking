@@ -186,7 +186,7 @@ export default function EmployeesPage() {
                                             <button
                                                 onClick={() => setBadgeFor(row)}
                                                 aria-label={`View badge for ${row.fullName}`}
-                                                className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted transition-colors hover:text-rust"
+                                                className="rounded-lg border border-edge bg-white px-2.5 py-1 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-olive-deep transition-colors hover:border-rust hover:bg-rust/5 hover:text-rust"
                                             >
                                                 View badge
                                             </button>
@@ -233,7 +233,7 @@ function BankDetailsCell({ employee, pending, onRequest }: BankDetailsCellProps)
                 onClick={onRequest}
                 disabled={pending || !canEmail}
                 title={canEmail ? undefined : 'Add an email address for this employee first'}
-                className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted transition-colors hover:text-rust disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg border border-edge bg-white px-2.5 py-1 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-olive-deep transition-colors hover:border-rust hover:bg-rust/5 hover:text-rust disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:bg-white disabled:hover:text-olive-deep"
             >
                 {pending ? 'Sending…' : hasDetails ? 'Resend' : 'Send request'}
             </button>
