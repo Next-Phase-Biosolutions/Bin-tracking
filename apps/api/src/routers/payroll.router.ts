@@ -1,6 +1,11 @@
 import { TRPCError } from '@trpc/server';
 import { router, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
-import { payrollPeriodSchema, payrollListSchema, payrollJobStatusSchema } from '@bin-tracker/validators';
+import {
+    payrollPeriodSchema,
+    payrollListSchema,
+    payrollJobStatusSchema,
+    payrollResolveExceptionSchema,
+} from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
 import { getHeavyJobsQueue, PAYROLL_COMPUTE_RUN_JOB, reviveJobResultDates } from '../lib/queue.js';
 import type { PayrollRunView } from '@bin-tracker/types';
@@ -67,5 +72,13 @@ export const payrollRouter = router({
         .input(payrollListSchema)
         .query(async ({ ctx, input }) => {
             return payrollService.listRuns(ctx.orgId, input);
+        }),
+
+    /** Resolve a held-back exception on a DRAFT run (dismiss, or fix the missing checkout). */
+    resolveException: orgOpsProcedure
+        .use(requireModule('PAYROLL'))
+        .input(payrollResolveExceptionSchema)
+        .mutation(async ({ ctx, input }) => {
+            return payrollService.resolveException(ctx.orgId, input);
         }),
 });

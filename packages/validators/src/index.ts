@@ -77,6 +77,7 @@ export {
     employeeRegisterSchema,
     employeeGetByIdSchema,
     employeeListSchema,
+    setEmployeeRateSchema,
     employeeBankDetailsSchema,
     employeeBankSubmitSchema,
     employeeBankLinkSchema,
@@ -84,6 +85,7 @@ export {
     type EmployeeRegisterInput,
     type EmployeeGetByIdInput,
     type EmployeeListInput,
+    type SetEmployeeRateInput,
     type EmployeeBankDetailsInput,
     type EmployeeBankSubmitInput,
     type EmployeeBankLinkInput,
@@ -113,10 +115,17 @@ export {
     payrollPeriodSchema,
     payrollListSchema,
     payrollJobStatusSchema,
+    payrollResolveExceptionSchema,
     type PayrollPeriodInput,
     type PayrollListInput,
     type PayrollJobStatusInput,
+    type PayrollResolveExceptionInput,
 } from './payroll.schema.js';
+
+export {
+    updatePayrollSettingsSchema,
+    type UpdatePayrollSettingsInput,
+} from './settings.schema.js';
 
 export {
     formListByStageSchema,

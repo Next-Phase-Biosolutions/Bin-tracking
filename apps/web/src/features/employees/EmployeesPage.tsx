@@ -32,6 +32,17 @@ export default function EmployeesPage() {
 
     const { hasModule, isLoading } = useSubscription();
 
+    // Rates are a PAYROLL-module feature AND ADMIN/OPS-only — the API strips
+    // them (and FORBIDs the write) unless both hold, so only render the Rate
+    // column when it would actually work.
+    const me = trpc.auth.me.useQuery();
+    const canManageRates =
+        (me.data?.orgRole === 'ADMIN' || me.data?.orgRole === 'OPS_MANAGER') && hasModule('PAYROLL');
+
+    const setRate = trpc.employee.setHourlyRate.useMutation({
+        onSuccess: () => void utils.employee.list.invalidate(),
+    });
+
     if (isLoading) {
         return (
             <div className="flex min-h-[60vh] items-center justify-center">
@@ -49,6 +60,7 @@ export default function EmployeesPage() {
     }
 
     const rows = listQuery.data ?? [];
+    const colCount = canManageRates ? 7 : 6;
     // ponytail: counts derived from the (capped) list rather than a dedicated
     // employee.stats endpoint — PLAN_LIMITS caps PRO at 200 employees, which
     // the limit above covers. Add the endpoint if an ENTERPRISE org exceeds it.
@@ -137,6 +149,9 @@ export default function EmployeesPage() {
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Employee</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Department</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Position</th>
+                                {canManageRates ? (
+                                    <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Rate</th>
+                                ) : null}
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Status</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Direct deposit</th>
                                 <th className="px-5 py-2.5 text-right font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Badge</th>
@@ -145,11 +160,11 @@ export default function EmployeesPage() {
                         <tbody className="divide-y divide-edge/40">
                             {listQuery.isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-8 text-center text-muted">Loading…</td>
+                                    <td colSpan={colCount} className="px-5 py-8 text-center text-muted">Loading…</td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-10 text-center text-muted">
+                                    <td colSpan={colCount} className="px-5 py-10 text-center text-muted">
                                         {trimmed ? 'No employees match your search.' : (
                                             <span>
                                                 No employees registered yet.{' '}
@@ -169,6 +184,15 @@ export default function EmployeesPage() {
                                         </td>
                                         <td className="px-5 py-3 text-muted">{row.department ?? '—'}</td>
                                         <td className="px-5 py-3 text-muted">{row.position ?? '—'}</td>
+                                        {canManageRates ? (
+                                            <td className="px-5 py-3">
+                                                <RateCell
+                                                    employee={row}
+                                                    pending={setRate.isPending && setRate.variables?.employeeId === row.id}
+                                                    onSave={(cents) => setRate.mutate({ employeeId: row.id, hourlyRateCents: cents })}
+                                                />
+                                            </td>
+                                        ) : null}
                                         <td className="px-5 py-3">
                                             <Badge tone={row.status === 'ACTIVE' ? 'good' : 'idle'}>{row.status}</Badge>
                                         </td>
@@ -201,6 +225,78 @@ export default function EmployeesPage() {
 
             {badgeFor && <BadgeModal employee={badgeFor} onClose={() => setBadgeFor(null)} />}
         </div>
+    );
+}
+
+interface RateCellProps {
+    employee: Employee;
+    pending: boolean;
+    onSave: (hourlyRateCents: number | null) => void;
+}
+
+/**
+ * Per-employee rate: shows the override amount (or a "Default" badge when unset,
+ * meaning the org flat rate applies), with an inline editor. Only rendered for
+ * ADMIN/OPS; the API strips the rate and FORBIDs the write for other roles.
+ */
+function RateCell({ employee, pending, onSave }: RateCellProps) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState('');
+
+    const startEdit = () => {
+        setDraft(employee.hourlyRateCents != null ? (employee.hourlyRateCents / 100).toFixed(2) : '');
+        setEditing(true);
+    };
+
+    const commit = (raw: string) => {
+        const trimmed = raw.trim();
+        if (trimmed === '') {
+            onSave(null); // clear → org default
+        } else {
+            const cents = Math.round(Number.parseFloat(trimmed) * 100);
+            if (!Number.isInteger(cents) || cents <= 0) {
+                setEditing(false);
+                return;
+            }
+            onSave(cents);
+        }
+        setEditing(false);
+    };
+
+    if (editing) {
+        return (
+            <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                autoFocus
+                defaultValue={draft}
+                onBlur={(e) => commit(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') commit((e.target as HTMLInputElement).value);
+                    if (e.key === 'Escape') setEditing(false);
+                }}
+                aria-label={`Hourly rate for ${employee.fullName} in dollars, blank for org default`}
+                className="w-24 rounded-lg border border-rust bg-white px-2 py-1 text-sm text-ink outline-none"
+            />
+        );
+    }
+
+    return (
+        <button
+            onClick={startEdit}
+            disabled={pending}
+            aria-label={`Edit hourly rate for ${employee.fullName}`}
+            className="inline-flex items-center gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-rust/5 disabled:opacity-50"
+        >
+            {employee.hourlyRateCents != null ? (
+                <span className="font-mono text-sm text-ink">${(employee.hourlyRateCents / 100).toFixed(2)}</span>
+            ) : (
+                <Badge tone="idle">Default</Badge>
+            )}
+            <Icon name="badge" width={12} height={12} className="text-muted" />
+        </button>
     );
 }
 

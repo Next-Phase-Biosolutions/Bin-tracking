@@ -4,6 +4,7 @@ import {
     employeeRegisterSchema,
     employeeGetByIdSchema,
     employeeListSchema,
+    setEmployeeRateSchema,
     employeeBankSubmitSchema,
     employeeBankLinkSchema,
     employeeRequestBankDetailsSchema,
@@ -19,20 +20,32 @@ export const employeeRouter = router({
             return employeeService.register(input, ctx.orgId);
         }),
 
-    /** List employees (optionally filtered by status / search) */
+    /** List employees (optionally filtered by status / search). Per-employee
+     * rates are stripped for non-ADMIN/OPS callers (ctx.orgRole). */
     list: orgProcedure
         .use(requireModule('WORKFORCE'))
         .input(employeeListSchema)
         .query(async ({ input, ctx }) => {
-            return employeeService.list(ctx.orgId, input);
+            return employeeService.list(ctx.orgId, input, ctx.orgRole);
         }),
 
-    /** Fetch a single employee by id */
+    /** Fetch a single employee by id (rate stripped for non-ADMIN/OPS callers) */
     getById: orgProcedure
         .use(requireModule('WORKFORCE'))
         .input(employeeGetByIdSchema)
         .query(async ({ input, ctx }) => {
-            return employeeService.getById(ctx.orgId, input.id);
+            return employeeService.getById(ctx.orgId, input.id, ctx.orgRole);
+        }),
+
+    /** Set or clear (null) an employee's per-employee pay rate override.
+     * Ops+admin only, and only while the org's PAYROLL module is enabled —
+     * rates are a payroll feature, so OFF blocks writes as well as reads. */
+    setHourlyRate: orgOpsProcedure
+        .use(requireModule('WORKFORCE'))
+        .use(requireModule('PAYROLL'))
+        .input(setEmployeeRateSchema)
+        .mutation(async ({ input, ctx }) => {
+            return employeeService.setHourlyRate(ctx.orgId, input.employeeId, input.hourlyRateCents, ctx.user!.id);
         }),
 
     /** Email the employee a one-time link to submit their own bank details */

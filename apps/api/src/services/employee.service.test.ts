@@ -17,6 +17,7 @@ interface FakeEmployee {
     email: string | null;
     status: 'ACTIVE' | 'INACTIVE';
     createdAt: Date;
+    hourlyRateCents?: number | null;
     bankInstitution?: string | null;
     bankTransit?: string | null;
     bankAccount?: string | null;
@@ -33,6 +34,9 @@ const store = vi.hoisted(() => {
         employees: [] as FakeEmployee[],
         subscription: null as { plan: 'STARTER' | 'PRO' | 'ENTERPRISE' } | null,
         organization: { name: 'Acme Farms' } as { name: string } | null,
+        /** Per-org PAYROLL module state — rate visibility/writes depend on it. */
+        payrollEnabled: {} as Record<string, boolean>,
+        auditLogs: [] as Array<Record<string, unknown>>,
     };
 });
 
@@ -84,8 +88,29 @@ vi.mock('@bin-tracker/db', () => {
     const organization = {
         findUnique: () => Promise.resolve(store.organization),
     };
+    const organizationModule = {
+        findUnique: ({ where }: { where: { orgId_module: { orgId: string; module: string } } }) => {
+            const enabled = store.payrollEnabled[where.orgId_module.orgId];
+            return Promise.resolve(enabled === undefined ? null : { enabled });
+        },
+    };
+    const payrollAuditLog = {
+        create: ({ data }: { data: Record<string, unknown> }) => {
+            store.auditLogs.push(data);
+            return Promise.resolve(data);
+        },
+    };
 
-    return { prisma: { employee, subscription, organization } };
+    return {
+        prisma: {
+            employee,
+            subscription,
+            organization,
+            organizationModule,
+            payrollAuditLog,
+            $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+        },
+    };
 });
 
 const { employeeService } = await import('./employee.service.js');
@@ -124,6 +149,9 @@ beforeEach(() => {
     store.employees = [];
     store.subscription = null;
     store.organization = { name: 'Acme Farms' };
+    // PAYROLL on for the default test org — module-off cases override per test.
+    store.payrollEnabled = { 'org-a': true };
+    store.auditLogs.length = 0;
     sentEmails.length = 0;
     process.env['BANK_DETAILS_KEY'] = 'a'.repeat(64);
 });
@@ -135,7 +163,7 @@ describe('employeeService.list', () => {
             makeEmployee({ id: 'emp-b', organizationId: 'org-b' }),
         );
 
-        const result = await employeeService.list('org-a', { limit: 100 });
+        const result = await employeeService.list('org-a', { limit: 100 }, 'ADMIN');
 
         expect(result.map((e) => e.id)).toEqual(['emp-a']);
     });
@@ -145,13 +173,13 @@ describe('employeeService.getById', () => {
     it('rejects with NOT_FOUND (not FORBIDDEN) for an employee in another org', async () => {
         store.employees.push(makeEmployee({ id: 'emp-b', organizationId: 'org-b' }));
 
-        await expect(employeeService.getById('org-a', 'emp-b')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        await expect(employeeService.getById('org-a', 'emp-b', 'ADMIN')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('returns the employee when it belongs to the requesting org', async () => {
         store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a' }));
 
-        const result = await employeeService.getById('org-a', 'emp-a');
+        const result = await employeeService.getById('org-a', 'emp-a', 'ADMIN');
 
         expect(result.id).toBe('emp-a');
     });
@@ -187,6 +215,123 @@ describe('employeeService.register — plan quantity limit', () => {
         const result = await employeeService.register({ fullName: 'New Hire' }, 'org-a');
 
         expect(result.organizationId).toBe('org-a');
+    });
+});
+
+// ─── Per-employee rate + visibility ───────────────────────────
+// Individual pay rates are ADMIN/OPS-only: list()/getById() must null out
+// hourlyRateCents for any other role. setHourlyRate() sets/clears it and is
+// org-scoped.
+
+describe('employeeService rate visibility', () => {
+    it('returns the real rate to an ADMIN and OPS_MANAGER but null to DRIVER/WORKER', async () => {
+        store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a', hourlyRateCents: 1800 }));
+
+        const asAdmin = await employeeService.getById('org-a', 'emp-a', 'ADMIN');
+        const asOps = await employeeService.getById('org-a', 'emp-a', 'OPS_MANAGER');
+        const asDriver = await employeeService.getById('org-a', 'emp-a', 'DRIVER');
+        const asWorker = await employeeService.getById('org-a', 'emp-a', 'WORKER');
+        const asNoRole = await employeeService.getById('org-a', 'emp-a', null);
+
+        expect(asAdmin.hourlyRateCents).toBe(1800);
+        expect(asOps.hourlyRateCents).toBe(1800);
+        expect(asDriver.hourlyRateCents).toBeNull();
+        expect(asWorker.hourlyRateCents).toBeNull();
+        expect(asNoRole.hourlyRateCents).toBeNull();
+    });
+
+    it('strips the rate from every row in list() for a non-privileged caller', async () => {
+        store.employees.push(
+            makeEmployee({ id: 'emp-a', organizationId: 'org-a', hourlyRateCents: 1800 }),
+            makeEmployee({ id: 'emp-b', organizationId: 'org-a', hourlyRateCents: 2000 }),
+        );
+
+        const asDriver = await employeeService.list('org-a', { limit: 100 }, 'DRIVER');
+        const asAdmin = await employeeService.list('org-a', { limit: 100 }, 'ADMIN');
+
+        expect(asDriver.every((e) => e.hourlyRateCents === null)).toBe(true);
+        expect(asAdmin.map((e) => e.hourlyRateCents).sort()).toEqual([1800, 2000]);
+    });
+});
+
+describe('employeeService rate visibility — PAYROLL module gate', () => {
+    it('hides the rate even from an ADMIN when the org’s PAYROLL module is off', async () => {
+        store.payrollEnabled = { 'org-a': false };
+        store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a', hourlyRateCents: 1800 }));
+
+        const viaGet = await employeeService.getById('org-a', 'emp-a', 'ADMIN');
+        const viaList = await employeeService.list('org-a', { limit: 100 }, 'ADMIN');
+
+        expect(viaGet.hourlyRateCents).toBeNull();
+        expect(viaList[0]?.hourlyRateCents).toBeNull();
+        // Hidden, not deleted — the stored value is untouched.
+        expect(store.employees[0]?.hourlyRateCents).toBe(1800);
+    });
+
+    it('treats a missing module row as off (deny by default)', async () => {
+        store.payrollEnabled = {}; // no row at all for org-a
+        store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a', hourlyRateCents: 1800 }));
+
+        const result = await employeeService.getById('org-a', 'emp-a', 'ADMIN');
+        expect(result.hourlyRateCents).toBeNull();
+    });
+});
+
+describe('employeeService.register — rate requires PAYROLL module', () => {
+    it('rejects a registration that includes a rate while PAYROLL is off', async () => {
+        store.payrollEnabled = { 'org-a': false };
+
+        await expect(
+            employeeService.register({ fullName: 'New Hire', hourlyRateCents: 1800 }, 'org-a'),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('still registers WITHOUT a rate while PAYROLL is off', async () => {
+        store.payrollEnabled = { 'org-a': false };
+
+        const result = await employeeService.register({ fullName: 'New Hire' }, 'org-a');
+        expect(result.organizationId).toBe('org-a');
+    });
+
+    it('saves the rate when PAYROLL is on', async () => {
+        const result = await employeeService.register({ fullName: 'New Hire', hourlyRateCents: 1800 }, 'org-a');
+        expect(result.hourlyRateCents).toBe(1800);
+    });
+});
+
+describe('employeeService.setHourlyRate', () => {
+    it('sets and then clears (null → org fallback) an employee’s rate', async () => {
+        store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a' }));
+
+        const set = await employeeService.setHourlyRate('org-a', 'emp-a', 1750, 'admin-1');
+        expect(set.hourlyRateCents).toBe(1750);
+
+        const cleared = await employeeService.setHourlyRate('org-a', 'emp-a', null, 'admin-1');
+        expect(cleared.hourlyRateCents).toBeNull();
+    });
+
+    it('rejects with NOT_FOUND for an employee in another org', async () => {
+        store.employees.push(makeEmployee({ id: 'emp-b', organizationId: 'org-b' }));
+
+        await expect(employeeService.setHourlyRate('org-a', 'emp-b', 1750, 'admin-1')).rejects.toMatchObject({
+            code: 'NOT_FOUND',
+        });
+    });
+
+    it('audits who changed whose rate, from what to what', async () => {
+        store.employees.push(makeEmployee({ id: 'emp-a', organizationId: 'org-a', hourlyRateCents: 1500 }));
+
+        await employeeService.setHourlyRate('org-a', 'emp-a', 1750, 'admin-1');
+
+        expect(store.auditLogs).toHaveLength(1);
+        expect(store.auditLogs[0]).toMatchObject({
+            orgId: 'org-a',
+            actorId: 'admin-1',
+            action: 'employee.setHourlyRate',
+            targetId: 'emp-a',
+            oldValue: { hourlyRateCents: 1500 },
+            newValue: { hourlyRateCents: 1750 },
+        });
     });
 });
 

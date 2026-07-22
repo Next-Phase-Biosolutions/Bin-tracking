@@ -14,6 +14,7 @@ import { shipmentRouter } from './shipment.router.js';
 import { payrollRouter } from './payroll.router.js';
 import { billingRouter } from './billing.router.js';
 import { adminRouter } from './admin.router.js';
+import { settingsRouter } from './settings.router.js';
 
 export const appRouter = router({
     auth: authRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
     payroll: payrollRouter,
     billing: billingRouter,
     admin: adminRouter,
+    settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

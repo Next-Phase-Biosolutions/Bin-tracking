@@ -2,15 +2,28 @@ import { z } from 'zod';
 
 // ─── Employee Validators ──────────────────────────────────────
 
+// Per-employee pay rate in cents. Positive (a $0 rate falls back to the org
+// default via null, not a stored 0); capped as a fat-finger guard; nullable to
+// mean "use the org's flat rate".
+const hourlyRateCents = z.number().int().positive().max(100_000_00).nullable();
+
 export const employeeRegisterSchema = z.object({
     fullName: z.string().min(1, 'Full name is required').max(120),
     email: z.string().email('Invalid email').optional(),
     phone: z.string().max(30).optional(),
     department: z.string().max(80).optional(),
     position: z.string().max(80).optional(),
+    hourlyRateCents: hourlyRateCents.optional(),
 });
 
 export type EmployeeRegisterInput = z.infer<typeof employeeRegisterSchema>;
+
+export const setEmployeeRateSchema = z.object({
+    employeeId: z.string().min(1),
+    hourlyRateCents, // null clears the override → back to the org flat rate
+});
+
+export type SetEmployeeRateInput = z.infer<typeof setEmployeeRateSchema>;
 
 export const employeeGetByIdSchema = z.object({
     id: z.string().min(1),
