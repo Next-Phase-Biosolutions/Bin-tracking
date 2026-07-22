@@ -435,6 +435,12 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  // Per-employee pay rate override, in cents. NULL = fall back to the org's
+  // Settings.flatHourlyRateCents. Snapshotted onto each PayrollLineItem at
+  // compute time, so later changes never rewrite past runs. Visible only to
+  // org ADMIN/OPS_MANAGER (stripped from reads for other roles).
+  hourlyRateCents Int?
+
   // ─── EFT payout details ────────────────────────────────────────────────
   // Read by the payroll payout agent (separate repo, read-only on this table)
   // to send direct deposits via Zum Rails. All nullable: an employee must be
@@ -686,6 +692,25 @@ model PayrollException {
 // `prisma migrate` doesn't report the live table as drift. bin-tracker never
 // reads or writes it — the payout agent stores the Zum Rails User id it
 // created for an employee on their first payout.
+// ─── Payroll audit log ───────────────────────────────────────────────────────
+// Money-adjacent config changes (org rate/settings, per-employee rates, module
+// toggles) recorded with who/old/new. Append-only; no relations so entries
+// survive any future cleanup of the rows they describe. Write-only for now —
+// queried directly when investigating; a viewer UI can come later.
+model PayrollAuditLog {
+  id        String   @id @default(cuid())
+  orgId     String
+  actorId   String // user id of the admin who made the change
+  action    String // 'settings.update' | 'employee.setHourlyRate' | 'module.toggle'
+  targetId  String? // employeeId for rate changes, ModuleKey for toggles
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("payroll_audit_logs")
+}
+
 model ZumPayee {
   employeeId String   @id
   zumUserId  String   @unique

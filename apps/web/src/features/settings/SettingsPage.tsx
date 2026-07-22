@@ -6,6 +6,8 @@ import { MARKETING_URL } from '../../lib/marketingUrl';
 import { PageHeader } from '../../components/app/PageHeader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button, Badge, LiveDot } from '../../components/ui/primitives';
+import { useSubscription } from '../../context/SubscriptionContext';
+import { PayrollSettingsCard } from './PayrollSettingsCard';
 
 const ROLE_OPTIONS = [
     { value: 'ADMIN', label: 'Admin' },
@@ -39,6 +41,7 @@ function PanelHead({ kicker, title, right }: { kicker: string; title: string; ri
 
 export default function SettingsPage() {
     const me = trpc.auth.me.useQuery();
+    const { hasModule, modulesReady } = useSubscription();
 
     return (
         <div className="mx-auto max-w-3xl">
@@ -53,6 +56,7 @@ export default function SettingsPage() {
                     <>
                         <MembersCard myUserId={me.data.id} />
                         <InvitesCard />
+                        {modulesReady && hasModule('PAYROLL') ? <PayrollSettingsCard /> : null}
                     </>
                 ) : null}
             </div>

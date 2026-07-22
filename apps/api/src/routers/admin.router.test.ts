@@ -85,7 +85,20 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
 
-    const fakePrisma = { organizationModule };
+    // toggleModule now reads the pre-toggle state and writes an audit entry.
+    const organizationModuleWithFind = {
+        ...organizationModule,
+        findUnique: ({ where }: { where: { orgId_module: { orgId: string; module: string } } }) => {
+            const row = store.modules.find(
+                (m) => m.orgId === where.orgId_module.orgId && m.module === where.orgId_module.module,
+            );
+            return Promise.resolve(row ? { ...row } : null);
+        },
+    };
+    const fakePrisma = {
+        organizationModule: organizationModuleWithFind,
+        payrollAuditLog: { create: ({ data }: { data: unknown }) => Promise.resolve(data) },
+    };
 
     // setModuleOverride re-implemented against the fake store, mirroring the
     // real packages/db/src/module-service.ts implementation exactly (always

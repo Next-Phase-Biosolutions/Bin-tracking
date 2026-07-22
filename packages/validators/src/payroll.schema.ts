@@ -23,3 +23,22 @@ export const payrollJobStatusSchema = z.object({
 });
 
 export type PayrollJobStatusInput = z.infer<typeof payrollJobStatusSchema>;
+
+/**
+ * Resolve a payroll exception (a dirty session held back from pay).
+ * DISMISS acknowledges it (hours stay unpaid); FIX_CHECKOUT supplies the
+ * missing checkout time so a recompute can include the session.
+ */
+export const payrollResolveExceptionSchema = z
+    .object({
+        exceptionId: z.string().min(1),
+        action: z.enum(['DISMISS', 'FIX_CHECKOUT']),
+        checkOutAt: z.string().datetime().optional(),
+        note: z.string().max(500).optional(),
+    })
+    .refine((d) => d.action !== 'FIX_CHECKOUT' || d.checkOutAt !== undefined, {
+        message: 'checkOutAt is required to fix a missing checkout',
+        path: ['checkOutAt'],
+    });
+
+export type PayrollResolveExceptionInput = z.infer<typeof payrollResolveExceptionSchema>;

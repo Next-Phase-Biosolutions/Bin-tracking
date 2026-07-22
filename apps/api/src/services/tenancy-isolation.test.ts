@@ -301,6 +301,11 @@ vi.mock('@bin-tracker/db', () => {
     Object.assign(fakePrisma, {
         employee,
         payrollRun,
+        // Rate visibility checks the org's PAYROLL module; enabled here so the
+        // ADMIN-viewer list test exercises the org filter, not the module gate.
+        organizationModule: {
+            findUnique: () => Promise.resolve({ enabled: true }),
+        },
         binType,
         bin: { ...bin, update: binUpdate.update },
         facility,
@@ -483,7 +488,7 @@ describe('cross-organization tenancy isolation', () => {
             seedEmployee({ id: 'emp-a', organizationId: ORG_A });
             seedEmployee({ id: 'emp-b', organizationId: ORG_B });
 
-            const result = await employeeService.list(ORG_A, { limit: 100 });
+            const result = await employeeService.list(ORG_A, { limit: 100 }, 'ADMIN');
 
             expect(result.map((e) => e.id)).toEqual(['emp-a']);
         });

@@ -28,6 +28,9 @@ export interface PayrollExceptionView {
     sessionId: string;
     type: PayrollExceptionType;
     resolved: boolean;
+    note: string | null;
+    /** Session bounds so a fixer can see when the shift started. */
+    checkInAt: Date;
 }
 
 /** Full payroll run with its line items and exceptions. */
@@ -56,4 +59,55 @@ export interface PayrollRunSummary {
     currency: string;
     computedAt: Date | null;
     createdAt: Date;
+}
+
+// ─── Platform-admin payroll monitoring ─────────────────────────────────────
+// Read-only, cross-org views for the platform-admin panel. Never expose
+// decrypted bank fields here — bankAccountLast4 (a plaintext mask source) is
+// the only account identifier that may appear.
+
+/** One org's PAYROLL module state plus its most recent run, for the overview list. */
+export interface PayrollOrgOverview {
+    orgId: string;
+    orgName: string;
+    payrollEnabled: boolean;
+    latestRun: PayrollRunSummary | null;
+    heldCount: number;
+    failedCount: number;
+}
+
+/** One employee's pay line within a run, as shown to a platform admin. */
+export interface PayrollAdminLineItemView {
+    id: string;
+    employeeId: string;
+    fullName: string;
+    bankAccountLast4: string | null;
+    grossCents: number;
+    payoutStatus: PayoutStatus;
+}
+
+/** One held-back session within a run, as shown to a platform admin. */
+export interface PayrollAdminExceptionView {
+    id: string;
+    employeeId: string;
+    fullName: string;
+    type: PayrollExceptionType;
+    resolved: boolean;
+    note: string | null;
+}
+
+/** Full run detail for the platform-admin drill-down. */
+export interface PayrollAdminRunDetail {
+    id: string;
+    orgId: string;
+    orgName: string;
+    period: string;
+    status: PayrollRunStatus;
+    currency: string;
+    totalEmployees: number;
+    totalGrossCents: number;
+    computedAt: Date | null;
+    createdAt: Date;
+    lineItems: PayrollAdminLineItemView[];
+    exceptions: PayrollAdminExceptionView[];
 }

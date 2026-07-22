@@ -20,4 +20,15 @@ export const adminRouter = router({
     toggleModule: platformAdminProcedure
         .input(z.object({ orgId: z.string(), module: moduleKeyEnum, enabled: z.boolean() }))
         .mutation(({ ctx, input }) => adminService.toggleModule(input, ctx.user!.id)),
+
+    // ─── Payroll monitoring (read-only) ────────────────────────────────────
+    payrollOverview: platformAdminProcedure.query(() => adminService.getPayrollOverview()),
+
+    payrollOrgRuns: platformAdminProcedure
+        .input(z.object({ orgId: z.string() }))
+        .query(({ input }) => adminService.getPayrollOrgRuns(input.orgId)),
+
+    payrollRunDetail: platformAdminProcedure
+        .input(z.object({ runId: z.string() }))
+        .query(({ input }) => adminService.getPayrollRunDetail(input.runId)),
 });

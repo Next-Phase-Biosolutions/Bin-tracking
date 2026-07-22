@@ -89,7 +89,10 @@ export function Sidebar({
     // gate; this only decides whether to show the nav entry.
     const whoAmI = trpc.admin.whoAmI.useQuery(undefined, { staleTime: 300_000 });
     const platformNav: NavItem[] = whoAmI.data?.isPlatformAdmin
-        ? [{ label: 'Org Modules', href: '/app/admin/orgs', icon: 'grid' }]
+        ? [
+              { label: 'Org Modules', href: '/app/admin/orgs', icon: 'grid' },
+              { label: 'Payroll Monitor', href: '/app/admin/payroll', icon: 'clock' },
+          ]
         : [];
 
     return (

@@ -8,6 +8,7 @@ import type {
     EmployeeListInput,
     EmployeeBankSubmitInput,
 } from '@bin-tracker/validators';
+import type { UserRole } from '@prisma/client';
 import { handlePrismaError } from '../lib/errors.js';
 import { hashToken } from '../lib/token.js';
 import { encryptBankField, last4 } from '../lib/bank-crypto.js';
@@ -32,12 +33,51 @@ function generateQrToken(): string {
 
 const BANK_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days, same as invitations
 
+/**
+ * Individual pay rates are a PAYROLL-module feature and management data:
+ * visible only when the org's PAYROLL module is enabled AND the viewer is
+ * ADMIN/OPS_MANAGER. Otherwise hourlyRateCents is nulled out of the read (the
+ * field is already nullable, so the type is unchanged). The stored values are
+ * never deleted on a module toggle — hidden while OFF, back when re-enabled.
+ */
+function roleMaySeeRates(role: UserRole | null): boolean {
+    return role === 'ADMIN' || role === 'OPS_MANAGER';
+}
+
+async function orgPayrollEnabled(orgId: string): Promise<boolean> {
+    const row = await prisma.organizationModule.findUnique({
+        where: { orgId_module: { orgId, module: 'PAYROLL' } },
+    });
+    return row?.enabled ?? false;
+}
+
+/** role check first — it's free — so non-privileged viewers never cost a module query. */
+async function viewerSeesRates(orgId: string, role: UserRole | null): Promise<boolean> {
+    return roleMaySeeRates(role) && (await orgPayrollEnabled(orgId));
+}
+
+function redactRate(employee: SafeEmployee, showRates: boolean): SafeEmployee {
+    if (showRates) return employee;
+    return { ...employee, hourlyRateCents: null };
+}
+
 export const employeeService = {
     /**
      * Register an employee (one-time) and mint a unique, permanent QR token.
      * Retries on the rare code/token collision.
      */
     async register(input: EmployeeRegisterInput, organizationId: string): Promise<SafeEmployee> {
+        // Rates are a PAYROLL-module feature. Registration itself is WORKFORCE
+        // and must keep working with PAYROLL off — but a rate supplied while the
+        // module is off is rejected loudly rather than silently dropped into a
+        // column the org can't see.
+        if (input.hourlyRateCents != null && !(await orgPayrollEnabled(organizationId))) {
+            throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Per-employee rates require the Payroll module. Enable it or omit the rate.',
+            });
+        }
+
         // Every org gets a Subscription row at provisioning time (org-provision.ts),
         // so this should always resolve — if it's ever missing, skip the quantity
         // check rather than block employee registration on an unrelated invariant break.
@@ -66,6 +106,7 @@ export const employeeService = {
                         phone: input.phone ?? null,
                         department: input.department ?? null,
                         position: input.position ?? null,
+                        hourlyRateCents: input.hourlyRateCents ?? null,
                         organizationId,
                     },
                 });
@@ -87,9 +128,9 @@ export const employeeService = {
         });
     },
 
-    async list(orgId: string, input: EmployeeListInput): Promise<SafeEmployee[]> {
+    async list(orgId: string, input: EmployeeListInput, viewerRole: UserRole | null): Promise<SafeEmployee[]> {
         const search = input.search?.trim();
-        return prisma.employee.findMany({
+        const employees = await prisma.employee.findMany({
             where: {
                 organizationId: orgId,
                 ...(input.status ? { status: input.status } : {}),
@@ -106,10 +147,46 @@ export const employeeService = {
             orderBy: { createdAt: 'desc' },
             take: input.limit,
         });
+        const showRates = await viewerSeesRates(orgId, viewerRole);
+        return employees.map((e) => redactRate(e, showRates));
     },
 
-    async getById(orgId: string, id: string): Promise<SafeEmployee> {
-        return getEmployeeInOrg(orgId, id);
+    async getById(orgId: string, id: string, viewerRole: UserRole | null): Promise<SafeEmployee> {
+        const [employee, showRates] = await Promise.all([
+            getEmployeeInOrg(orgId, id),
+            viewerSeesRates(orgId, viewerRole),
+        ]);
+        return redactRate(employee, showRates);
+    },
+
+    /**
+     * Set (or clear, with null) an employee's per-employee pay rate override.
+     * Routed through getEmployeeInOrg first, so an employeeId from another org
+     * fails NOT_FOUND before the update by verified id. Caller is ops+admin only
+     * (employee.router), so the returned row always shows the rate. Audited:
+     * who changed whose rate from what to what, in the same transaction.
+     */
+    async setHourlyRate(
+        orgId: string,
+        employeeId: string,
+        hourlyRateCents: number | null,
+        actorId: string,
+    ): Promise<SafeEmployee> {
+        const existing = await getEmployeeInOrg(orgId, employeeId);
+        const [updated] = await prisma.$transaction([
+            prisma.employee.update({ where: { id: employeeId }, data: { hourlyRateCents } }),
+            prisma.payrollAuditLog.create({
+                data: {
+                    orgId,
+                    actorId,
+                    action: 'employee.setHourlyRate',
+                    targetId: employeeId,
+                    oldValue: { hourlyRateCents: existing.hourlyRateCents },
+                    newValue: { hourlyRateCents },
+                },
+            }),
+        ]);
+        return updated;
     },
 
     // ─── Bank details (EFT payout) ────────────────────────────────────────

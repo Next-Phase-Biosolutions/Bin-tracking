@@ -18,6 +18,7 @@ interface FormState {
     phone: string;
     department: string;
     position: string;
+    hourlyRate: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -26,7 +27,16 @@ const EMPTY_FORM: FormState = {
     phone: '',
     department: '',
     position: '',
+    hourlyRate: '',
 };
+
+/** Dollars string → integer cents, guarding float drift. undefined when blank. */
+function rateToCents(dollars: string): number | undefined {
+    const trimmed = dollars.trim();
+    if (trimmed === '') return undefined;
+    const cents = Math.round(Number.parseFloat(trimmed) * 100);
+    return Number.isInteger(cents) && cents > 0 ? cents : undefined;
+}
 
 export default function EmployeeRegisterPage() {
     const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
@@ -66,6 +76,7 @@ export default function EmployeeRegisterPage() {
             phone: form.phone.trim() || undefined,
             department: form.department.trim() || undefined,
             position: form.position.trim() || undefined,
+            hourlyRateCents: rateToCents(form.hourlyRate),
         });
     };
 
@@ -140,6 +151,16 @@ export default function EmployeeRegisterPage() {
                                 onChange={(v) => handleChange('position', v)}
                                 placeholder="Technician"
                             />
+                            {hasModule('PAYROLL') ? (
+                                <Field
+                                    label="Hourly rate (CAD)"
+                                    type="number"
+                                    value={form.hourlyRate}
+                                    onChange={(v) => handleChange('hourlyRate', v)}
+                                    placeholder="Leave blank for org default"
+                                    hint="Overrides the organization's default rate for this employee."
+                                />
+                            ) : null}
                         </div>
 
                         {registerMutation.isError && (

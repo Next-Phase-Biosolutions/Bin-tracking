@@ -28,6 +28,10 @@ export type {
     PayrollExceptionView,
     PayrollRunView,
     PayrollRunSummary,
+    PayrollOrgOverview,
+    PayrollAdminLineItemView,
+    PayrollAdminExceptionView,
+    PayrollAdminRunDetail,
 } from './payroll.js';
 export type {
     ApiSuccess,

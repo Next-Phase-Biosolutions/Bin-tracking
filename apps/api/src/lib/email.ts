@@ -75,3 +75,34 @@ export async function sendBankDetailsRequestEmail(to: string, url: string, orgNa
         ].join(''),
     });
 }
+
+/**
+ * Security notice to the PREVIOUS payroll manager address when it changes.
+ * managerEmail is effectively an approval credential (its inbox authorizes
+ * payouts), so the old holder must find out if it is silently redirected.
+ * Best-effort — callers must not fail the settings save if this throws.
+ */
+export async function sendManagerEmailChangedNotice(
+    to: string,
+    orgName: string,
+    newEmail: string | null,
+): Promise<void> {
+    const from = process.env['EMAIL_FROM'];
+    if (!from) throw new Error('EMAIL_FROM not configured — set it before sending manager change notices');
+
+    const safeOrgName = escapeHtml(orgName);
+    const safeNew = newEmail ? escapeHtml(newEmail) : null;
+
+    await getResend().emails.send({
+        from,
+        to,
+        subject: `${orgName}: payroll approval email changed`,
+        html: [
+            `<p>The payroll approval email for <strong>${safeOrgName}</strong> was just changed.</p>`,
+            safeNew
+                ? `<p>Approval requests now go to <strong>${safeNew}</strong> instead of this address.</p>`
+                : `<p>The approval address was removed — approval emails are paused until a new one is set.</p>`,
+            `<p>If you expected this, no action is needed. If you did NOT expect it, contact your organization admin immediately — payroll approvals may be redirected.</p>`,
+        ].join(''),
+    });
+}

@@ -109,9 +109,28 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            single-use hashed bankLinkToken on a PUBLIC endpoint with no
 #            session and no caller-asserted org. See the [TOKEN] category
 #            above.
+#   [VERIFIED-ID] return prisma.employee.update({ where: { id: employeeId } ...
+#            in setHourlyRate — updates the SAME row getEmployeeInOrg(orgId,
+#            employeeId) validated one line above (throws NOT_FOUND on an
+#            org mismatch before the update runs).
+#
+# Org payroll settings (settings.service.ts) entry:
+#   [FILTER] return prisma.settings.upsert({ in settingsService.update — the
+#            where/create/update are keyed on { organizationId: orgId } on the
+#            lines below; the org is taken from ctx.orgId, never client input,
+#            so it can only ever touch the caller's own Settings row.
+#
+# Platform-admin payroll monitor (admin.service.ts) entry:
+#   [PLATFORM-ADMIN] const run = await prisma.payrollRun.findUnique({ in
+#            getPayrollRunDetail — reachable ONLY via platformAdminProcedure,
+#            whose trust model is deliberately cross-org (a platform admin
+#            monitors every org's payroll). There is no caller org to scope
+#            to; the org is derived from the run's own organizationId and
+#            returned for display. Not an org-tenant leak vector.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
+apps/api/src/services/admin.service.ts	const run = await prisma.payrollRun.findUnique({
 apps/api/src/services/attendance.service.ts	const employee = await prisma.employee.findUnique({
 apps/api/src/services/attendance.service.ts	const employees = await prisma.employee.findMany({
 apps/api/src/services/bin.service.ts	const activeBins = await prisma.bin.findMany({
@@ -145,7 +164,8 @@ apps/api/src/services/employee.service.ts	await prisma.employee.update({
 apps/api/src/services/employee.service.ts	const employee = await prisma.employee.findUnique({
 apps/api/src/services/employee.service.ts	const employee = await prisma.employee.findUnique({ where: { id } });
 apps/api/src/services/employee.service.ts	return await prisma.employee.create({
-apps/api/src/services/employee.service.ts	return prisma.employee.findMany({
+apps/api/src/services/employee.service.ts	const employees = await prisma.employee.findMany({
+apps/api/src/services/employee.service.ts	prisma.employee.update({ where: { id: employeeId }, data: { hourlyRateCents } }),
 apps/api/src/services/facility.service.ts	const facility = await prisma.facility.findFirst({
 apps/api/src/services/facility.service.ts	prisma.facility.count({ where }),
 apps/api/src/services/facility.service.ts	prisma.facility.findMany({
@@ -161,6 +181,7 @@ apps/api/src/services/form.service.ts	const rows = await prisma.formTemplate.fin
 apps/api/src/services/payroll.service.ts	const existing = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const runs = await prisma.payrollRun.findMany({
+apps/api/src/services/settings.service.ts	prisma.settings.upsert({
 apps/api/src/services/shipment.service.ts	const row = await prisma.shipment.create({
 apps/api/src/services/shipment.service.ts	const row = await prisma.shipment.findUnique({
 apps/api/src/services/shipment.service.ts	const rows = await prisma.shipment.findMany({
