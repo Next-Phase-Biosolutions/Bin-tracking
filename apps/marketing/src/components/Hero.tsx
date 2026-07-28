@@ -95,27 +95,9 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.55 }}
             className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
           >
-            <CTAButton href="#how-it-works" variant="primary">
-              See how it works
-            </CTAButton>
-            <CTAButton href="#contact" variant="ghost">
+            <CTAButton href="#contact" variant="primary">
               Contact Sales
             </CTAButton>
-          </motion.div>
-
-          <motion.div
-            initial={reduce ? false : { opacity: 0 }}
-            animate={reduce ? false : { opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
-            className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-bone-light"
-          >
-            <span>CFIA</span>
-            <span className="text-bone-light/40">·</span>
-            <span>Vision AI</span>
-            <span className="text-bone-light/40">·</span>
-            <span>Carbon Credits</span>
-            <span className="text-bone-light/40">·</span>
-            <span>Blockchain Verified</span>
           </motion.div>
         </div>
 

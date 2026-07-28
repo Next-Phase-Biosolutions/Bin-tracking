@@ -57,7 +57,7 @@ export default function OnboardingWizard() {
     const stepIndex = STEPS.findIndex((s) => s.key === step);
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-canvas p-6">
             <div className="mx-auto max-w-2xl">
                 <StepProgress currentIndex={stepIndex} />
 
@@ -78,17 +78,17 @@ function StepProgress({ currentIndex }: { currentIndex: number }) {
                         <div
                             className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
                                 i < currentIndex
-                                    ? 'bg-emerald-500 text-white'
+                                    ? 'bg-olive-deep text-bone-light'
                                     : i === currentIndex
-                                      ? 'bg-[#3d5aa8] text-white'
-                                      : 'bg-gray-200 text-gray-500'
+                                      ? 'bg-rust text-canvas'
+                                      : 'bg-bone text-muted'
                             }`}
                         >
                             {i < currentIndex ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
                         </div>
-                        <span className="text-xs font-medium text-gray-500">{s.label}</span>
+                        <span className="text-xs font-medium text-muted">{s.label}</span>
                     </div>
-                    {i < STEPS.length - 1 && <div className="mx-2 h-0.5 flex-1 bg-gray-200" />}
+                    {i < STEPS.length - 1 && <div className="mx-2 h-0.5 flex-1 bg-edge" />}
                 </li>
             ))}
         </ol>
@@ -96,11 +96,11 @@ function StepProgress({ currentIndex }: { currentIndex: number }) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-    return <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">{children}</div>;
+    return <div className="rounded-2xl border border-edge/60 bg-white p-6 shadow-card">{children}</div>;
 }
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
-    return <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 text-gray-400">{children}</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-canvas p-6 text-muted">{children}</div>;
 }
 
 // ─── Step 1: Organization ──────────────────────────────────────────────
@@ -125,7 +125,7 @@ function OrgStep({ onDone }: { onDone: () => void }) {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Acme Processing Co."
                     autoFocus
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                    className="w-full rounded-lg border border-edge px-4 py-2 text-ink focus:border-rust focus:outline-none"
                 />
                 {createOrg.isError && <ErrorBanner message={createOrg.error.message} />}
                 <SubmitButton pending={createOrg.isPending} disabled={!name.trim()} label="Create organization" />
@@ -161,11 +161,11 @@ function FacilityStep({ onDone }: { onDone: () => void }) {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <TextField label="Facility name" value={name} onChange={setName} placeholder="Main Plant" />
                 <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">Type</span>
+                    <span className="mb-1 block text-sm font-medium text-olive-deep">Type</span>
                     <select
                         value={type}
                         onChange={(e) => setType(e.target.value as 'PROCESSING' | 'RENDERING')}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                        className="w-full rounded-lg border border-edge px-4 py-2 text-ink focus:border-rust focus:outline-none"
                     >
                         <option value="PROCESSING">Processing</option>
                         <option value="RENDERING">Rendering</option>
@@ -219,7 +219,7 @@ function InviteStep({ onDone }: { onDone: () => void }) {
     return (
         <Card>
             <StepHeader icon={<Users className="h-5 w-5" />} title="Invite your team" />
-            <p className="mb-6 text-sm text-gray-600">
+            <p className="mb-6 text-sm text-muted">
                 Send a teammate an invite now, or skip and invite them later from your dashboard.
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -231,11 +231,11 @@ function InviteStep({ onDone }: { onDone: () => void }) {
                     placeholder="teammate@example.com"
                 />
                 <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">Role</span>
+                    <span className="mb-1 block text-sm font-medium text-olive-deep">Role</span>
                     <select
                         value={role}
                         onChange={(e) => setRole(e.target.value as InviteRole)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                        className="w-full rounded-lg border border-edge px-4 py-2 text-ink focus:border-rust focus:outline-none"
                     >
                         {ROLE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -246,7 +246,7 @@ function InviteStep({ onDone }: { onDone: () => void }) {
                 </label>
                 {createInvitation.isError && <ErrorBanner message={createInvitation.error.message} />}
                 {sentTo && (
-                    <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    <div className="rounded-lg bg-live/10 px-4 py-3 text-sm text-olive-deep">
                         Invitation sent to {sentTo}.
                     </div>
                 )}
@@ -255,7 +255,7 @@ function InviteStep({ onDone }: { onDone: () => void }) {
             <button
                 type="button"
                 onClick={onDone}
-                className="mt-3 w-full rounded-xl border border-gray-300 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
+                className="mt-3 w-full rounded-xl border border-edge py-3 text-sm font-bold text-olive-deep transition-colors hover:bg-bone-light"
             >
                 {sentTo ? 'Done' : 'Skip for now'}
             </button>
@@ -268,16 +268,16 @@ function InviteStep({ onDone }: { onDone: () => void }) {
 function StepHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
     return (
         <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3d5aa8]/10 text-[#3d5aa8]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-rust/10 text-rust">
                 {icon}
             </div>
-            <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+            <h2 className="font-display text-lg font-bold text-olive-deep">{title}</h2>
         </div>
     );
 }
 
 function ErrorBanner({ message }: { message: string }) {
-    return <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{message}</div>;
+    return <div className="rounded-lg bg-rust/10 px-4 py-3 text-sm text-rust">{message}</div>;
 }
 
 function SubmitButton({ pending, disabled, label }: { pending: boolean; disabled: boolean; label: string }) {
@@ -285,7 +285,7 @@ function SubmitButton({ pending, disabled, label }: { pending: boolean; disabled
         <button
             type="submit"
             disabled={pending || disabled}
-            className="w-full rounded-xl bg-[#3d5aa8] py-3 text-sm font-bold text-white transition-colors hover:bg-[#2d4898] disabled:opacity-50"
+            className="w-full rounded-xl bg-rust py-3 text-sm font-bold text-canvas transition-colors hover:bg-rust/90 disabled:opacity-50"
         >
             {pending ? 'Saving…' : label}
         </button>
@@ -307,13 +307,13 @@ function TextField({
 }) {
     return (
         <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+            <span className="mb-1 block text-sm font-medium text-olive-deep">{label}</span>
             <input
                 type={type}
                 value={value}
                 placeholder={placeholder}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-[#3d5aa8] focus:ring-[#3d5aa8]"
+                className="w-full rounded-lg border border-edge px-4 py-2 text-ink focus:border-rust focus:outline-none"
             />
         </label>
     );

@@ -70,8 +70,21 @@ export function CTAButton({
       "border border-bone/30 bg-white/5 text-bone hover:bg-white/10 hover:border-bone/60",
   }[variant];
 
+  const cls = `${base} ${styles} ${className}`;
+  // In-page hash anchors (e.g. "#contact") must use a native <a> so the browser
+  // scrolls to the section. React-router <Link to="#contact"> treats it as a route
+  // and doesn't scroll. External/route paths still use <Link>.
+  if (href.startsWith("#")) {
+    return (
+      <a href={href} className={cls}>
+        {children}
+        <ArrowRight />
+      </a>
+    );
+  }
+
   return (
-    <Link to={href} className={`${base} ${styles} ${className}`}>
+    <Link to={href} className={cls}>
       {children}
       <ArrowRight />
     </Link>
