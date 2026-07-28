@@ -96,7 +96,7 @@ export default function GuardScannerPage() {
                         <Icon name="badge" width={22} height={22} />
                     </span>
                     <div>
-                        <h1 className="font-display text-lg font-extrabold text-olive-deep">Guard Scanner</h1>
+                        <h1 className="font-display text-lg font-extrabold text-olive-deep">Employee Scanner</h1>
                         <p className="text-sm text-muted">Scan an employee badge to check in or out</p>
                     </div>
                 </div>

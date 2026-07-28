@@ -5,7 +5,7 @@ import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
 import { CameraScanner } from '../../components/app/CameraScanner';
 
-const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || 'Facility Scanner';
+const TABLET_STATION_ID = import.meta.env.VITE_STATION_LABEL || 'Bin Scanner';
 
 export function TabletPage() {
     const [scannedBinId, setScannedBinId] = useState<string | null>(null);
@@ -62,11 +62,10 @@ export function TabletPage() {
     return (
         <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-canvas p-4">
             <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg opacity-40" />
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/3 rounded-b-[40px] bg-olive-deep shadow-panel" />
 
             <Card className="relative z-10 flex w-full max-w-lg flex-col items-center p-6 md:p-8">
                 <div className="mb-6 w-full text-center">
-                    <h1 className="font-display text-3xl font-extrabold tracking-tight text-olive-deep md:text-4xl">Facility Scanner</h1>
+                    <h1 className="font-display text-3xl font-extrabold tracking-tight text-olive-deep md:text-4xl">Bin Scanner</h1>
                     <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-rust">Station: {TABLET_STATION_ID}</p>
 
                     <div className="mt-6 flex items-center justify-center gap-3">
