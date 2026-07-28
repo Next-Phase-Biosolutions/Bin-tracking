@@ -42,12 +42,12 @@ export function FormRenderer({ form, onBack }: Props) {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F8F2]">
-            <div className="bg-[#043F2E] px-4 pt-10 pb-3">
+        <div className="min-h-screen bg-canvas">
+            <div className="bg-olive-deep px-4 pt-10 pb-3">
                 <button
                     type="button"
                     onClick={onBack}
-                    className="mb-3 flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-white"
+                    className="mb-3 flex items-center gap-2 text-sm text-bone/70 transition-colors hover:text-bone"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Forms
