@@ -24,5 +24,4 @@ export const operationsNav: NavItem[] = [
     { label: 'Timesheet', href: '/app/timesheet', icon: 'clock', module: 'WORKFORCE' },
     { label: 'Payroll', href: '/app/payroll', icon: 'clock', module: 'PAYROLL' },
     { label: 'Forms', href: '/app/forms', icon: 'form', module: 'FORMS' },
-    { label: 'Create a Form', href: '/app/forms/import', icon: 'form', module: 'FORMS_AI_DIGITIZE' },
 ];

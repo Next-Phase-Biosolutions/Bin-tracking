@@ -5,8 +5,7 @@ import { Icon } from '../ui/Icon';
 import { operationsNav, type NavItem } from '../../lib/nav';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
-import { trpc } from '../../lib/trpc';
-import { OrgSwitcher } from './OrgSwitcher';
+import { trpc, getSelectedOrgId } from '../../lib/trpc';
 
 const ROLE_LABELS: Record<string, string> = {
     ADMIN: 'Admin',
@@ -88,6 +87,13 @@ export function Sidebar({
     // served by admin.whoAmI. Server-side platformAdminProcedure is the real
     // gate; this only decides whether to show the nav entry.
     const whoAmI = trpc.admin.whoAmI.useQuery(undefined, { staleTime: 300_000 });
+    // Show the active organization's name under the logo (falls back to the
+    // brand name while loading / for a not-yet-onboarded user).
+    const myOrgs = trpc.auth.myOrgs.useQuery(undefined, { staleTime: 300_000 });
+    const orgs = myOrgs.data ?? [];
+    const selectedOrg = getSelectedOrgId();
+    const currentOrg = (selectedOrg && orgs.find((o) => o.orgId === selectedOrg)) || orgs[0];
+    const orgName = currentOrg?.name ?? 'Facility OS';
     const platformNav: NavItem[] = whoAmI.data?.isPlatformAdmin
         ? [
               { label: 'Org Modules', href: '/app/admin/orgs', icon: 'grid' },
@@ -104,8 +110,8 @@ export function Sidebar({
                         <Link to="/app/dashboard" className="relative inline-flex">
                             <Logo variant="light" className="h-7 w-auto" />
                         </Link>
-                        <p className="relative mt-2 font-mono text-[0.58rem] uppercase tracking-[0.16em] text-bone/40">
-                            Facility OS · Plant 01
+                        <p className="relative mt-2 truncate font-mono text-[0.58rem] uppercase tracking-[0.16em] text-bone/40">
+                            {orgName}
                         </p>
                     </>
                 )}
@@ -115,7 +121,7 @@ export function Sidebar({
                         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         className={`relative flex items-center justify-center rounded-lg py-1.5 text-bone/50 transition-colors hover:bg-white/10 hover:text-bone-light ${
-                            collapsed ? 'mx-auto w-9' : 'absolute right-3 top-1/2 w-8 -translate-y-1/2'
+                            collapsed ? 'mx-auto w-9' : 'absolute right-3 top-3 w-8'
                         }`}
                     >
                         <Icon name="arrow" width={15} height={15} className={collapsed ? '' : 'rotate-180'} />
@@ -124,7 +130,6 @@ export function Sidebar({
             </div>
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
-                <OrgSwitcher collapsed={collapsed} />
                 <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} collapsed={collapsed} />
                 {platformNav.length > 0 ? (
                     <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} collapsed={collapsed} />
