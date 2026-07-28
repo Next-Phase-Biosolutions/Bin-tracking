@@ -114,6 +114,11 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Forward-only sequential counter backing Employee.employeeCode
+  // (EMP-000001, EMP-000002, ...). Incremented atomically per registration;
+  // never decremented or reused, even when an employee is deleted.
+  employeeCounter Int @default(0)
+
   members      OrganizationMember[]
   invitations  Invitation[]
   subscription Subscription?
@@ -263,8 +268,10 @@ model Facility {
   name           String
   type           FacilityType @default(PROCESSING)
   address        String
-  lat            Float
-  lng            Float
+  city           String?
+  province       String?
+  postalCode     String?
+  country        String?
   deletedAt      DateTime?
   organizationId String
   createdAt      DateTime     @default(now())
@@ -407,15 +414,18 @@ model AnimalRegistration {
   breed           String?
   age             String?
   weight          String?
-  ownerName       String
+  plantId         String // 4-digit plant/facility code, reusable across registrations
+  employeeId      String? // employee who received the animal; nullable in DB for pre-existing rows, required by the form going forward
   healthCondition String?
   rawTranscript   String?
   organizationId  String
   createdAt       DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee?    @relation(fields: [employeeId], references: [id])
 
   @@index([organizationId])
+  @@index([employeeId])
   @@map("animal_registrations")
 }
 
@@ -468,8 +478,9 @@ model Employee {
   sessions     WorkSession[]
   events       AttendanceEvent[]
 
-  payrollLineItems  PayrollLineItem[]
-  payrollExceptions PayrollException[]
+  payrollLineItems    PayrollLineItem[]
+  payrollExceptions   PayrollException[]
+  animalRegistrations AnimalRegistration[]
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, qrCode])

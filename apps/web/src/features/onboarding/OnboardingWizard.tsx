@@ -140,19 +140,30 @@ function FacilityStep({ onDone }: { onDone: () => void }) {
     const [name, setName] = useState('');
     const [type, setType] = useState<'PROCESSING' | 'RENDERING'>('PROCESSING');
     const [address, setAddress] = useState('');
-    const [lat, setLat] = useState('');
-    const [lng, setLng] = useState('');
+    const [city, setCity] = useState('');
+    const [province, setProvince] = useState('');
+    const [postalCode, setPostalCode] = useState('');
+    const [country, setCountry] = useState('Canada');
 
     const createFacility = trpc.facility.create.useMutation({
         onSuccess: () => onDone(),
     });
 
+    const isValid =
+        name.trim() && address.trim() && city.trim() && province.trim() && postalCode.trim() && country.trim();
+
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        const latNum = Number(lat);
-        const lngNum = Number(lng);
-        if (!name.trim() || !address.trim() || Number.isNaN(latNum) || Number.isNaN(lngNum)) return;
-        createFacility.mutate({ name: name.trim(), type, address: address.trim(), lat: latNum, lng: lngNum });
+        if (!isValid) return;
+        createFacility.mutate({
+            name: name.trim(),
+            type,
+            address: address.trim(),
+            city: city.trim(),
+            province: province.trim(),
+            postalCode: postalCode.trim(),
+            country: country.trim(),
+        });
     };
 
     return (
@@ -173,15 +184,20 @@ function FacilityStep({ onDone }: { onDone: () => void }) {
                 </label>
                 <TextField label="Address" value={address} onChange={setAddress} placeholder="123 Main St" />
                 <div className="grid grid-cols-2 gap-4">
-                    <TextField label="Latitude" value={lat} onChange={setLat} placeholder="41.8781" />
-                    <TextField label="Longitude" value={lng} onChange={setLng} placeholder="-87.6298" />
+                    <TextField label="City" value={city} onChange={setCity} placeholder="Toronto" />
+                    <TextField label="Province" value={province} onChange={setProvince} placeholder="Ontario" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <TextField
+                        label="Postal Code"
+                        value={postalCode}
+                        onChange={setPostalCode}
+                        placeholder="A1A 1A1"
+                    />
+                    <TextField label="Country" value={country} onChange={setCountry} placeholder="Canada" />
                 </div>
                 {createFacility.isError && <ErrorBanner message={createFacility.error.message} />}
-                <SubmitButton
-                    pending={createFacility.isPending}
-                    disabled={!name.trim() || !address.trim() || !lat || !lng}
-                    label="Add facility"
-                />
+                <SubmitButton pending={createFacility.isPending} disabled={!isValid} label="Add facility" />
             </form>
         </Card>
     );

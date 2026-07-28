@@ -97,6 +97,15 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            unconditionally present; only the search OR-block is conditional.
 #   [FILTER] prisma.animalRegistration.groupBy({ — `where: { organizationId:
 #            orgId }` is the entire filter, on the line below the call.
+#   [POSTCHECK] const employee = await prisma.employee.findUnique({ where: {
+#            id: input.employeeId } }); in register() — the very next line
+#            throws BAD_REQUEST when `!employee || employee.organizationId
+#            !== organizationId`, before the id is ever written to the new
+#            AnimalRegistration row.
+#   [FILTER] const matches = await prisma.employee.findMany({ in
+#            matchEmployeeByName() — `where: { organizationId: orgId,
+#            fullName: {...} } }` is on the line below the call, org is the
+#            function's own orgId parameter, never client input.
 #
 # Employee bank-details self-serve link (employee.service.ts) entries:
 #   [VERIFIED-ID] await prisma.employee.update({ in requestBankDetails —
@@ -174,6 +183,8 @@ apps/api/src/services/facility.service.ts	return prisma.facility.update({
 apps/api/src/services/farmer.service.ts	const record = await prisma.animalRegistration.create({
 apps/api/src/services/farmer.service.ts	return prisma.animalRegistration.findMany({
 apps/api/src/services/farmer.service.ts	prisma.animalRegistration.groupBy({
+apps/api/src/services/farmer.service.ts	const employee = await prisma.employee.findUnique({ where: { id: input.employeeId } });
+apps/api/src/services/farmer.service.ts	const matches = await prisma.employee.findMany({
 apps/api/src/services/form.service.ts	const maxSort = await prisma.formTemplate.aggregate({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.create({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.findUnique({ where: { id } });

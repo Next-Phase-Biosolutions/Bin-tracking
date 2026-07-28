@@ -7,8 +7,10 @@ export interface Facility {
     name: string;
     type: FacilityType;
     address: string;
-    lat: number;
-    lng: number;
+    city: string | null;
+    province: string | null;
+    postalCode: string | null;
+    country: string | null;
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;

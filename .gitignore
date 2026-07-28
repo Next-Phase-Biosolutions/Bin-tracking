@@ -40,3 +40,4 @@ ruvector.db
 # Local Claude Code config and Playwright MCP debug artifacts
 .claude/
 .playwright-mcp/
+.claude-flow/

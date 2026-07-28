@@ -7,7 +7,7 @@ export const transcribeAudioSchema = z.object({
     mimeType: z.enum(['audio/webm', 'audio/mp4']),
     /** If set, only extract this one field from the transcript */
     targetField: z
-        .enum(['animalType', 'breed', 'age', 'weight', 'ownerName', 'healthCondition'])
+        .enum(['animalType', 'breed', 'age', 'weight', 'plantId', 'employeeReceived', 'healthCondition'])
         .optional(),
 });
 
@@ -18,7 +18,8 @@ export const animalRegistrationSchema = z.object({
     breed: z.string().optional(),
     age: z.string().optional(),
     weight: z.string().optional(),
-    ownerName: z.string().min(1, 'Owner name is required'),
+    plantId: z.string().regex(/^\d{4}$/, 'Plant ID must be exactly 4 digits'),
+    employeeId: z.string().cuid('Select the employee who received the animal'),
     healthCondition: z.string().optional(),
     rawTranscript: z.string().optional(),
 });
@@ -26,7 +27,7 @@ export const animalRegistrationSchema = z.object({
 export type AnimalRegistrationInput = z.infer<typeof animalRegistrationSchema>;
 
 export const animalListSchema = z.object({
-    /** Case-insensitive match against animalType, breed, and ownerName */
+    /** Case-insensitive match against animalType, breed, and plantId */
     search: z.string().max(200).optional(),
     limit: z.number().int().min(1).max(200).default(100),
 });
@@ -44,7 +45,9 @@ export const extractedAnimalFieldsSchema = z.object({
     breed: z.string().nullable(),
     age: z.string().nullable(),
     weight: z.string().nullable(),
-    ownerName: z.string().nullable(),
+    plantId: z.string().nullable(),
+    /** Spoken employee name as heard by the transcriber — fuzzy-matched server-side to an employeeId */
+    employeeReceived: z.string().nullable(),
     healthCondition: z.string().nullable(),
 });
 

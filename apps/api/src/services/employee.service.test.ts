@@ -33,7 +33,7 @@ const store = vi.hoisted(() => {
     return {
         employees: [] as FakeEmployee[],
         subscription: null as { plan: 'STARTER' | 'PRO' | 'ENTERPRISE' } | null,
-        organization: { name: 'Acme Farms' } as { name: string } | null,
+        organization: { name: 'Acme Farms', employeeCounter: 0 } as { name: string; employeeCounter: number } | null,
         /** Per-org PAYROLL module state — rate visibility/writes depend on it. */
         payrollEnabled: {} as Record<string, boolean>,
         auditLogs: [] as Array<Record<string, unknown>>,
@@ -87,6 +87,11 @@ vi.mock('@bin-tracker/db', () => {
     };
     const organization = {
         findUnique: () => Promise.resolve(store.organization),
+        update: ({ data }: { data: { employeeCounter: { increment: number } } }) => {
+            if (!store.organization) return Promise.reject(new Error('not found'));
+            store.organization.employeeCounter += data.employeeCounter.increment;
+            return Promise.resolve({ employeeCounter: store.organization.employeeCounter });
+        },
     };
     const organizationModule = {
         findUnique: ({ where }: { where: { orgId_module: { orgId: string; module: string } } }) => {
@@ -148,7 +153,7 @@ const VALID_DETAILS = {
 beforeEach(() => {
     store.employees = [];
     store.subscription = null;
-    store.organization = { name: 'Acme Farms' };
+    store.organization = { name: 'Acme Farms', employeeCounter: 0 };
     // PAYROLL on for the default test org — module-off cases override per test.
     store.payrollEnabled = { 'org-a': true };
     store.auditLogs.length = 0;
@@ -296,6 +301,16 @@ describe('employeeService.register — rate requires PAYROLL module', () => {
     it('saves the rate when PAYROLL is on', async () => {
         const result = await employeeService.register({ fullName: 'New Hire', hourlyRateCents: 1800 }, 'org-a');
         expect(result.hourlyRateCents).toBe(1800);
+    });
+});
+
+describe('employeeService.register — sequential employeeCode', () => {
+    it('assigns EMP-000001, then EMP-000002 for the next registration in the same org', async () => {
+        const first = await employeeService.register({ fullName: 'First Hire' }, 'org-a');
+        const second = await employeeService.register({ fullName: 'Second Hire' }, 'org-a');
+
+        expect(first.employeeCode).toBe('EMP-000001');
+        expect(second.employeeCode).toBe('EMP-000002');
     });
 });
 
