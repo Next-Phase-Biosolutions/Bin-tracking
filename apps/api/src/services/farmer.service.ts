@@ -27,6 +27,8 @@ export const farmerService = {
     async transcribeAndExtract(input: TranscribeAudioInput, orgId: string): Promise<{
         transcript: string;
         fields: Partial<ExtractedAnimalFields>;
+        /** Employee whose name was heard in the transcript, resolved to a real record — null if unmentioned or ambiguous */
+        matchedEmployeeId: string | null;
     }> {
         // Second, independent check after requireModule('ANIMAL_INTAKE') has already
         // gated access — "how much have they used this month". Same
@@ -72,7 +74,7 @@ export const farmerService = {
         // 3. Extract fields with Claude
         const fieldsList = input.targetField
             ? input.targetField
-            : 'animalType, breed, age, weight, ownerName, healthCondition';
+            : 'animalType, breed, age, weight, plantId, employeeReceived, healthCondition';
 
         // Instructions live in the system prompt; the farmer's transcript is
         // passed as the user turn (data, not instructions) so spoken words like
@@ -82,7 +84,9 @@ export const farmerService = {
 Extract the following fields: ${fieldsList}
 
 Rules:
-- Return ONLY a valid JSON object with these keys: animalType, breed, age, weight, ownerName, healthCondition
+- Return ONLY a valid JSON object with these keys: animalType, breed, age, weight, plantId, employeeReceived, healthCondition
+- plantId is a 4-digit numeric plant/facility code (e.g. "0007") — only return it if the speaker said 4 digits
+- employeeReceived is the name of the staff member who received the animal, exactly as spoken
 - If a field is not mentioned, return null for that field
 - Keep values concise and natural (e.g. age: "3 years", weight: "250 kg")
 - Do not add any explanation or text outside the JSON
@@ -125,7 +129,8 @@ Rules:
                     breed: parsed['breed'] ?? null,
                     age: parsed['age'] ?? null,
                     weight: parsed['weight'] ?? null,
-                    ownerName: parsed['ownerName'] ?? null,
+                    plantId: parsed['plantId'] ?? null,
+                    employeeReceived: parsed['employeeReceived'] ?? null,
                     healthCondition: parsed['healthCondition'] ?? null,
                 };
             }
@@ -137,18 +142,27 @@ Rules:
             });
         }
 
-        return { transcript, fields };
+        const spokenName = fields.employeeReceived;
+        const matchedEmployeeId = spokenName ? await matchEmployeeByName(orgId, spokenName) : null;
+
+        return { transcript, fields, matchedEmployeeId };
     },
 
     /** Saves the reviewed animal registration to the database */
     async register(input: AnimalRegistrationInput, organizationId: string): Promise<{ id: string }> {
+        const employee = await prisma.employee.findUnique({ where: { id: input.employeeId } });
+        if (!employee || employee.organizationId !== organizationId) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selected employee not found' });
+        }
+
         const record = await prisma.animalRegistration.create({
             data: {
                 animalType: input.animalType,
                 breed: input.breed,
                 age: input.age,
                 weight: input.weight,
-                ownerName: input.ownerName,
+                plantId: input.plantId,
+                employeeId: input.employeeId,
                 healthCondition: input.healthCondition,
                 rawTranscript: input.rawTranscript,
                 organizationId,
@@ -169,11 +183,12 @@ Rules:
                           OR: [
                               { animalType: { contains: search, mode: 'insensitive' as const } },
                               { breed: { contains: search, mode: 'insensitive' as const } },
-                              { ownerName: { contains: search, mode: 'insensitive' as const } },
+                              { plantId: { contains: search, mode: 'insensitive' as const } },
                           ],
                       }
                     : {}),
             },
+            include: { employee: { select: { fullName: true, employeeCode: true } } },
             orderBy: { createdAt: 'desc' },
             take: input.limit,
         });
@@ -208,3 +223,18 @@ Rules:
         return { id };
     },
 };
+
+/**
+ * Resolves a spoken employee name to a real employeeId within the org.
+ * Case-insensitive substring match; returns null (leave it to manual
+ * selection) unless exactly one employee matches — an ambiguous or absent
+ * match is not something voice extraction should guess at.
+ */
+async function matchEmployeeByName(orgId: string, spokenName: string): Promise<string | null> {
+    const matches = await prisma.employee.findMany({
+        where: { organizationId: orgId, fullName: { contains: spokenName, mode: 'insensitive' } },
+        select: { id: true },
+        take: 2,
+    });
+    return matches.length === 1 ? matches[0]!.id : null;
+}

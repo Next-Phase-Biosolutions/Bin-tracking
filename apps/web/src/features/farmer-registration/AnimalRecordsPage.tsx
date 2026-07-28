@@ -104,7 +104,7 @@ export default function AnimalRecordsPage() {
                             type="search"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search type, breed, owner…"
+                            placeholder="Search type, breed, plant ID…"
                             aria-label="Search registrations"
                             className="w-56 rounded-lg border border-edge px-3 py-1.5 text-sm text-ink outline-none focus:border-rust"
                         />
@@ -123,7 +123,8 @@ export default function AnimalRecordsPage() {
                         <thead>
                             <tr className="border-b border-edge/60">
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Animal</th>
-                                <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Owner</th>
+                                <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Plant ID</th>
+                                <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Employee Received</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Age</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Weight</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Health</th>
@@ -134,11 +135,11 @@ export default function AnimalRecordsPage() {
                         <tbody className="divide-y divide-edge/40">
                             {listQuery.isLoading ? (
                                 <tr>
-                                    <td colSpan={canDelete ? 7 : 6} className="px-5 py-8 text-center text-muted">Loading…</td>
+                                    <td colSpan={canDelete ? 8 : 7} className="px-5 py-8 text-center text-muted">Loading…</td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={canDelete ? 7 : 6} className="px-5 py-10 text-center text-muted">
+                                    <td colSpan={canDelete ? 8 : 7} className="px-5 py-10 text-center text-muted">
                                         {trimmed ? 'No registrations match your search.' : (
                                             <span>
                                                 No animals registered yet.{' '}
@@ -156,7 +157,8 @@ export default function AnimalRecordsPage() {
                                             <div className="font-medium text-ink">{row.animalType}</div>
                                             {row.breed ? <div className="text-xs text-muted">{row.breed}</div> : null}
                                         </td>
-                                        <td className="px-5 py-3 text-ink">{row.ownerName}</td>
+                                        <td className="px-5 py-3 text-ink">{row.plantId}</td>
+                                        <td className="px-5 py-3 text-ink">{row.employee?.fullName ?? '—'}</td>
                                         <td className="px-5 py-3 text-muted">{row.age ?? '—'}</td>
                                         <td className="px-5 py-3 text-muted">{row.weight ?? '—'}</td>
                                         <td className="px-5 py-3">
@@ -170,9 +172,9 @@ export default function AnimalRecordsPage() {
                                         {canDelete ? (
                                             <td className="px-5 py-3 text-right">
                                                 <button
-                                                    onClick={() => handleDelete(row.id, `${row.animalType} — ${row.ownerName}`)}
+                                                    onClick={() => handleDelete(row.id, `${row.animalType} — Plant ${row.plantId}`)}
                                                     disabled={removeMutation.isPending}
-                                                    aria-label={`Delete registration for ${row.animalType} owned by ${row.ownerName}`}
+                                                    aria-label={`Delete registration for ${row.animalType}, Plant ${row.plantId}`}
                                                     className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted transition-colors hover:text-rust disabled:opacity-40"
                                                 >
                                                     Delete

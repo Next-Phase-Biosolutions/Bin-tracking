@@ -100,11 +100,11 @@ async function main(): Promise<void> {
     // ─── 3. Facilities ────────────────────────────────────────────
     console.log('🏭 Creating facilities...');
     const facilities = await Promise.all([
-        prisma.facility.create({ data: { name: 'Chicago Processing',   type: FacilityType.PROCESSING, address: '123 Industrial Blvd, Chicago, IL 60601',       lat: 41.8781, lng: -87.6298, organizationId: orgId } }),
-        prisma.facility.create({ data: { name: 'Detroit Processing',   type: FacilityType.PROCESSING, address: '456 Factory Ave, Detroit, MI 48201',             lat: 42.3314, lng: -83.0458, organizationId: orgId } }),
-        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd, Milwaukee, WI 53202',              lat: 43.0389, lng: -87.9065, organizationId: orgId } }),
-        prisma.facility.create({ data: { name: 'Midwest Rendering',    type: FacilityType.RENDERING,  address: '321 Render Lane, Indianapolis, IN 46201',        lat: 39.7684, lng: -86.1581, organizationId: orgId } }),
-        prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way, Columbus, OH 43215',            lat: 39.9612, lng: -82.9988, organizationId: orgId } }),
+        prisma.facility.create({ data: { name: 'Chicago Processing',   type: FacilityType.PROCESSING, address: '123 Industrial Blvd', city: 'Chicago',     province: 'IL', postalCode: '60601', country: 'USA', organizationId: orgId } }),
+        prisma.facility.create({ data: { name: 'Detroit Processing',   type: FacilityType.PROCESSING, address: '456 Factory Ave',     city: 'Detroit',     province: 'MI', postalCode: '48201', country: 'USA', organizationId: orgId } }),
+        prisma.facility.create({ data: { name: 'Milwaukee Processing', type: FacilityType.PROCESSING, address: '789 Plant Rd',        city: 'Milwaukee',   province: 'WI', postalCode: '53202', country: 'USA', organizationId: orgId } }),
+        prisma.facility.create({ data: { name: 'Midwest Rendering',    type: FacilityType.RENDERING,  address: '321 Render Lane',     city: 'Indianapolis',province: 'IN', postalCode: '46201', country: 'USA', organizationId: orgId } }),
+        prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way',     city: 'Columbus',    province: 'OH', postalCode: '43215', country: 'USA', organizationId: orgId } }),
     ]);
     const [chicago, detroit, milwaukee] = facilities;
 

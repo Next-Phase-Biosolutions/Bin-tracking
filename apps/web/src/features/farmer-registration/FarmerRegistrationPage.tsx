@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/trpc';
 import { AnimalForm } from './AnimalForm';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -15,17 +15,24 @@ const EMPTY_FIELDS: ExtractedAnimalFields = {
     breed: null,
     age: null,
     weight: null,
-    ownerName: null,
+    plantId: null,
+    employeeReceived: null,
     healthCondition: null,
 };
 
 export default function FarmerRegistrationPage() {
     const [formFields, setFormFields] = useState<ExtractedAnimalFields>({ ...EMPTY_FIELDS });
+    const [employeeId, setEmployeeId] = useState<string | null>(null);
     const [transcriptLog, setTranscriptLog] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [transcribeError, setTranscribeError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
+
+    const { data: employees = [] } = useQuery({
+        queryKey: ['farmer-registration-employees'],
+        queryFn: () => apiClient.employee.list.query({ status: 'ACTIVE', limit: 200 }),
+    });
 
     const transcribeMutation = useMutation({
         mutationFn: (input: Parameters<typeof apiClient.farmer.transcribe.mutate>[0]) =>
@@ -56,6 +63,7 @@ export default function FarmerRegistrationPage() {
                             }
                             return next;
                         });
+                        if (data.matchedEmployeeId) setEmployeeId(data.matchedEmployeeId);
                         setIsProcessing(false);
                     },
                     onError: (err) => {
@@ -89,7 +97,7 @@ export default function FarmerRegistrationPage() {
     };
 
     const handleSubmit = () => {
-        if (!formFields.animalType || !formFields.ownerName) return;
+        if (!formFields.animalType || !formFields.plantId || !employeeId) return;
 
         setIsSubmitting(true);
         setSubmitSuccess(false);
@@ -100,7 +108,8 @@ export default function FarmerRegistrationPage() {
                 breed: formFields.breed ?? undefined,
                 age: formFields.age ?? undefined,
                 weight: formFields.weight ?? undefined,
-                ownerName: formFields.ownerName,
+                plantId: formFields.plantId,
+                employeeId,
                 healthCondition: formFields.healthCondition ?? undefined,
                 rawTranscript: transcriptLog.join(' | ') || undefined,
             },
@@ -108,6 +117,7 @@ export default function FarmerRegistrationPage() {
                 onSuccess: () => {
                     setSubmitSuccess(true);
                     setFormFields({ ...EMPTY_FIELDS });
+                    setEmployeeId(null);
                     setTranscriptLog([]);
                     setIsSubmitting(false);
                 },
@@ -139,6 +149,9 @@ export default function FarmerRegistrationPage() {
                     <AnimalForm
                         fields={formFields}
                         onChange={handleFieldChange}
+                        employees={employees}
+                        employeeId={employeeId}
+                        onEmployeeChange={setEmployeeId}
                         onSubmit={handleSubmit}
                         isSubmitting={isSubmitting}
                         submitSuccess={submitSuccess}

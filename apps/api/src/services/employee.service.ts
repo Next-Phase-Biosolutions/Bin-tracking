@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { prisma } from '@bin-tracker/db';
 import type { SafeEmployee } from '@bin-tracker/db';
@@ -15,16 +15,20 @@ import { encryptBankField, last4 } from '../lib/bank-crypto.js';
 import { sendBankDetailsRequestEmail } from '../lib/email.js';
 import { captureError } from '../lib/sentry.js';
 
-// Unambiguous alphabet (no 0/O/1/I) for human-readable employee codes.
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-function generateEmployeeCode(): string {
-    const bytes = randomBytes(6);
-    let code = '';
-    for (const byte of bytes) {
-        code += CODE_ALPHABET[byte % CODE_ALPHABET.length];
-    }
-    return `EMP-${code}`;
+/**
+ * Next sequential employee code for an org: EMP-000001, EMP-000002, ...
+ * The increment is a single atomic UPDATE (Postgres row-lock), so concurrent
+ * registrations never hand out the same number. Numbers are never reused —
+ * if a later step in register() fails, the increment stands and the number
+ * is retired, which is fine (forward-only, gaps allowed).
+ */
+async function nextEmployeeCode(organizationId: string): Promise<string> {
+    const org = await prisma.organization.update({
+        where: { id: organizationId },
+        data: { employeeCounter: { increment: 1 } },
+        select: { employeeCounter: true },
+    });
+    return `EMP-${String(org.employeeCounter).padStart(6, '0')}`;
 }
 
 function generateQrToken(): string {
@@ -97,9 +101,10 @@ export const employeeService = {
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
             try {
+                const employeeCode = await nextEmployeeCode(organizationId);
                 return await prisma.employee.create({
                     data: {
-                        employeeCode: generateEmployeeCode(),
+                        employeeCode,
                         qrCode: generateQrToken(),
                         fullName: input.fullName,
                         email: input.email ?? null,
@@ -111,7 +116,9 @@ export const employeeService = {
                     },
                 });
             } catch (error: unknown) {
-                // P2002 = unique collision on employeeCode/qrCode — retry with new values.
+                // P2002 = unique collision, virtually always the random qrCode
+                // (employeeCode comes from an atomic per-org counter and won't
+                // collide). Retrying issues a fresh code/token pair.
                 const isCollision =
                     typeof error === 'object' &&
                     error !== null &&

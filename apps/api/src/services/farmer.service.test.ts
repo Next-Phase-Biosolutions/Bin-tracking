@@ -12,7 +12,8 @@ interface FakeRegistration {
     id: string;
     animalType: string;
     breed: string | null;
-    ownerName: string;
+    plantId: string;
+    employeeId: string | null;
     organizationId: string;
     createdAt: Date;
 }
@@ -64,13 +65,13 @@ vi.mock('@bin-tracker/db', () => {
     // counter untouched (no rollback needed).
     // Minimal list/count/groupBy/deleteMany fake for the records-dashboard
     // methods. Search filtering mirrors Prisma's contains/insensitive OR.
-    const matches = (r: { animalType: string; breed: string | null; ownerName: string }, search?: string) => {
+    const matches = (r: { animalType: string; breed: string | null; plantId: string }, search?: string) => {
         if (!search) return true;
         const s = search.toLowerCase();
         return (
             r.animalType.toLowerCase().includes(s) ||
             (r.breed?.toLowerCase().includes(s) ?? false) ||
-            r.ownerName.toLowerCase().includes(s)
+            r.plantId.toLowerCase().includes(s)
         );
     };
     const animalRegistration = {
@@ -159,7 +160,8 @@ function reg(overrides: Partial<FakeRegistration>): FakeRegistration {
         id: `reg-${Math.random().toString(36).slice(2, 8)}`,
         animalType: 'Cow',
         breed: null,
-        ownerName: 'Owner',
+        plantId: '0001',
+        employeeId: null,
         organizationId: 'org-a',
         createdAt: new Date(),
         ...overrides,
@@ -210,17 +212,24 @@ describe('farmerService.list — org scoping and search', () => {
         expect(result.map((r) => r.id)).toEqual(['r2', 'r1']);
     });
 
-    it('matches search against animalType, breed, and ownerName case-insensitively', async () => {
+    it('matches search against animalType and breed case-insensitively', async () => {
         store.registrations.push(
             reg({ id: 'r1', animalType: 'Goat' }),
             reg({ id: 'r2', breed: 'Boer goat' }),
-            reg({ id: 'r3', ownerName: 'Goatherd Ali' }),
-            reg({ id: 'r4', animalType: 'Cow', ownerName: 'Someone' }),
+            reg({ id: 'r3', animalType: 'Cow', breed: 'Angus' }),
         );
 
         const result = await farmerService.list('org-a', { search: 'goat', limit: 100 });
 
-        expect(result.map((r) => r.id).sort()).toEqual(['r1', 'r2', 'r3']);
+        expect(result.map((r) => r.id).sort()).toEqual(['r1', 'r2']);
+    });
+
+    it('matches search against plantId', async () => {
+        store.registrations.push(reg({ id: 'r1', plantId: '4477' }), reg({ id: 'r2', plantId: '0001' }));
+
+        const result = await farmerService.list('org-a', { search: '4477', limit: 100 });
+
+        expect(result.map((r) => r.id)).toEqual(['r1']);
     });
 });
 
