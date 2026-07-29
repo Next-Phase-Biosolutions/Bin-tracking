@@ -55,7 +55,7 @@ export function ChecklistFormRenderer({ schema, onSubmit }: Props) {
         <div className="flex flex-col gap-5">
             {/* Header fields */}
             {schema.headerFields.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="bg-white rounded-2xl border border-edge p-5 shadow-sm">
                     <div className="grid grid-cols-2 gap-4">
                         {schema.headerFields.map((f) => (
                             <div key={f.id} className={f.type === 'textarea' ? 'col-span-2' : ''}>
@@ -73,24 +73,24 @@ export function ChecklistFormRenderer({ schema, onSubmit }: Props) {
 
             {/* Checklist groups */}
             {schema.groups.map((group) => (
-                <div key={group.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="bg-[#043F2E] px-5 py-3">
-                        <h3 className="text-sm font-bold text-white">{group.title}</h3>
+                <div key={group.id} className="bg-white rounded-2xl border border-edge shadow-sm overflow-hidden">
+                    <div className="bg-olive-deep px-5 py-3">
+                        <h3 className="text-sm font-bold text-bone-light">{group.title}</h3>
                     </div>
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-edge/50">
                         {group.items.map((item) => {
                             const state = itemStates[item.id] ?? { answer: null, deviation: '', corrective: '' };
                             return (
                                 <div key={item.id} className="p-4">
-                                    <p className="text-sm text-gray-800 mb-3 leading-snug">{item.label}</p>
+                                    <p className="text-sm text-ink mb-3 leading-snug">{item.label}</p>
                                     <div className="flex gap-2 mb-2">
                                         <button
                                             type="button"
                                             onClick={() => setItemAnswer(item.id, 'yes')}
                                             className={`px-5 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${
                                                 state.answer === 'yes'
-                                                    ? 'bg-green-600 text-white border-green-600'
-                                                    : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+                                                    ? 'bg-live text-white border-live'
+                                                    : 'bg-white text-ink border-edge hover:border-live'
                                             }`}
                                         >
                                             Yes
@@ -100,8 +100,8 @@ export function ChecklistFormRenderer({ schema, onSubmit }: Props) {
                                             onClick={() => setItemAnswer(item.id, 'no')}
                                             className={`px-5 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${
                                                 state.answer === 'no'
-                                                    ? 'bg-red-600 text-white border-red-600'
-                                                    : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
+                                                    ? 'bg-rust text-canvas border-rust'
+                                                    : 'bg-white text-ink border-edge hover:border-rust'
                                             }`}
                                         >
                                             No
@@ -110,24 +110,24 @@ export function ChecklistFormRenderer({ schema, onSubmit }: Props) {
                                     {state.answer === 'no' && (
                                         <div className="flex flex-col gap-2 mt-2 pl-1">
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                                <label className="block text-xs font-semibold text-muted mb-1">
                                                     Description of Deviation
                                                 </label>
                                                 <textarea
                                                     rows={2}
-                                                    className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+                                                    className="w-full border border-edge rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-rust resize-none"
                                                     value={state.deviation}
                                                     onChange={(e) => setItemText(item.id, 'deviation', e.target.value)}
                                                     placeholder="Describe the deviation..."
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                                <label className="block text-xs font-semibold text-muted mb-1">
                                                     Corrective Actions
                                                 </label>
                                                 <textarea
                                                     rows={2}
-                                                    className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                                                    className="w-full border border-edge rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-warn resize-none"
                                                     value={state.corrective}
                                                     onChange={(e) => setItemText(item.id, 'corrective', e.target.value)}
                                                     placeholder="Corrective action taken..."
@@ -145,7 +145,7 @@ export function ChecklistFormRenderer({ schema, onSubmit }: Props) {
             <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors mt-2"
+                className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
             >
                 Submit Form
             </button>

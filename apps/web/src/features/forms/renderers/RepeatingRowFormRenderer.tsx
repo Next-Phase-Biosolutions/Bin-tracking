@@ -86,10 +86,10 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
         onSubmit();
     };
 
-    const cellBorder = 'border border-gray-400';
+    const cellBorder = 'border border-edge';
     const inputCls = (hasError: boolean) =>
-        `w-full min-w-[3.5rem] border-0 bg-transparent px-2 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#043F2E] focus:ring-inset ${
-            hasError ? 'bg-red-50 ring-1 ring-red-400' : ''
+        `w-full min-w-[3.5rem] border-0 bg-transparent px-2 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-rust focus:ring-inset ${
+            hasError ? 'bg-rust/10 ring-1 ring-rust/40' : ''
         }`;
 
     return (
@@ -99,30 +99,30 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
             )}
             {/* Instructions banner */}
             {schema.instructions && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                    <p className="text-xs font-bold text-amber-800 mb-2 uppercase tracking-wide">Instructions</p>
-                    <p className="text-sm text-amber-900 whitespace-pre-line leading-relaxed">
+                <div className="bg-bone-light border border-edge rounded-2xl p-4">
+                    <p className="text-xs font-bold text-olive-deep mb-2 uppercase tracking-wide">Instructions</p>
+                    <p className="text-sm text-ink whitespace-pre-line leading-relaxed">
                         {schema.instructions}
                     </p>
                 </div>
             )}
 
             {/* Rows table */}
-            <div className="overflow-hidden rounded-lg border border-gray-400 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-lg border border-edge bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-max border-collapse border border-gray-400 text-xs">
+                    <table className="w-full min-w-max border-collapse border border-edge text-xs">
                         <thead>
-                            <tr className="bg-[#043F2E]">
+                            <tr className="bg-olive-deep">
                                 {schema.columns.map((col) => (
                                     <th
                                         key={col.id}
-                                        className={`${cellBorder} whitespace-nowrap px-3 py-2.5 text-left font-semibold text-white`}
+                                        className={`${cellBorder} whitespace-nowrap px-3 py-2.5 text-left font-semibold text-bone-light`}
                                     >
                                         {col.label}
-                                        {col.required && <span className="ml-0.5 text-red-300">*</span>}
+                                        {col.required && <span className="ml-0.5 text-rust-light">*</span>}
                                     </th>
                                 ))}
-                                <th className={`${cellBorder} w-10 bg-[#043F2E] px-2 py-2.5`} />
+                                <th className={`${cellBorder} w-10 bg-olive-deep px-2 py-2.5`} />
                             </tr>
                         </thead>
                         <tbody>
@@ -133,7 +133,7 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
                                         const hasError = !!errors[errKey];
                                         const flagged = flaggedCells.has(errKey);
                                         return (
-                                            <td key={col.id} className={`${cellBorder} min-w-[4rem] p-0 align-top ${flagged ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : ''}`}>
+                                            <td key={col.id} className={`${cellBorder} min-w-[4rem] p-0 align-top ${flagged ? 'bg-warn/10 ring-2 ring-inset ring-warn' : ''}`}>
                                                 {col.type === 'select' ? (
                                                     <select
                                                         className={inputCls(hasError)}
@@ -157,9 +157,9 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
                                                                 className={`rounded px-2 py-1 text-[10px] font-semibold ${
                                                                     row[col.id] === opt
                                                                         ? opt === 'Yes'
-                                                                            ? 'bg-green-600 text-white'
-                                                                            : 'bg-red-600 text-white'
-                                                                        : 'border border-gray-300 bg-white'
+                                                                            ? 'bg-live text-white'
+                                                                            : 'bg-rust text-canvas'
+                                                                        : 'border border-edge bg-white'
                                                                 }`}
                                                             >
                                                                 {opt}
@@ -197,7 +197,7 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
                                             type="button"
                                             onClick={() => removeRow(rowIdx)}
                                             disabled={rows.length === 1}
-                                            className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors"
+                                            className="p-1.5 text-muted hover:text-rust disabled:opacity-30 transition-colors"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
@@ -208,11 +208,11 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
                     </table>
                 </div>
 
-                <div className="px-4 py-3 border-t border-gray-100">
+                <div className="px-4 py-3 border-t border-edge/50">
                     <button
                         type="button"
                         onClick={addRow}
-                        className="flex items-center gap-2 text-sm font-semibold text-[#043F2E] hover:text-[#032f22] transition-colors"
+                        className="flex items-center gap-2 text-sm font-semibold text-olive-deep hover:text-rust transition-colors"
                     >
                         <Plus className="w-4 h-4" />
                         Add Row
@@ -220,13 +220,13 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
                 </div>
             </div>
 
-            <p className="text-xs text-gray-400 text-center">{rows.length} {rows.length === 1 ? 'entry' : 'entries'}</p>
+            <p className="text-xs text-muted text-center">{rows.length} {rows.length === 1 ? 'entry' : 'entries'}</p>
 
             {!previewMode && (
                 <button
                     type="button"
                     onClick={handleSubmit}
-                    className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors"
+                    className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors"
                 >
                     Submit Form
                 </button>

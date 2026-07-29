@@ -38,13 +38,13 @@ export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps
     const busy = status === 'processing' || fill.isPending;
 
     return (
-        <div className="flex flex-col gap-1.5 rounded-2xl border border-[#043F2E]/20 bg-[#F5F8F2] p-4">
+        <div className="flex flex-col gap-1.5 rounded-2xl border border-olive-deep/20 bg-bone-light p-4">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#043F2E]" />
+                    <Sparkles className="h-4 w-4 text-olive-deep" />
                     <div>
-                        <p className="text-sm font-bold text-[#043F2E]">Fill form by voice</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-bold text-olive-deep">Fill form by voice</p>
+                        <p className="text-xs text-muted">
                             Speak once — say the fields and one table row. Unclear values get flagged.
                         </p>
                     </div>
@@ -54,13 +54,13 @@ export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps
                     <button
                         type="button"
                         onClick={stopRecording}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rust px-4 py-2 text-sm font-semibold text-canvas hover:bg-rust/90"
                     >
                         <MicOff className="h-4 w-4 animate-pulse" />
                         Stop
                     </button>
                 ) : busy ? (
-                    <span className="inline-flex shrink-0 items-center gap-1.5 px-3 text-sm text-gray-500">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 px-3 text-sm text-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Filling…
                     </span>
@@ -68,7 +68,7 @@ export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps
                     <button
                         type="button"
                         onClick={() => void startRecording()}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#043F2E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#032f22]"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-olive-deep px-4 py-2 text-sm font-semibold text-bone-light hover:bg-olive-deep/90"
                     >
                         <Mic className="h-4 w-4" />
                         Speak
@@ -76,7 +76,7 @@ export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps
                 )}
             </div>
             {(error || fill.error) && (
-                <p role="alert" className="text-xs font-semibold text-red-600">
+                <p role="alert" className="text-xs font-semibold text-rust">
                     {error ?? fill.error?.message}
                 </p>
             )}

@@ -13,23 +13,23 @@ export function FormSuccessScreen({ formTitle, onBack }: Props) {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-            <div className="bg-green-50 rounded-full p-6 mb-6">
-                <CheckCircle2 className="w-20 h-20 text-green-500" />
+            <div className="bg-live/10 rounded-full p-6 mb-6">
+                <CheckCircle2 className="w-20 h-20 text-live" />
             </div>
-            <h2 className="text-3xl font-bold text-[#043F2E] mb-2">Form Submitted!</h2>
-            <p className="text-gray-600 text-lg mb-1 font-medium">{formTitle}</p>
-            <p className="text-gray-400 text-sm mb-8">
+            <h2 className="text-3xl font-bold text-olive-deep mb-2">Form Submitted!</h2>
+            <p className="text-ink text-lg mb-1 font-medium">{formTitle}</p>
+            <p className="text-muted text-sm mb-8">
                 {dateStr} — {timeStr}
             </p>
             <button
                 onClick={onBack}
-                className="bg-[#043F2E] hover:bg-[#032f22] text-white px-8 py-3 rounded-xl font-bold text-base transition-colors"
+                className="bg-olive-deep hover:bg-olive-deep/90 text-bone-light px-8 py-3 rounded-xl font-bold text-base transition-colors"
             >
                 Back to Forms
             </button>
             <Link
                 to="/app/bin"
-                className="mt-4 text-sm text-gray-400 hover:text-gray-600 underline underline-offset-4"
+                className="mt-4 text-sm text-muted hover:text-olive-deep underline underline-offset-4"
             >
                 Go to Scanner
             </Link>

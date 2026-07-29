@@ -15,9 +15,9 @@ function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
     const voice = showVoice && field.voiceEnabled;
     return (
         <div className="flex items-start justify-between gap-2 mb-1">
-            <label className="block text-sm font-semibold text-gray-700 flex-1">
+            <label className="block text-sm font-semibold text-ink flex-1">
                 {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                {field.required && <span className="text-rust ml-0.5">*</span>}
             </label>
             {voice && (
                 <VoiceFieldButton
@@ -33,14 +33,14 @@ function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
 }
 
 const inputCls =
-    'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#043F2E] focus:border-transparent disabled:bg-gray-50';
-const errorCls = 'text-red-600 text-xs mt-1';
-const flagRing = 'ring-2 ring-amber-400 border-amber-400';
+    'w-full border border-edge rounded-lg px-3 py-2.5 text-ink text-sm focus:outline-none focus:ring-2 focus:ring-rust focus:border-transparent disabled:bg-bone-light/50';
+const errorCls = 'text-rust text-xs mt-1';
+const flagRing = 'ring-2 ring-warn border-warn';
 
 /** Shows the required-field error, or (when clean) the amber voice-fill review hint. */
 function FieldHint({ flagged, error }: { flagged?: boolean; error?: string }) {
     if (error) return <p className={errorCls}>{error}</p>;
-    if (flagged) return <p className="text-amber-600 text-xs mt-1">Check this — voice fill wasn&apos;t sure</p>;
+    if (flagged) return <p className="text-warn text-xs mt-1">Check this — voice fill wasn&apos;t sure</p>;
     return null;
 }
 
@@ -160,9 +160,9 @@ export function RadioInput({ field, value, onChange, error, flagged }: BaseProps
                             value={opt}
                             checked={value === opt}
                             onChange={() => onChange(opt)}
-                            className="accent-[#043F2E] w-4 h-4"
+                            className="accent-olive-deep w-4 h-4"
                         />
-                        <span className="text-sm text-gray-800">{opt}</span>
+                        <span className="text-sm text-ink">{opt}</span>
                     </label>
                 ))}
             </div>
@@ -184,9 +184,9 @@ export function YesNoInput({ field, value, onChange, error, flagged }: BaseProps
                         className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors ${
                             value === opt
                                 ? opt === 'Yes'
-                                    ? 'bg-green-600 text-white border-green-600'
-                                    : 'bg-red-600 text-white border-red-600'
-                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                                    ? 'bg-live text-white border-live'
+                                    : 'bg-rust text-canvas border-rust'
+                                : 'bg-white text-ink border-edge hover:border-muted'
                         }`}
                     >
                         {opt}

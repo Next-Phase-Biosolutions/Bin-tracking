@@ -145,11 +145,11 @@ export function StandardFormRenderer({
                 <VoiceFormFillButton formId={formId} onFill={applyVoiceFill} />
             )}
             {showInstructions && instructions?.trim() && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-800">
+                <div className="rounded-2xl border border-edge bg-bone-light p-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-olive-deep">
                         Instructions
                     </p>
-                    <p className="whitespace-pre-line text-sm leading-relaxed text-amber-900">
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-ink">
                         {instructions}
                     </p>
                 </div>
@@ -163,10 +163,10 @@ export function StandardFormRenderer({
                 return (
                     <div
                         key={section.id}
-                        className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+                        className="rounded-2xl border border-edge bg-white p-5 shadow-sm"
                     >
                         {section.title && (
-                            <h3 className="mb-4 border-b border-gray-100 pb-2 text-base font-bold text-[#043F2E]">
+                            <h3 className="mb-4 border-b border-edge/50 pb-2 text-base font-bold text-olive-deep">
                                 {section.title}
                             </h3>
                         )}
@@ -216,7 +216,7 @@ export function StandardFormRenderer({
                 <button
                     type="button"
                     onClick={handleSubmit}
-                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#043F2E] py-4 text-lg font-bold text-white shadow-md transition-colors hover:bg-[#032f22]"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep py-4 text-lg font-bold text-bone-light shadow-md transition-colors hover:bg-olive-deep/90"
                 >
                     Submit Form
                 </button>

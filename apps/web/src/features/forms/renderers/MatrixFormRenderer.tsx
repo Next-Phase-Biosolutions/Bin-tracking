@@ -68,7 +68,7 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
         <div className="flex flex-col gap-5">
             {/* Header fields */}
             {schema.headerFields.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="bg-white rounded-2xl border border-edge p-5 shadow-sm">
                     <div className="grid grid-cols-2 gap-4">
                         {schema.headerFields.map((f) => (
                             <div key={f.id} className={f.type === 'textarea' ? 'col-span-2' : ''}>
@@ -88,23 +88,23 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
             )}
 
             {/* Matrix table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-edge shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="bg-[#043F2E]">
-                                <th className="text-left text-white px-4 py-3 font-semibold w-1/3">Component</th>
+                            <tr className="bg-olive-deep">
+                                <th className="text-left text-bone-light px-4 py-3 font-semibold w-1/3">Component</th>
                                 {schema.columns.map((col) => (
-                                    <th key={col.id} className="text-center text-white px-3 py-3 font-semibold text-xs leading-tight">
+                                    <th key={col.id} className="text-center text-bone-light px-3 py-3 font-semibold text-xs leading-tight">
                                         {col.label}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-edge/50">
                             {schema.rows.map((row, idx) => (
-                                <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                    <td className="px-4 py-3 text-gray-800 leading-snug text-xs align-top">
+                                <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-bone-light/50'}>
+                                    <td className="px-4 py-3 text-ink leading-snug text-xs align-top">
                                         {row.label}
                                     </td>
                                     {schema.columns.map((col) => {
@@ -121,9 +121,9 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
                                                                 className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${
                                                                     cell.answer === ans
                                                                         ? ans === 'YES'
-                                                                            ? 'bg-green-600 text-white border-green-600'
-                                                                            : 'bg-red-600 text-white border-red-600'
-                                                                        : 'bg-white text-gray-500 border-gray-300'
+                                                                            ? 'bg-live text-white border-live'
+                                                                            : 'bg-rust text-canvas border-rust'
+                                                                        : 'bg-white text-muted border-edge'
                                                                 }`}
                                                             >
                                                                 {ans}
@@ -136,7 +136,7 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
                                                             placeholder="Ingredient"
                                                             value={cell.ingredient}
                                                             onChange={(e) => setCellIngredient(row.id, col.id, e.target.value)}
-                                                            className="w-24 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#043F2E]"
+                                                            className="w-24 border border-edge rounded px-2 py-1 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-rust"
                                                         />
                                                     )}
                                                 </div>
@@ -152,7 +152,7 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
 
             {/* Footer fields */}
             {(schema.footerFields ?? []).length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="bg-white rounded-2xl border border-edge p-5 shadow-sm">
                     <div className="flex flex-col gap-4">
                         {(schema.footerFields ?? []).map((f) => (
                             <FieldInput
@@ -173,7 +173,7 @@ export function MatrixFormRenderer({ schema, onSubmit }: Props) {
             <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full bg-[#043F2E] hover:bg-[#032f22] text-white py-4 rounded-xl text-lg font-bold transition-colors mt-2"
+                className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
             >
                 Submit Form
             </button>
