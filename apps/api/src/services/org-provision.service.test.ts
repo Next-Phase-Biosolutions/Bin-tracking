@@ -40,6 +40,7 @@ function makeFakePrisma(): any {
         organization: { create: ({ data }: { data: { name: string; slug: string } }) => Promise.resolve({ id: 'org-new', ...data }) },
         organizationMember,
         binType: { createMany: () => Promise.resolve({ count: 0 }) },
+        formTemplate: { createMany: () => Promise.resolve({ count: 0 }) },
         settings: { create: () => Promise.resolve({}) },
         subscription: { create: () => Promise.resolve({}) },
         organizationModule,

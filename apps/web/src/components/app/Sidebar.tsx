@@ -40,6 +40,8 @@ function NavGroup({
     pathname,
     hasModule,
     subscriptionLoading,
+    orgRole,
+    roleLoading,
     collapsed,
 }: {
     title: string;
@@ -47,9 +49,15 @@ function NavGroup({
     pathname: string;
     hasModule: (key: NonNullable<NavItem['module']>) => boolean;
     subscriptionLoading: boolean;
+    orgRole: string | null | undefined;
+    roleLoading: boolean;
     collapsed: boolean;
 }) {
-    const visibleItems = items.filter((item) => !item.module || (!subscriptionLoading && hasModule(item.module)));
+    const visibleItems = items.filter((item) => {
+        if (item.module && (subscriptionLoading || !hasModule(item.module))) return false;
+        if (item.roles && (roleLoading || !orgRole || !(item.roles as string[]).includes(orgRole))) return false;
+        return true;
+    });
     if (visibleItems.length === 0) return null;
 
     return (
@@ -83,6 +91,10 @@ export function Sidebar({
     const pathname = useLocation().pathname;
     const { user, logout } = useAuth();
     const { hasModule, modulesReady } = useSubscription();
+    // Role-gated nav items (e.g. Employees) need ctx.orgRole — this is the
+    // same auth.me query ProfileChip below already fetches, deduped by
+    // React Query rather than a second network round-trip.
+    const me = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
     // Platform-admin flag is NOT on auth.me — it's the org-independent DB flag
     // served by admin.whoAmI. Server-side platformAdminProcedure is the real
     // gate; this only decides whether to show the nav entry.
@@ -130,9 +142,9 @@ export function Sidebar({
             </div>
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
-                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} collapsed={collapsed} />
+                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
                 {platformNav.length > 0 ? (
-                    <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} collapsed={collapsed} />
+                    <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
                 ) : null}
             </nav>
 

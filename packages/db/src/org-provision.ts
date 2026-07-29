@@ -3,6 +3,7 @@ import type { DbClient } from './client.js';
 import { Urgency } from '@prisma/client';
 import type { Plan } from '@bin-tracker/types';
 import { reconcileModulesForPlan } from './module-service.js';
+import { DEFAULT_FORM_TEMPLATES } from './default-form-templates.js';
 
 /**
  * Default bin-type set every new organization gets on creation.
@@ -80,6 +81,18 @@ export async function provisionOrganization(
 
         await tx.binType.createMany({
             data: DEFAULT_BIN_TYPES.map((binType) => ({ ...binType, organizationId: org.id })),
+        });
+
+        // sortOrder is scoped per (organizationId, stage) — see form.service.ts's
+        // create(), which assigns it the same way. A brand-new org has no forms
+        // yet, so this is just each stage's running position in list order.
+        const sortOrderByStage = new Map<string, number>();
+        await tx.formTemplate.createMany({
+            data: DEFAULT_FORM_TEMPLATES.map((form) => {
+                const sortOrder = sortOrderByStage.get(form.stage) ?? 0;
+                sortOrderByStage.set(form.stage, sortOrder + 1);
+                return { ...form, sortOrder, organizationId: org.id };
+            }),
         });
 
         await tx.settings.create({

@@ -167,6 +167,24 @@ export const employeeService = {
     },
 
     /**
+     * Minimal active-employee list for non-admin pickers (e.g. "employee
+     * received" on animal intake). Deliberately excludes qrCode — the badge
+     * credential attendance.scan accepts as a bearer token — along with rate
+     * and bank fields, so any org member can pick a name without being able
+     * to view or reproduce another employee's check-in badge.
+     */
+    async listForPicker(orgId: string): Promise<Array<{ id: string; fullName: string; employeeCode: string }>> {
+        return prisma.employee.findMany({
+            where: {
+                organizationId: orgId,
+                status: 'ACTIVE',
+            },
+            select: { id: true, fullName: true, employeeCode: true },
+            orderBy: { fullName: 'asc' },
+        });
+    },
+
+    /**
      * Set (or clear, with null) an employee's per-employee pay rate override.
      * Routed through getEmployeeInOrg first, so an employeeId from another org
      * fails NOT_FOUND before the update by verified id. Caller is ops+admin only

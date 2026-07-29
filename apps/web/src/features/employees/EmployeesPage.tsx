@@ -59,6 +59,17 @@ export default function EmployeesPage() {
         );
     }
 
+    // Employee badges (qrCode) are check-in credentials — the API itself
+    // already 403s this for non-admin roles (orgOpsProcedure), this just
+    // avoids showing a broken page to someone who reached the URL directly.
+    if (me.data?.orgRole !== 'ADMIN' && me.data?.orgRole !== 'OPS_MANAGER') {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted">
+                Employees is available to admins and ops managers only.
+            </div>
+        );
+    }
+
     const rows = listQuery.data ?? [];
     const colCount = canManageRates ? 7 : 6;
     // ponytail: counts derived from the (capped) list rather than a dedicated

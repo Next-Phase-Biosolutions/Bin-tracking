@@ -8,6 +8,8 @@ export interface NavItem {
     icon: string;
     /** When set, the link only renders if the org's subscription has this module enabled — mirrors the gating the dashboard's old inline sidebar enforced. */
     module?: ModuleKey;
+    /** When set, the link only renders for these org roles (ctx.orgRole). Omit for no restriction. */
+    roles?: Array<'ADMIN' | 'OPS_MANAGER' | 'DRIVER' | 'WORKER'>;
 }
 
 /** OPERATIONS — people, logistics, records, compliance. Main Dashboard/Driver/Bin are core tracking, never gated. */
@@ -18,8 +20,8 @@ export const operationsNav: NavItem[] = [
     { label: 'Shipments', href: '/app/shipments', icon: 'box', module: 'SHIPMENTS' },
     { label: 'Animal Registration', href: '/app/animalregistration', icon: 'cow', module: 'ANIMAL_INTAKE' },
     { label: 'Animal Records', href: '/app/animals', icon: 'form', module: 'ANIMAL_INTAKE' },
-    { label: 'Employees', href: '/app/employees', icon: 'users', module: 'WORKFORCE' },
-    { label: 'Employee Registration', href: '/app/employees/register', icon: 'badge', module: 'WORKFORCE' },
+    { label: 'Employees', href: '/app/employees', icon: 'users', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
+    { label: 'Employee Registration', href: '/app/employees/register', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
     { label: 'Employee Scanner', href: '/app/guard', icon: 'badge', module: 'WORKFORCE' },
     { label: 'Timesheet', href: '/app/timesheet', icon: 'clock', module: 'WORKFORCE' },
     { label: 'Payroll', href: '/app/payroll', icon: 'clock', module: 'PAYROLL' },
