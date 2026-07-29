@@ -46,6 +46,7 @@ export default function EmployeeRegisterPage() {
         onSuccess: (employee) => setRegistered(employee),
     });
     const { hasModule, isLoading } = useSubscription();
+    const me = trpc.auth.me.useQuery();
 
     if (isLoading) {
         return (
@@ -59,6 +60,16 @@ export default function EmployeeRegisterPage() {
         return (
             <div className="flex min-h-[60vh] items-center justify-center">
                 <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
+
+    // register is orgOpsProcedure server-side — this just avoids showing a
+    // form that would 403 on submit to someone who reached the URL directly.
+    if (me.data?.orgRole !== 'ADMIN' && me.data?.orgRole !== 'OPS_MANAGER') {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted">
+                Employee registration is available to admins and ops managers only.
             </div>
         );
     }

@@ -31,7 +31,7 @@ export default function FarmerRegistrationPage() {
 
     const { data: employees = [] } = useQuery({
         queryKey: ['farmer-registration-employees'],
-        queryFn: () => apiClient.employee.list.query({ status: 'ACTIVE', limit: 200 }),
+        queryFn: () => apiClient.employee.listForPicker.query(),
     });
 
     const transcribeMutation = useMutation({

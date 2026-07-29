@@ -20,21 +20,34 @@ export const employeeRouter = router({
             return employeeService.register(input, ctx.orgId);
         }),
 
-    /** List employees (optionally filtered by status / search). Per-employee
-     * rates are stripped for non-ADMIN/OPS callers (ctx.orgRole). */
-    list: orgProcedure
+    /** List employees (optionally filtered by status / search), including
+     * each employee's badge (qrCode) — the same code attendance.scan accepts
+     * as a bearer credential. ADMIN/OPS_MANAGER only: any org member could
+     * otherwise view (and reproduce) another employee's check-in badge. Rates
+     * are additionally stripped unless the PAYROLL module is on. */
+    list: orgOpsProcedure
         .use(requireModule('WORKFORCE'))
         .input(employeeListSchema)
         .query(async ({ input, ctx }) => {
             return employeeService.list(ctx.orgId, input, ctx.orgRole);
         }),
 
-    /** Fetch a single employee by id (rate stripped for non-ADMIN/OPS callers) */
-    getById: orgProcedure
+    /** Fetch a single employee by id — same badge-exposure reasoning as
+     * `list`, so ADMIN/OPS_MANAGER only. */
+    getById: orgOpsProcedure
         .use(requireModule('WORKFORCE'))
         .input(employeeGetByIdSchema)
         .query(async ({ input, ctx }) => {
             return employeeService.getById(ctx.orgId, input.id, ctx.orgRole);
+        }),
+
+    /** Minimal active-employee picker (id/name/code, no badge) for non-admin
+     * flows like animal-intake's "employee received" field. Open to any org
+     * member — see employeeService.listForPicker for why it's safe. */
+    listForPicker: orgProcedure
+        .use(requireModule('WORKFORCE'))
+        .query(async ({ ctx }) => {
+            return employeeService.listForPicker(ctx.orgId);
         }),
 
     /** Set or clear (null) an employee's per-employee pay rate override.

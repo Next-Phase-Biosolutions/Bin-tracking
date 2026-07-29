@@ -107,6 +107,11 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            fullName: {...} } }` is on the line below the call, org is the
 #            function's own orgId parameter, never client input.
 #
+# Employee picker (employee.service.ts, listForPicker) entry:
+#   [FILTER] return prisma.employee.findMany({ — `where: { organizationId:
+#            orgId, status: 'ACTIVE' } }` is on the lines below the call; orgId
+#            is the function's own parameter (ctx.orgId), never client input.
+#
 # Employee bank-details self-serve link (employee.service.ts) entries:
 #   [VERIFIED-ID] await prisma.employee.update({ in requestBankDetails —
 #            updates the SAME row returned by getEmployeeInOrg(orgId, ...)
@@ -175,6 +180,7 @@ apps/api/src/services/employee.service.ts	const employee = await prisma.employee
 apps/api/src/services/employee.service.ts	return await prisma.employee.create({
 apps/api/src/services/employee.service.ts	const employees = await prisma.employee.findMany({
 apps/api/src/services/employee.service.ts	prisma.employee.update({ where: { id: employeeId }, data: { hourlyRateCents } }),
+apps/api/src/services/employee.service.ts	return prisma.employee.findMany({
 apps/api/src/services/facility.service.ts	const facility = await prisma.facility.findFirst({
 apps/api/src/services/facility.service.ts	prisma.facility.count({ where }),
 apps/api/src/services/facility.service.ts	prisma.facility.findMany({
