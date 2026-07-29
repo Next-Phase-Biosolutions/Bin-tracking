@@ -23,7 +23,8 @@
         "build": "tsc --noEmit",
         "typecheck": "tsc --noEmit",
         "clean": "rm -rf dist node_modules/.prisma",
-        "backfill:org": "tsx --env-file=../../.env src/backfill-org.ts"
+        "backfill:org": "tsx --env-file=../../.env src/backfill-org.ts",
+        "backfill:forms": "tsx --env-file=../../.env src/backfill-forms.ts"
     },
     "dependencies": {
         "@bin-tracker/types": "workspace:*",
