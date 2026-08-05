@@ -198,6 +198,7 @@ enum ModuleKey {
   FORMS_AI_DIGITIZE
   BLOCKCHAIN_ANCHOR
   PAYROLL
+  ENVIRONMENT_MONITORING
 }
 
 model OrganizationModule {

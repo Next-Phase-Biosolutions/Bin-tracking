@@ -93,6 +93,11 @@ interface FakeShipment {
     receivedAt: Date;
 }
 
+interface FakeSensorDevice {
+    id: string;
+    organizationId: string;
+}
+
 interface FakeFormTemplate {
     id: string;
     organizationId: string;
@@ -120,6 +125,7 @@ const store = vi.hoisted(() => {
         facilities: [] as FakeFacility[],
         cycles: [] as FakeCycle[],
         shipments: [] as FakeShipment[],
+        sensorDevices: [] as FakeSensorDevice[],
         formTemplates: [] as FakeFormTemplate[],
         seq: 0,
     };
@@ -252,6 +258,17 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
 
+    const sensorDevice = {
+        findFirst: ({ where }: { where: { id: string; organizationId: string } }) => {
+            const found = store.sensorDevices.find((d) => d.id === where.id && d.organizationId === where.organizationId);
+            return Promise.resolve(found ? { ...found } : null);
+        },
+    };
+
+    const sensorReading = {
+        findMany: () => Promise.resolve([]),
+    };
+
     const formTemplate = {
         findMany: ({ where }: { where: { organizationId: string; stage?: string; isActive?: boolean } }) =>
             Promise.resolve(
@@ -312,6 +329,8 @@ vi.mock('@bin-tracker/db', () => {
         userFacility,
         binCycle,
         shipment,
+        sensorDevice,
+        sensorReading,
         formTemplate,
         eventLog,
         $queryRaw: () => Promise.resolve([]),
@@ -329,6 +348,7 @@ const { cycleService } = await import('./cycle.service.js');
 const { dashboardService } = await import('./dashboard.service.js');
 const { facilityService } = await import('./facility.service.js');
 const { shipmentService } = await import('./shipment.service.js');
+const { sensorService } = await import('./sensor.service.js');
 const { formService } = await import('./form.service.js');
 
 const ORG_A = 'org-a';
@@ -447,6 +467,16 @@ function seedShipment(overrides: Partial<FakeShipment> = {}): FakeShipment {
     return shipment;
 }
 
+function seedSensorDevice(overrides: Partial<FakeSensorDevice> = {}): FakeSensorDevice {
+    const device: FakeSensorDevice = {
+        id: nextId('dev'),
+        organizationId: ORG_A,
+        ...overrides,
+    };
+    store.sensorDevices.push(device);
+    return device;
+}
+
 function seedFormTemplate(overrides: Partial<FakeFormTemplate> = {}): FakeFormTemplate {
     const formTemplate: FakeFormTemplate = {
         id: nextId('form'),
@@ -478,6 +508,7 @@ beforeEach(() => {
     store.facilities.length = 0;
     store.cycles.length = 0;
     store.shipments.length = 0;
+    store.sensorDevices.length = 0;
     store.formTemplates.length = 0;
     store.seq = 0;
 });
@@ -630,6 +661,24 @@ describe('cross-organization tenancy isolation', () => {
             const result = await shipmentService.getById(ORG_A, shipment.id);
 
             expect(result.id).toBe(shipment.id);
+        });
+    });
+
+    describe('sensorService.getDeviceHistory', () => {
+        it('rejects with NOT_FOUND for a foreign-org device, before any reading is returned', async () => {
+            const device = seedSensorDevice({ organizationId: ORG_B });
+
+            await expect(sensorService.getDeviceHistory(ORG_A, device.id, '24h')).rejects.toMatchObject({
+                code: 'NOT_FOUND',
+            });
+        });
+
+        it('resolves history when the device belongs to the requesting org', async () => {
+            const device = seedSensorDevice({ organizationId: ORG_A });
+
+            const result = await sensorService.getDeviceHistory(ORG_A, device.id, '24h');
+
+            expect(result).toEqual([]);
         });
     });
 
