@@ -12,7 +12,8 @@ export type ModuleKey =
     | 'FORMS'              // create + fill forms — form.router, excluding AI digitize
     | 'FORMS_AI_DIGITIZE'  // Gemini photo-to-form digitization — metered, Task 15
     | 'BLOCKCHAIN_ANCHOR'  // Cardano CIP-25 anchoring — blockchain.router
-    | 'PAYROLL';           // requires WORKFORCE — payroll.router
+    | 'PAYROLL'            // requires WORKFORCE — payroll.router
+    | 'ENVIRONMENT_MONITORING'; // sensor devices/readings — sensor.router
 
 /** Compile-time exhaustiveness check: every ModuleKey must appear exactly once. */
 const MODULE_KEY_SET: Record<ModuleKey, true> = {
@@ -23,6 +24,7 @@ const MODULE_KEY_SET: Record<ModuleKey, true> = {
     FORMS_AI_DIGITIZE: true,
     BLOCKCHAIN_ANCHOR: true,
     PAYROLL: true,
+    ENVIRONMENT_MONITORING: true,
 };
 
 /** Every gateable module key, in display order — used by the platform-admin panel (Task 16) to render one checkbox column per module. */
@@ -41,6 +43,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
     FORMS_AI_DIGITIZE: 'Create a Form',
     BLOCKCHAIN_ANCHOR: 'Blockchain Anchor',
     PAYROLL: 'Payroll',
+    ENVIRONMENT_MONITORING: 'Environment',
 };
 
 /** For umbrella modules that gate multiple app surfaces: which sidebar items / features they control. */
@@ -64,9 +67,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
 
 /** Default module bundle granted when an org signs up for or upgrades to a plan. */
 export const PLAN_DEFAULT_MODULES: Record<Plan, ModuleKey[]> = {
-    STARTER:    ['WORKFORCE', 'SHIPMENTS'],
-    PRO:        ['ANIMAL_INTAKE', 'WORKFORCE', 'SHIPMENTS', 'FORMS', 'BLOCKCHAIN_ANCHOR', 'PAYROLL'],
-    ENTERPRISE: ['ANIMAL_INTAKE', 'WORKFORCE', 'SHIPMENTS', 'FORMS', 'FORMS_AI_DIGITIZE', 'BLOCKCHAIN_ANCHOR', 'PAYROLL'],
+    STARTER:    ['WORKFORCE', 'SHIPMENTS', 'ENVIRONMENT_MONITORING'],
+    PRO:        ['ANIMAL_INTAKE', 'WORKFORCE', 'SHIPMENTS', 'FORMS', 'BLOCKCHAIN_ANCHOR', 'PAYROLL', 'ENVIRONMENT_MONITORING'],
+    ENTERPRISE: ['ANIMAL_INTAKE', 'WORKFORCE', 'SHIPMENTS', 'FORMS', 'FORMS_AI_DIGITIZE', 'BLOCKCHAIN_ANCHOR', 'PAYROLL', 'ENVIRONMENT_MONITORING'],
 };
 
 const USABLE_STATUSES: readonly SubscriptionStatus[] = ['TRIALING', 'ACTIVE'];
