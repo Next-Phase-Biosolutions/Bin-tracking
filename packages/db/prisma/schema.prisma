@@ -134,6 +134,7 @@ model Organization {
   settings            Settings?
   payrollRuns         PayrollRun[]
   modules             OrganizationModule[]
+  sensorDevices       SensorDevice[]
 
   @@map("organizations")
 }
@@ -277,13 +278,14 @@ model Facility {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id])
-  users        UserFacility[]
-  stations     Station[]
-  bins         Bin[]          @relation("CurrentFacility")
-  cycles       BinCycle[]     @relation("CycleFacility")
-  deliveries   BinCycle[]     @relation("CycleDestination")
-  shipments    Shipment[]     @relation("FacilityShipments")
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  users         UserFacility[]
+  stations      Station[]
+  bins          Bin[]          @relation("CurrentFacility")
+  cycles        BinCycle[]     @relation("CycleFacility")
+  deliveries    BinCycle[]     @relation("CycleDestination")
+  shipments     Shipment[]     @relation("FacilityShipments")
+  sensorDevices SensorDevice[]
 
   @@index([organizationId])
   @@map("facilities")
@@ -303,6 +305,54 @@ model Station {
 
   @@index([facilityId])
   @@map("stations")
+}
+
+model SensorDevice {
+  id             String    @id @default(cuid())
+  organizationId String
+  facilityId     String
+  externalId     String    @unique
+  label          String
+  status         String    @default("ACTIVE")
+  lastSeenAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  facility     Facility        @relation(fields: [facilityId], references: [id])
+  readings     SensorReading[]
+
+  @@index([organizationId])
+  @@index([facilityId])
+  @@map("sensor_devices")
+}
+
+// thresholdStatus is deliberately NOT a stored column — thresholds are
+// vendor-unconfirmed placeholders (see packages/types/src/sensor-thresholds.ts,
+// Action Item 4), so status is computed at read time only, never at insert.
+model SensorReading {
+  id          String   @id @default(cuid())
+  deviceId    String
+  timestamp   DateTime
+  tempC       Float
+  humidityPct Float
+  nh3Ppm      Float?
+  tvoc        Float?
+  eco2Ppm     Float?
+  aqhiPlus    Float?
+  ozonePpb    Float?
+  pressure    Float?
+  pm25        Float?
+
+  device SensorDevice @relation(fields: [deviceId], references: [id])
+
+  // Unique-constraint decision (Action Item 1, step 3, v6): vendor confirmed
+  // legitimate backlog-catchup rows have distinct timestamps — only garbage
+  // rows from the device's one-time Wi-Fi-setup period share a timestamp.
+  // This constraint therefore only ever collapses confirmed-junk rows, never
+  // legitimate data. Action Item 3 must insert via
+  // createMany({ skipDuplicates: true }), not a hand-rolled in-memory dedup.
+  @@unique([deviceId, timestamp])
+  @@map("sensor_readings")
 }
 
 model BinType {
