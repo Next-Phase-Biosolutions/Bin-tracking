@@ -5,11 +5,32 @@ import { Icon } from '../../components/ui/Icon';
 import { TickValue } from '../../components/app/LiveValue';
 import { getZone } from '../../lib/facility-zones-data';
 
+/** Only these zones have a built-out view so far — the rest show a placeholder until wired up. */
+const ACCESSIBLE_ZONE_IDS = new Set(['killfloor', 'wetaging']);
+
 export default function ZonePage() {
     const { zoneId } = useParams<{ zoneId: string }>();
     const zone = zoneId ? getZone(zoneId) : undefined;
 
     if (!zone) return <Navigate to="/app/dashboard" replace />;
+
+    if (!ACCESSIBLE_ZONE_IDS.has(zone.id)) {
+        return (
+            <div className="mx-auto max-w-7xl">
+                <PageHeader
+                    title={`${zone.name} Zone`}
+                    subtitle={zone.tagline}
+                    icon={<Icon name={zone.icon} width={22} height={22} />}
+                />
+                <div className="flex min-h-[40vh] items-center justify-center">
+                    <Card className="w-full max-w-md p-8 text-center">
+                        <Badge tone="idle">Not accessible</Badge>
+                        <p className="mt-4 text-sm text-muted">Feature incoming — this zone view isn&apos;t available yet.</p>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="mx-auto max-w-7xl">
