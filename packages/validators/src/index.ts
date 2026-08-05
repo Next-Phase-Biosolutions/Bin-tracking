@@ -151,3 +151,10 @@ export {
     type FormTranscribeFieldInput,
     type FormFillByVoiceInput,
 } from './form.schema.js';
+
+export {
+    listDevicesSchema,
+    sensorReadingRangeSchema,
+    type ListDevicesInput,
+    type SensorReadingRangeInput,
+} from './sensor.schema.js';
