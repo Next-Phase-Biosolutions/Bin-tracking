@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import TabletPage from './features/tablet/TabletPage';
+import ZonePage from './features/facility-zones/ZonePage';
 import DriverPage from './features/driver/DriverPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import FarmerRegistrationPage from './features/farmer-registration/FarmerRegistrationPage';
@@ -66,6 +67,7 @@ export function App() {
                 <Route path="/app/shipments/new" element={<ShipmentRegisterPage />} />
                 <Route path="/app/driver" element={<DriverPage />} />
                 <Route path="/app/dashboard" element={<DashboardPage />} />
+                <Route path="/app/zones/:zoneId" element={<ZonePage />} />
                 <Route path="/app/employees" element={<EmployeesPage />} />
                 <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
                 <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />

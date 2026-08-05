@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Logo } from './Logo';
 import { Icon } from '../ui/Icon';
-import { operationsNav, type NavItem } from '../../lib/nav';
+import { facilityZonesNav, operationsNav, type NavItem } from '../../lib/nav';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { trpc, getSelectedOrgId } from '../../lib/trpc';
@@ -142,6 +142,7 @@ export function Sidebar({
             </div>
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
+                <NavGroup title="Facility Zones" items={facilityZonesNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
                 <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
                 {platformNav.length > 0 ? (
                     <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />

@@ -27,3 +27,13 @@ export const operationsNav: NavItem[] = [
     { label: 'Payroll', href: '/app/payroll', icon: 'clock', module: 'PAYROLL' },
     { label: 'Forms', href: '/app/forms', icon: 'form', module: 'FORMS' },
 ];
+
+/** FACILITY ZONES — the floor view. Presentation-only (mock data), same as the original design mockup — no module gating. */
+export const facilityZonesNav: NavItem[] = [
+    { label: 'Receiving', href: '/app/zones/receiving', icon: 'truck' },
+    { label: 'Kill Floor', href: '/app/zones/killfloor', icon: 'blade' },
+    { label: 'Processing', href: '/app/zones/processing', icon: 'knife' },
+    { label: 'Wet Aging', href: '/app/zones/wetaging', icon: 'snow' },
+    { label: 'Value Add', href: '/app/zones/valueadd', icon: 'box' },
+    { label: 'Shipping', href: '/app/zones/shipping', icon: 'ship' },
+];
