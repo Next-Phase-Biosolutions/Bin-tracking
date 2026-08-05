@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PLAN_DEFAULT_MODULES, PLAN_LIMITS, defaultModulesForPlan, isSubscriptionUsable } from '@bin-tracker/types';
+import { ALL_MODULE_KEYS, MODULE_LABELS, PLAN_DEFAULT_MODULES, PLAN_LIMITS, defaultModulesForPlan, isSubscriptionUsable } from '@bin-tracker/types';
 
 describe('entitlements', () => {
     it('STARTER does not default-include blockchain or payroll', () => {
@@ -25,5 +25,14 @@ describe('entitlements', () => {
         const keys = Object.keys(PLAN_LIMITS.STARTER);
         expect(Object.keys(PLAN_LIMITS.PRO)).toEqual(keys);
         expect(Object.keys(PLAN_LIMITS.ENTERPRISE)).toEqual(keys);
+    });
+    it('every plan default-includes ENVIRONMENT_MONITORING', () => {
+        expect(defaultModulesForPlan('STARTER')).toContain('ENVIRONMENT_MONITORING');
+        expect(defaultModulesForPlan('PRO')).toContain('ENVIRONMENT_MONITORING');
+        expect(defaultModulesForPlan('ENTERPRISE')).toContain('ENVIRONMENT_MONITORING');
+    });
+    it('ENVIRONMENT_MONITORING is in ALL_MODULE_KEYS with a matching label', () => {
+        expect(ALL_MODULE_KEYS).toContain('ENVIRONMENT_MONITORING');
+        expect(MODULE_LABELS.ENVIRONMENT_MONITORING).toBe('Environment');
     });
 });
