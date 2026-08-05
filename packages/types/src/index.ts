@@ -70,6 +70,6 @@ export type {
     VoiceFilledValue,
     FormVoiceFillResult,
 } from './form.js';
-export { VOICE_FILL_REPEATING_KEY } from './form.js';
+export { VOICE_FILL_REPEATING_KEY, voiceKeys } from './form.js';
 export type { Plan, SubscriptionStatus, ModuleKey, PlanLimits } from './entitlements.js';
 export { PLAN_LIMITS, PLAN_DEFAULT_MODULES, ALL_MODULE_KEYS, MODULE_LABELS, MODULE_SUBLABELS, defaultModulesForPlan, isSubscriptionUsable } from './entitlements.js';

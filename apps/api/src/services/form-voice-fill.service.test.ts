@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { VOICE_FILL_REPEATING_KEY, type RepeatingSchema, type StandardSchema } from '@bin-tracker/types';
 import {
+    VOICE_FILL_REPEATING_KEY,
+    voiceKeys,
+    type ChecklistSchema,
+    type MatrixSchema,
+    type RepeatingSchema,
+    type StandardSchema,
+} from '@bin-tracker/types';
+import {
+    BLANKET_ALL,
+    BLANKET_KEY,
     flattenCatalog,
     buildKeyterms,
+    expandBlanket,
     normalizeVoiceValue,
     mapClaudeResponseToResult,
 } from './form-voice-fill.service.js';
@@ -38,6 +48,35 @@ const repeating: RepeatingSchema = {
     ],
 };
 
+const checklist: ChecklistSchema = {
+    formType: 'checklist',
+    headerFields: [{ id: 'who', type: 'text', label: 'Person Responsible', required: false }],
+    groups: [
+        {
+            id: 'g1',
+            title: 'Equipment',
+            items: [
+                { id: 'i1', label: 'Corrosion resistant' },
+                { id: 'i2', label: 'Free of cracks' },
+            ],
+        },
+    ],
+};
+
+const matrix: MatrixSchema = {
+    formType: 'matrix',
+    headerFields: [{ id: 'supplier', type: 'text', label: 'Supplier Name', required: false }],
+    rows: [
+        { id: 'peanut', label: 'Peanut' },
+        { id: 'milk', label: 'Milk' },
+    ],
+    columns: [
+        { id: 'col_product', label: 'Present in the product' },
+        { id: 'col_line', label: 'Present on same line' },
+    ],
+    footerFields: [{ id: 'procedures', type: 'yes_no', label: 'Procedures in place', required: false }],
+};
+
 describe('flattenCatalog', () => {
     it('flattens standard flat fields and table columns with routing metadata', () => {
         const catalog = flattenCatalog(standard);
@@ -53,8 +92,81 @@ describe('flattenCatalog', () => {
         expect(catalog.every((e) => e.location === 'table' && e.sectionId === VOICE_FILL_REPEATING_KEY)).toBe(true);
     });
 
-    it('returns [] for unsupported form types', () => {
-        expect(flattenCatalog({ formType: 'checklist', headerFields: [], groups: [] })).toEqual([]);
+    it('emits a checklist item as answer + deviation + corrective, blanket only on the answer', () => {
+        const catalog = flattenCatalog(checklist);
+        expect(catalog.map((e) => e.id)).toEqual([
+            'who',
+            'i1',
+            'i1__deviation',
+            'i1__corrective',
+            'i2',
+            'i2__deviation',
+            'i2__corrective',
+        ]);
+        expect(catalog[1]).toMatchObject({ type: 'yes_no', blanketScope: BLANKET_ALL });
+        // Header fields and free text must never be written by a blanket.
+        expect(catalog[0]?.blanketScope).toBeUndefined();
+        expect(catalog[2]?.blanketScope).toBeUndefined();
+    });
+
+    it('scopes each matrix cell blanket to its own column, and covers footer fields', () => {
+        const catalog = flattenCatalog(matrix);
+        expect(catalog.map((e) => e.id)).toEqual([
+            'supplier',
+            'peanut__col_product',
+            'peanut__col_product__ingredient',
+            'peanut__col_line',
+            'peanut__col_line__ingredient',
+            'milk__col_product',
+            'milk__col_product__ingredient',
+            'milk__col_line',
+            'milk__col_line__ingredient',
+            'procedures',
+        ]);
+        expect(catalog[1]).toMatchObject({ type: 'yes_no', blanketScope: 'col_product' });
+        expect(catalog[3]).toMatchObject({ type: 'yes_no', blanketScope: 'col_line' });
+        expect(catalog[2]?.blanketScope).toBeUndefined();
+    });
+
+    it('leaves standard and repeating slots outside blanket reach', () => {
+        expect(flattenCatalog(standard).every((e) => e.blanketScope === undefined)).toBe(true);
+        expect(flattenCatalog(repeating).every((e) => e.blanketScope === undefined)).toBe(true);
+    });
+});
+
+describe('expandBlanket', () => {
+    const catalog = flattenCatalog(checklist);
+
+    it('fills nothing when no blanket was spoken', () => {
+        const { answers, blanketKeys } = expandBlanket(catalog, { k1: { value: 'No', confidence: 'high' } });
+        expect(blanketKeys.size).toBe(0);
+        expect(answers).toEqual({ k1: { value: 'No', confidence: 'high' } });
+    });
+
+    it('covers only unspoken answer slots, never header or free-text slots', () => {
+        const { answers, blanketKeys } = expandBlanket(catalog, {
+            k1: { value: 'No', confidence: 'high' },
+            [BLANKET_KEY]: { value: 'Yes' },
+        });
+        // k0=who, k1=i1 (spoken), k2/k3=i1 text, k4=i2, k5/k6=i2 text
+        expect([...blanketKeys]).toEqual(['k4']);
+        expect(answers.k1).toEqual({ value: 'No', confidence: 'high' });
+        expect(answers.k0).toBeUndefined();
+        expect(answers.k2).toBeUndefined();
+    });
+
+    it('honours a column scope on matrix cells', () => {
+        const matrixCatalog = flattenCatalog(matrix);
+        const { blanketKeys } = expandBlanket(matrixCatalog, {
+            [BLANKET_KEY]: { value: 'No', scope: 'col_product' },
+        });
+        const filled = matrixCatalog.filter((e) => blanketKeys.has(e.key)).map((e) => e.id);
+        expect(filled).toEqual(['peanut__col_product', 'milk__col_product']);
+    });
+
+    it('ignores a blanket with no value', () => {
+        const { blanketKeys } = expandBlanket(catalog, { [BLANKET_KEY]: { value: '  ' } });
+        expect(blanketKeys.size).toBe(0);
     });
 });
 
@@ -73,6 +185,13 @@ describe('normalizeVoiceValue', () => {
         expect(normalizeVoiceValue('yes_no', 'yeah')).toBe('Yes');
         expect(normalizeVoiceValue('yes_no', 'NOPE')).toBe('No');
         expect(normalizeVoiceValue('yes_no', 'maybe')).toBe('maybe');
+    });
+
+    it('maps compliance and allergen phrasings', () => {
+        expect(normalizeVoiceValue('yes_no', 'compliant')).toBe('Yes');
+        expect(normalizeVoiceValue('yes_no', 'Present')).toBe('Yes');
+        expect(normalizeVoiceValue('yes_no', 'not present')).toBe('No');
+        expect(normalizeVoiceValue('yes_no', 'unsatisfactory')).toBe('No');
     });
 
     it('extracts numeric content', () => {
@@ -100,11 +219,11 @@ describe('mapClaudeResponseToResult', () => {
             'the transcript',
         );
         const today = new Date().toISOString().split('T')[0];
-        expect(result.fields.date).toEqual({ value: today, confidence: 'high' });
-        expect(result.fields.species).toEqual({ value: 'beef', confidence: 'high' });
+        expect(result.fields.date).toEqual({ value: today, confidence: 'high', source: 'spoken' });
+        expect(result.fields.species).toEqual({ value: 'beef', confidence: 'high', source: 'spoken' });
         expect(result.tableRows.monitoring).toEqual({
-            temp: { value: '3.1', confidence: 'low' },
-            ok: { value: 'Yes', confidence: 'high' },
+            temp: { value: '3.1', confidence: 'low', source: 'spoken' },
+            ok: { value: 'Yes', confidence: 'high', source: 'spoken' },
         });
         expect(result.transcript).toBe('the transcript');
     });
@@ -116,7 +235,94 @@ describe('mapClaudeResponseToResult', () => {
             't',
         );
         expect(result.fields).toEqual({});
-        expect(result.tableRows.monitoring).toEqual({ temp: { value: '5', confidence: 'low' } });
+        expect(result.tableRows.monitoring).toEqual({
+            temp: { value: '5', confidence: 'low', source: 'spoken' },
+        });
+    });
+
+    it('tags blanket-expanded answers as such and spoken ones as spoken', () => {
+        const result = mapClaudeResponseToResult(
+            checklist,
+            { k4: { value: 'no', confidence: 'high' }, [BLANKET_KEY]: { value: 'yes' } },
+            't',
+        );
+        expect(result.fields[voiceKeys.checklistAnswer('i2')]).toEqual({
+            value: 'No',
+            confidence: 'high',
+            source: 'spoken',
+        });
+        expect(result.fields[voiceKeys.checklistAnswer('i1')]).toEqual({
+            value: 'Yes',
+            confidence: 'high',
+            source: 'blanket',
+        });
+    });
+
+    it('refuses an off-vocabulary yes_no value rather than coercing it to the opposite answer', () => {
+        // The renderers branch on an exact 'Yes'; anything else would land in
+        // the else-arm and mark every item non-compliant / every allergen absent.
+        const checklistResult = mapClaudeResponseToResult(
+            checklist,
+            { [BLANKET_KEY]: { value: 'mostly fine I think' } },
+            't',
+        );
+        expect(checklistResult.fields[voiceKeys.checklistAnswer('i1')]).toBeUndefined();
+        expect(checklistResult.fields[voiceKeys.checklistAnswer('i2')]).toBeUndefined();
+
+        const matrixResult = mapClaudeResponseToResult(
+            matrix,
+            { k1: { value: 'maybe traces', confidence: 'high' } },
+            't',
+        );
+        expect(matrixResult.fields[voiceKeys.matrixCell('peanut', 'col_product')]).toBeUndefined();
+    });
+
+    it('accepts a blanket phrased in compliance wording', () => {
+        const result = mapClaudeResponseToResult(checklist, { [BLANKET_KEY]: { value: 'compliant' } }, 't');
+        expect(result.fields[voiceKeys.checklistAnswer('i1')]).toEqual({
+            value: 'Yes',
+            confidence: 'high',
+            source: 'blanket',
+        });
+    });
+
+    it('forces a checklist item to No when the speaker described a deviation', () => {
+        // Blanket says everything is compliant, but i1 has spoken corrective text.
+        const result = mapClaudeResponseToResult(
+            checklist,
+            {
+                k3: { value: 'resurfaced the table', confidence: 'high' },
+                [BLANKET_KEY]: { value: 'yes' },
+            },
+            't',
+        );
+        expect(result.fields[voiceKeys.checklistAnswer('i1')]).toEqual({
+            value: 'No',
+            confidence: 'high',
+            source: 'spoken',
+        });
+        expect(result.fields[voiceKeys.checklistCorrective('i1')]?.value).toBe('resurfaced the table');
+        // The untouched item still follows the blanket.
+        expect(result.fields[voiceKeys.checklistAnswer('i2')]?.value).toBe('Yes');
+    });
+
+    it('forces a matrix cell to YES when an ingredient was named', () => {
+        const result = mapClaudeResponseToResult(
+            matrix,
+            {
+                k2: { value: 'whey powder', confidence: 'high' },
+                [BLANKET_KEY]: { value: 'no', scope: 'col_product' },
+            },
+            't',
+        );
+        expect(result.fields[voiceKeys.matrixCell('peanut', 'col_product')]).toEqual({
+            value: 'Yes',
+            confidence: 'high',
+            source: 'spoken',
+        });
+        expect(result.fields[voiceKeys.matrixCell('milk', 'col_product')]?.value).toBe('No');
+        // The other column was out of scope — untouched.
+        expect(result.fields[voiceKeys.matrixCell('peanut', 'col_line')]).toBeUndefined();
     });
 
     it('routes repeating columns under the repeating key', () => {
@@ -126,8 +332,8 @@ describe('mapClaudeResponseToResult', () => {
             't',
         );
         expect(result.tableRows[VOICE_FILL_REPEATING_KEY]).toEqual({
-            time: { value: '09:00', confidence: 'high' },
-            reading: { value: '7', confidence: 'high' },
+            time: { value: '09:00', confidence: 'high', source: 'spoken' },
+            reading: { value: '7', confidence: 'high', source: 'spoken' },
         });
     });
 });

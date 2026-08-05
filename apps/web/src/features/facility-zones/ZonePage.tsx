@@ -25,7 +25,6 @@ export default function ZonePage() {
                 <div className="flex min-h-[40vh] items-center justify-center">
                     <Card className="w-full max-w-md p-8 text-center">
                         <Badge tone="idle">Not accessible</Badge>
-                        <p className="mt-4 text-sm text-muted">Feature incoming — this zone view isn&apos;t available yet.</p>
                     </Card>
                 </div>
             </div>

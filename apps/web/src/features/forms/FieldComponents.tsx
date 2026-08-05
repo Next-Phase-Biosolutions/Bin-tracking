@@ -1,33 +1,21 @@
 import type { FormField } from '@bin-tracker/types';
-import { VoiceFieldButton } from './VoiceFieldButton';
 
 interface BaseProps {
     field: FormField;
     value: string;
     onChange: (value: string) => void;
     error?: string;
-    showVoice?: boolean;
     /** AI voice-fill wasn't confident about this value — highlight for review. */
     flagged?: boolean;
 }
 
-function FieldLabelRow({ field, showVoice, onChange }: BaseProps) {
-    const voice = showVoice && field.voiceEnabled;
+function FieldLabelRow({ field }: { field: FormField }) {
     return (
         <div className="flex items-start justify-between gap-2 mb-1">
             <label className="block text-sm font-semibold text-ink flex-1">
                 {field.label}
                 {field.required && <span className="text-rust ml-0.5">*</span>}
             </label>
-            {voice && (
-                <VoiceFieldButton
-                    fieldId={field.id}
-                    fieldLabel={field.label}
-                    fieldType={field.type}
-                    fieldOptions={field.options}
-                    onValue={onChange}
-                />
-            )}
         </div>
     );
 }
@@ -48,10 +36,10 @@ function withFlag(base: string, flagged?: boolean): string {
     return flagged ? `${base} ${flagRing}` : base;
 }
 
-export function TextInput({ field, value, onChange, error, showVoice, flagged }: BaseProps) {
+export function TextInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
+            <FieldLabelRow field={field} />
             <input
                 type="text"
                 className={withFlag(inputCls, flagged)}
@@ -64,10 +52,10 @@ export function TextInput({ field, value, onChange, error, showVoice, flagged }:
     );
 }
 
-export function TextareaInput({ field, value, onChange, error, showVoice, flagged }: BaseProps) {
+export function TextareaInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} showVoice={showVoice} />
+            <FieldLabelRow field={field} />
             <textarea
                 rows={3}
                 className={`${withFlag(inputCls, flagged)} resize-none`}
@@ -83,7 +71,7 @@ export function TextareaInput({ field, value, onChange, error, showVoice, flagge
 export function NumberInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <input
                 type="number"
                 className={withFlag(inputCls, flagged)}
@@ -99,7 +87,7 @@ export function NumberInput({ field, value, onChange, error, flagged }: BaseProp
 export function DateInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <input
                 type="date"
                 className={withFlag(inputCls, flagged)}
@@ -114,7 +102,7 @@ export function DateInput({ field, value, onChange, error, flagged }: BaseProps)
 export function TimeInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <input
                 type="time"
                 className={withFlag(inputCls, flagged)}
@@ -129,7 +117,7 @@ export function TimeInput({ field, value, onChange, error, flagged }: BaseProps)
 export function SelectInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <select
                 className={withFlag(inputCls, flagged)}
                 value={value}
@@ -150,7 +138,7 @@ export function SelectInput({ field, value, onChange, error, flagged }: BaseProp
 export function RadioInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <div className={`flex flex-col gap-2 mt-1 rounded-lg ${flagged ? `${flagRing} p-2` : ''}`}>
                 {(field.options ?? []).map((opt) => (
                     <label key={opt} className="flex items-center gap-2 cursor-pointer">
@@ -174,7 +162,7 @@ export function RadioInput({ field, value, onChange, error, flagged }: BaseProps
 export function YesNoInput({ field, value, onChange, error, flagged }: BaseProps) {
     return (
         <div>
-            <FieldLabelRow field={field} value={value} onChange={onChange} />
+            <FieldLabelRow field={field} />
             <div className={`flex gap-3 mt-1 rounded-lg ${flagged ? `${flagRing} p-2` : ''}`}>
                 {(['Yes', 'No'] as const).map((opt) => (
                     <button
@@ -199,8 +187,7 @@ export function YesNoInput({ field, value, onChange, error, flagged }: BaseProps
 }
 
 /** Renders the correct input component for any FormField */
-export function FieldInput({ field, value, onChange, error, showVoice = true, flagged }: BaseProps) {
-    const voice = showVoice;
+export function FieldInput({ field, value, onChange, error, flagged }: BaseProps) {
     switch (field.type) {
         case 'textarea':
             return (
@@ -209,7 +196,6 @@ export function FieldInput({ field, value, onChange, error, showVoice = true, fl
                     value={value}
                     onChange={onChange}
                     error={error}
-                    showVoice={voice}
                     flagged={flagged}
                 />
             );
@@ -232,7 +218,6 @@ export function FieldInput({ field, value, onChange, error, showVoice = true, fl
                     value={value}
                     onChange={onChange}
                     error={error}
-                    showVoice={voice}
                     flagged={flagged}
                 />
             );

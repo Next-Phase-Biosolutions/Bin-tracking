@@ -138,10 +138,17 @@ export interface FormDigitizeDraft {
 
 // ─── Whole-form voice fill ────────────────────────────────────────────────────
 
-/** A single value extracted from speech, with the model's confidence in it. */
+/**
+ * A single value extracted from speech.
+ *
+ * `source` distinguishes a value the speaker named outright from one expanded
+ * out of a spoken blanket ("everything else is compliant") — only the latter is
+ * surfaced in the review banner. Absent means spoken.
+ */
 export interface VoiceFilledValue {
     value: string;
     confidence: 'high' | 'low';
+    source?: 'spoken' | 'blanket';
 }
 
 /**
@@ -149,6 +156,20 @@ export interface VoiceFilledValue {
  * keyed under this sentinel in `FormVoiceFillResult.tableRows`.
  */
 export const VOICE_FILL_REPEATING_KEY = '__repeating__';
+
+/**
+ * Checklist items and matrix cells have no flat field id, so voice fill routes
+ * them through `FormVoiceFillResult.fields` under these composite keys. The
+ * service builds them and the renderers decode them — keep both sides here.
+ */
+export const voiceKeys = {
+    checklistAnswer: (itemId: string) => itemId,
+    checklistDeviation: (itemId: string) => `${itemId}__deviation`,
+    checklistCorrective: (itemId: string) => `${itemId}__corrective`,
+    /** Matches MatrixFormRenderer's own cell key, so the renderer maps 1:1. */
+    matrixCell: (rowId: string, colId: string) => `${rowId}__${colId}`,
+    matrixIngredient: (rowId: string, colId: string) => `${rowId}__${colId}__ingredient`,
+} as const;
 
 /** Result of one whole-form voice fill: header field values + one row per table. */
 export interface FormVoiceFillResult {
