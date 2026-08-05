@@ -25,7 +25,10 @@
         "clean": "rm -rf dist node_modules/.prisma",
         "backfill:org": "tsx --env-file=../../.env src/backfill-org.ts",
         "backfill:forms": "tsx --env-file=../../.env src/backfill-forms.ts",
-        "enable:sensor-module-demo-org": "tsx --env-file=../../.env src/enable-sensor-module-demo-org.ts"
+        "backfill:sensors": "tsx --env-file=../../.env src/backfill-sensors.ts",
+        "enable:sensor-module-demo-org": "tsx --env-file=../../.env src/enable-sensor-module-demo-org.ts",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@bin-tracker/types": "workspace:*",
@@ -37,7 +40,8 @@
         "@types/pg": "^8.16.0",
         "prisma": "^7.4.0",
         "tsx": "^4.19.0",
-        "typescript": "^5.7.0"
+        "typescript": "^5.7.0",
+        "vitest": "^3.0.0"
     },
     "prisma": {
         "seed": "tsx --env-file=../../.env prisma/seed.local.ts"
