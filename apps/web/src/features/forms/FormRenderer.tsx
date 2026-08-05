@@ -33,9 +33,9 @@ export function FormRenderer({ form, onBack }: Props) {
                     />
                 );
             case 'checklist':
-                return <ChecklistFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} />;
+                return <ChecklistFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
             case 'matrix':
-                return <MatrixFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} />;
+                return <MatrixFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
             case 'repeating':
                 return <RepeatingRowFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
         }

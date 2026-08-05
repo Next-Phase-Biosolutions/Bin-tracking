@@ -8,6 +8,8 @@ import { useVoiceRecorder } from '../farmer-registration/useVoiceRecorder';
 interface VoiceFormFillButtonProps {
     formId: string;
     onFill: (result: FormVoiceFillResult) => void;
+    /** What's worth saying on this form type. Defaults to the table-form phrasing. */
+    hint?: string;
 }
 
 /**
@@ -16,7 +18,11 @@ interface VoiceFormFillButtonProps {
  * populates fields and flags low-confidence values. Mirrors VoiceFieldButton's
  * record → processing → error states, at form scope.
  */
-export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps) {
+export function VoiceFormFillButton({
+    formId,
+    onFill,
+    hint = 'Speak once — say the fields and one table row. Unclear values get flagged.',
+}: VoiceFormFillButtonProps) {
     const { status, startRecording, stopRecording, audioBase64, mimeType, error, clearAudio } =
         useVoiceRecorder();
 
@@ -44,9 +50,7 @@ export function VoiceFormFillButton({ formId, onFill }: VoiceFormFillButtonProps
                     <Sparkles className="h-4 w-4 text-olive-deep" />
                     <div>
                         <p className="text-sm font-bold text-olive-deep">Fill form by voice</p>
-                        <p className="text-xs text-muted">
-                            Speak once — say the fields and one table row. Unclear values get flagged.
-                        </p>
+                        <p className="text-xs text-muted">{hint}</p>
                     </div>
                 </div>
 
