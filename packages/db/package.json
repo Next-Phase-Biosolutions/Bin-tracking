@@ -27,6 +27,7 @@
         "backfill:forms": "tsx --env-file=../../.env src/backfill-forms.ts",
         "backfill:sensors": "tsx --env-file=../../.env src/backfill-sensors.ts",
         "enable:sensor-module-demo-org": "tsx --env-file=../../.env src/enable-sensor-module-demo-org.ts",
+        "seed:sensor-demo": "tsx --env-file=../../.env src/seed-sensor-demo.ts",
         "test": "vitest run",
         "test:watch": "vitest"
     },

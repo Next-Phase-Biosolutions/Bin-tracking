@@ -4,13 +4,42 @@ import { Card, Badge, Reveal, LiveDot, SectionHead } from '../../components/ui/p
 import { Icon } from '../../components/ui/Icon';
 import { TickValue } from '../../components/app/LiveValue';
 import { getZone } from '../../lib/facility-zones-data';
+import { describeLastSeen, sensorIdForZone, toEnvRows } from '../../lib/zone-sensors';
+import { trpc } from '../../lib/trpc';
+import { useSubscription } from '../../context/SubscriptionContext';
 
 /** Only these zones have a built-out view so far — the rest show a placeholder until wired up. */
 const ACCESSIBLE_ZONE_IDS = new Set(['killfloor', 'wetaging']);
 
+/** `UNKNOWN` must not read as green — a device that has never reported is not "OK". */
+const STATUS_TONE = { OK: 'good', WARN: 'warn', ALERT: 'alert', UNKNOWN: 'idle' } as const;
+
 export default function ZonePage() {
     const { zoneId } = useParams<{ zoneId: string }>();
     const zone = zoneId ? getZone(zoneId) : undefined;
+
+    // Live sensor wiring. These hooks run before the early returns below, so
+    // they must tolerate `zone` being undefined.
+    const sensorExternalId = zone ? sensorIdForZone(zone.id) : undefined;
+    const { hasModule, modulesReady } = useSubscription();
+    const devicesQuery = trpc.sensor.listDevices.useQuery(
+        {},
+        {
+            // Skip entirely when the zone has no device mapped or the org lacks
+            // the module — otherwise every zone visit fires a request that can
+            // only come back empty or FORBIDDEN.
+            enabled: sensorExternalId !== undefined && modulesReady && hasModule('ENVIRONMENT_MONITORING'),
+            // The poller writes new rows every ~10 min; without this the card
+            // freezes at whatever it showed on mount.
+            refetchInterval: 60_000,
+            // A module-gated 403 is a permanent answer, not a blip.
+            retry: false,
+        },
+    );
+
+    const device = devicesQuery.data?.devices.find((d) => d.externalId === sensorExternalId);
+    const reading = device?.readings[0];
+    const lastSeen = device ? describeLastSeen(device.lastSeenAt) : null;
 
     if (!zone) return <Navigate to="/app/dashboard" replace />;
 
@@ -30,6 +59,14 @@ export default function ZonePage() {
             </div>
         );
     }
+
+    // Real readings replace the zone's mock atmosphere wholesale when a device
+    // is mapped and reporting; otherwise the mock stands in unchanged, so zones
+    // without a sensor look exactly as they did before. A device that exists but
+    // has not reported yet shows nothing rather than mock numbers — presenting
+    // invented values under a real device's name is the one outcome to avoid.
+    const liveEnv = reading ? toEnvRows(reading) : null;
+    const envRows = liveEnv ?? (device ? [] : zone.env);
 
     return (
         <div className="mx-auto max-w-7xl">
@@ -115,24 +152,66 @@ export default function ZonePage() {
                             <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg opacity-40" />
                             <div className="relative flex items-center justify-between">
                                 <p className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-olive">zone_environment</p>
-                                <span className="flex items-center gap-1.5 font-mono text-[0.56rem] uppercase tracking-[0.12em] text-live">
-                                    <LiveDot /> {zone.envStable ? 'stable' : 'watch'}
-                                </span>
+                                {device ? (
+                                    <Badge tone={STATUS_TONE[device.latestStatus]}>{device.latestStatus}</Badge>
+                                ) : (
+                                    <span className="flex items-center gap-1.5 font-mono text-[0.56rem] uppercase tracking-[0.12em] text-live">
+                                        <LiveDot /> {zone.envStable ? 'stable' : 'watch'}
+                                    </span>
+                                )}
                             </div>
                             <div className="relative mt-4 space-y-3">
-                                {zone.env.map((e) => (
+                                {envRows.length === 0 ? (
+                                    <p className="py-4 text-center font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted">
+                                        awaiting first reading
+                                    </p>
+                                ) : null}
+                                {envRows.map((e) => (
                                     <div key={e.label} className="flex items-center justify-between border-b border-edge/60 pb-3 last:border-0 last:pb-0">
                                         <span className="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-olive">{e.label}</span>
                                         <span className="font-display text-xl font-bold text-olive-deep">
-                                            <TickValue base={e.value} unit={e.unit} decimals={e.decimals} />
+                                            {liveEnv ? (
+                                                <span className="tnum">
+                                                    {e.value.toLocaleString('en-US', {
+                                                        minimumFractionDigits: e.decimals ?? 1,
+                                                        maximumFractionDigits: e.decimals ?? 1,
+                                                    })}
+                                                    <span className="ml-0.5 text-[0.7em] opacity-60">{e.unit}</span>
+                                                </span>
+                                            ) : (
+                                                // Mock readings only — never wobble a real sensor value.
+                                                <TickValue base={e.value} unit={e.unit} decimals={e.decimals} />
+                                            )}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                            <div className="relative mt-4 flex items-center gap-2 rounded-lg bg-bone-light px-3 py-2.5">
-                                <Icon name="check" width={14} height={14} className="text-live" />
-                                <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted">environment stable</span>
-                            </div>
+                            {lastSeen ? (
+                                <div
+                                    className={`relative mt-4 flex items-center gap-2 rounded-lg px-3 py-2.5 ${
+                                        lastSeen.isStale ? 'bg-warn/10' : 'bg-bone-light'
+                                    }`}
+                                >
+                                    <Icon
+                                        name={lastSeen.isStale ? 'refresh' : 'check'}
+                                        width={14}
+                                        height={14}
+                                        className={lastSeen.isStale ? 'text-warn' : 'text-live'}
+                                    />
+                                    <span
+                                        className={`font-mono text-[0.6rem] uppercase tracking-[0.12em] ${
+                                            lastSeen.isStale ? 'text-warn' : 'text-muted'
+                                        }`}
+                                    >
+                                        {device?.label ?? 'sensor'} · {lastSeen.text}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="relative mt-4 flex items-center gap-2 rounded-lg bg-bone-light px-3 py-2.5">
+                                    <Icon name="check" width={14} height={14} className="text-live" />
+                                    <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted">environment stable</span>
+                                </div>
+                            )}
                         </Card>
                     </Reveal>
                 </div>
