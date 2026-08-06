@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ParsedSensorReading } from './ecosafesense.client.js';
 
 interface FakeReading {
@@ -15,7 +15,14 @@ const store = vi.hoisted(() => ({
 
 vi.mock('./client.js', () => {
     const prisma = {
+        organization: {
+            findUniqueOrThrow: () => Promise.resolve({ id: 'org-1', slug: 'default' }),
+        },
+        facility: {
+            findUniqueOrThrow: () => Promise.resolve({ id: 'fac-1', organizationId: 'org-1' }),
+        },
         sensorDevice: {
+            upsert: () => Promise.resolve({ ...store.device }),
             findUniqueOrThrow: ({ where }: { where: { id: string } }) => {
                 if (where.id !== store.device.id) throw new Error('not found');
                 return Promise.resolve({ ...store.device });
@@ -48,7 +55,21 @@ vi.mock('./client.js', () => {
     return { prisma };
 });
 
-const { runCycle } = await import('./backfill-sensors.js');
+// Hoisted so the EcoSafeSenseClient mock below can reach it — each test swaps
+// in the fetchReadings behaviour it needs before calling main().
+const vendor = vi.hoisted(() => ({
+    fetchReadings: vi.fn(),
+    listDevices: vi.fn(),
+}));
+
+vi.mock('./ecosafesense.client.js', () => ({
+    EcoSafeSenseClient: class {
+        fetchReadings = vendor.fetchReadings;
+        listDevices = vendor.listDevices;
+    },
+}));
+
+const { runCycle, main } = await import('./backfill-sensors.js');
 
 function reading(timestamp: string, tempC = 4): ParsedSensorReading {
     return {
@@ -75,6 +96,66 @@ const baseConfig = {
     facilityId: 'fac-1',
     backfillLookbackDays: 30,
 };
+
+// Action Item 10: the initial (pre-setInterval) cycle must catch and continue,
+// not propagate to main().catch() -> process.exit(1). Under `restart:
+// unless-stopped` an unprotected throw turns a transient vendor hiccup into a
+// full container restart instead of one logged, skipped cycle.
+describe('main — first-cycle failure resilience', () => {
+    beforeEach(() => {
+        store.device = { id: 'device-1', externalId: 'ext-1', organizationId: 'org-1', facilityId: 'fac-1', lastSeenAt: null };
+        store.readings = [];
+        store.nextId = 1;
+        vi.useFakeTimers(); // main() ends in setInterval; fake timers stop it holding the test open.
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vendor.listDevices.mockResolvedValue([]);
+        process.env['ECOSAFESENSE_BASE_URL'] = 'https://vendor.example';
+        process.env['ECOSAFESENSE_CLIENT_ID'] = 'id';
+        process.env['ECOSAFESENSE_CLIENT_SECRET'] = 'secret';
+        process.env['ECOSAFESENSE_DEVICE_ID'] = 'ext-1';
+        process.env['SENSOR_FACILITY_ID'] = 'fac-1';
+    });
+
+    afterEach(() => {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+        for (const k of [
+            'ECOSAFESENSE_BASE_URL',
+            'ECOSAFESENSE_CLIENT_ID',
+            'ECOSAFESENSE_CLIENT_SECRET',
+            'ECOSAFESENSE_DEVICE_ID',
+            'SENSOR_FACILITY_ID',
+        ]) {
+            delete process.env[k];
+        }
+    });
+
+    it('does not reject when the very first cycle throws — it logs and reaches the poll loop', async () => {
+        vendor.fetchReadings.mockRejectedValueOnce(new Error('401 from vendor on first cycle'));
+
+        // The assertion that matters: main() resolves rather than rejecting.
+        // A rejection here is exactly what would hit process.exit(1) in prod.
+        await expect(main()).resolves.toBeUndefined();
+
+        expect(console.error).toHaveBeenCalledWith(
+            expect.stringContaining('initial cycle failed, continuing to poll loop anyway'),
+            expect.any(Error),
+        );
+        // Reached the poll loop despite the failure.
+        expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('still reaches the poll loop on a clean first cycle', async () => {
+        vendor.fetchReadings.mockResolvedValue({ readings: [], fieldsUsed: [] });
+
+        await expect(main()).resolves.toBeUndefined();
+
+        expect(console.error).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(1);
+    });
+});
 
 describe('runCycle', () => {
     beforeEach(() => {

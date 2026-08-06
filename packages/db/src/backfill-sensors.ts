@@ -5,10 +5,15 @@ import { EcoSafeSenseClient } from './ecosafesense.client.js';
 
 /**
  * Historical backfill + 10-min repeat poll for EcoSafeSense sensor data
- * (docs/sensor-integration/03_backfill_script.md). Demo-scoped stand-in for
- * a future BullMQ worker — a plain interval loop, not production
- * infrastructure. Meant to run under `nohup ... &` for the demo window (see
- * "How To Test" in the doc); does not exit on its own.
+ * (docs/sensor-integration/03_backfill_script.md). A plain interval loop that
+ * never exits on its own.
+ *
+ * Runs in production as the `sensor-poller` container
+ * (infra/vps/bintracker-api/docker-compose.yml), supervised by Docker's
+ * `restart: unless-stopped` — the same pattern `worker` uses. It was
+ * originally a hand-started `nohup` process; that is no longer how it runs,
+ * and shouldn't be: an unsupervised local process meant readings silently
+ * stopped updating whenever the laptop running it slept.
  *
  * Does NOT compute or store threshold status — that's read-time only, via
  * the service layer (Action Item 4, a separate file this script must not
@@ -132,7 +137,8 @@ export async function runCycle(
     );
 }
 
-async function main(): Promise<void> {
+/** Exported for the first-cycle-resilience test; the isMainModule guard below keeps importing it side-effect-free. */
+export async function main(): Promise<void> {
     const config = loadConfig();
     const client = new EcoSafeSenseClient({
         baseUrl: config.baseUrl,
@@ -149,11 +155,17 @@ async function main(): Promise<void> {
     console.log(`[backfill-sensors] vendor device list (GET /api/v1/sensors): ${JSON.stringify(knownDevices)}`);
 
     console.log('[backfill-sensors] running initial historical backfill...');
-    await runCycle(client, device.id, config);
+    // Catch-and-continue, exactly like the interval cycles below. Unprotected,
+    // a transient first-cycle failure (momentary 401, network blip) propagates
+    // to main().catch() -> process.exit(1) and the poll loop is never reached —
+    // so a hiccup costs a full container restart instead of one logged, skipped
+    // cycle. `restart: unless-stopped` still backs us up for real crashes.
+    await runCycle(client, device.id, config).catch((err: unknown) => {
+        console.error('[backfill-sensors] initial cycle failed, continuing to poll loop anyway:', err);
+    });
 
     console.log(
-        `[backfill-sensors] starting ${POLL_INTERVAL_MS / 60_000}-minute poll loop (pid ${process.pid}) — ` +
-            'run this under nohup for the demo window',
+        `[backfill-sensors] starting ${POLL_INTERVAL_MS / 60_000}-minute poll loop (pid ${process.pid})`,
     );
     setInterval(() => {
         runCycle(client, device.id, config).catch((err: unknown) => {
