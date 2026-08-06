@@ -13,6 +13,7 @@ import {
   toEnvRows,
 } from '../../lib/zone-sensors';
 import { trpc } from '../../lib/trpc';
+import { useClock } from '../../lib/hooks';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { SensorMetricChart } from './SensorMetricChart';
 
@@ -118,17 +119,28 @@ export default function ZonePage() {
     } => c.series !== null && c.series.points.length >= 2,
   );
 
+  // Header status: a live "since last reading" timer whenever the zone's sensor
+  // has reported — its climb-and-reset cadence is directly comparable to the
+  // sensor's update interval. Falls back to the mock status only for genuinely
+  // non-sensor zones.
+  const lastReadingAt = device?.lastSeenAt ?? null;
+  const headerAction = lastReadingAt ? (
+    <LiveSinceReading lastSeenAt={lastReadingAt} />
+  ) : sensorEnabled ? (
+    <Badge tone="idle">awaiting first reading</Badge>
+  ) : (
+    <Badge tone={zone.status}>
+      {zone.status} · {zone.statusNote}
+    </Badge>
+  );
+
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title={`${zone.name} Zone`}
         subtitle={zone.tagline}
         icon={<Icon name={zone.icon} width={22} height={22} />}
-        actions={
-          <Badge tone={zone.status}>
-            {zone.status} · {zone.statusNote}
-          </Badge>
-        }
+        actions={headerAction}
       />
 
       {sensorEnabled ? (
@@ -337,5 +349,36 @@ export default function ZonePage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Ticking "time since the last sensor reading" chip for the zone header.
+ * Counts up every second (via `useClock`) and resets whenever `lastSeenAt`
+ * changes — i.e. when the 60s refetch pulls in a fresher reading — so its
+ * reset cadence mirrors the sensor's own update interval. Green while fresh,
+ * amber once the feed goes stale (shared `describeLastSeen` threshold).
+ */
+function LiveSinceReading({ lastSeenAt }: { lastSeenAt: Date }) {
+  const now = useClock();
+  const { isStale } = describeLastSeen(lastSeenAt);
+  const elapsedMs = Math.max(0, (now?.getTime() ?? Date.now()) - new Date(lastSeenAt).getTime());
+  const totalSec = Math.floor(elapsedMs / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const elapsed = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] ${
+        isStale ? 'bg-warn/10 text-warn' : 'bg-live/10 text-live'
+      }`}
+    >
+      {isStale ? <Icon name="refresh" width={11} height={11} /> : <LiveDot />}
+      <span className="tnum">{elapsed}</span>
+      <span className="opacity-70">since last reading</span>
+    </span>
   );
 }
