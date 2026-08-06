@@ -25,5 +25,10 @@ export const sensorRouter = router({
     getReadings: orgProcedure
         .use(requireModule('ENVIRONMENT_MONITORING'))
         .input(sensorReadingRangeSchema)
-        .query(({ ctx, input }) => sensorService.getDeviceHistory(ctx.orgId, input.deviceId, input.range)),
+        .query(({ ctx, input }) => {
+            if (!ctx.user || !ctx.orgRole) {
+                throw new TRPCError({ code: 'UNAUTHORIZED' });
+            }
+            return sensorService.getDeviceHistory(ctx.orgId, input.deviceId, input.range, ctx.user.id, ctx.orgRole);
+        }),
 });
