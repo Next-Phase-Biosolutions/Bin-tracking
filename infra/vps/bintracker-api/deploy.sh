@@ -55,4 +55,12 @@ docker compose stop "$CURRENT"
 echo "Recreating worker on the new image."
 docker compose up -d --force-recreate worker
 
+# Same treatment for the sensor poller (Action Item 10). Without this it would
+# keep running the image from whenever it was last started, silently drifting
+# behind every deploy — and on a first deploy it would never start at all.
+# Mid-cycle restarts are safe: the next cycle re-derives its watermark from the
+# newest stored row, and createMany({ skipDuplicates }) absorbs any overlap.
+echo "Recreating sensor poller on the new image."
+docker compose up -d --force-recreate sensor-poller
+
 echo "Deploy complete. Live: $IDLE"

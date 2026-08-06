@@ -87,6 +87,36 @@ services:
       driver: json-file
       options: { max-size: '50m', max-file: '3' }
 
+  # EcoSafeSense sensor ingestion (Action Item 10). Was a hand-started `nohup`
+  # process on a laptop, which meant readings silently stopped whenever that
+  # laptop slept — with no alert and no restart. Same image and supervision
+  # pattern as `worker` above; no new Dockerfile, no new build step.
+  #
+  # NOTE: the script lives in packages/db, but the image's WORKDIR is
+  # /repo/apps/api (see apps/api/Dockerfile), hence the ../../ prefix.
+  # Deliberately no `--env-file` flag: .env is not baked into the image (it's
+  # host-side), so passing it fails with `node: .env: not found` — `env_file`
+  # below already injects those vars into the container environment.
+  sensor-poller:
+    build:
+      context: ../../..
+      dockerfile: apps/api/Dockerfile
+    image: bintracker-api:latest
+    container_name: bintracker_sensor_poller
+    restart: unless-stopped
+    command: ['./node_modules/.bin/tsx', '../../packages/db/src/backfill-sensors.ts']
+    healthcheck:
+      # Same situation as `worker`: no HTTP server, so the image's inherited
+      # :3001/health check can never pass. Disable rather than let it flap.
+      disable: true
+    env_file: .env
+    networks: [api_net]
+    mem_limit: 512m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options: { max-size: '50m', max-file: '3' }
+
   redis:
     image: redis:7-alpine
     container_name: bintracker_redis
