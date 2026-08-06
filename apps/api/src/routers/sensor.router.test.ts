@@ -79,7 +79,7 @@ describe('sensor.getReadings — happy path', () => {
         const result = await caller.getReadings({ deviceId: 'dev-1', range: '24h' });
 
         expect(result).toEqual(readings);
-        expect(sensorServiceMock.getDeviceHistory).toHaveBeenCalledWith(ORG_A, 'dev-1', '24h');
+        expect(sensorServiceMock.getDeviceHistory).toHaveBeenCalledWith(ORG_A, 'dev-1', '24h', 'user-1', 'ADMIN');
     });
 
     it('propagates NOT_FOUND from the service for a foreign-org deviceId', async () => {
@@ -152,5 +152,18 @@ describe('sensor.listDevices — DISABLE_AUTH null-context', () => {
 
         await expect(caller.listDevices({})).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
         expect(sensorServiceMock.listDevicesForOrg).not.toHaveBeenCalled();
+    });
+
+    it('returns UNAUTHORIZED cleanly for getReadings too, rather than throwing when ctx.user is null under DISABLE_AUTH=true', async () => {
+        vi.doMock('../lib/auth-flags.js', () => ({ isAuthDisabled: () => true }));
+        vi.doMock('../services/sensor.service.js', () => ({ sensorService: sensorServiceMock }));
+        await import('../trpc/trpc.js');
+        const { sensorRouter: sensorRouterBypassed } = await import('./sensor.router.js');
+
+        const ctx = makeCtx({ orgRole: null, moduleEnabled: true, user: null });
+        const caller = sensorRouterBypassed.createCaller(ctx);
+
+        await expect(caller.getReadings({ deviceId: 'dev-1', range: '24h' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(sensorServiceMock.getDeviceHistory).not.toHaveBeenCalled();
     });
 });

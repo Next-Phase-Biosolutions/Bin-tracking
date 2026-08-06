@@ -668,7 +668,7 @@ describe('cross-organization tenancy isolation', () => {
         it('rejects with NOT_FOUND for a foreign-org device, before any reading is returned', async () => {
             const device = seedSensorDevice({ organizationId: ORG_B });
 
-            await expect(sensorService.getDeviceHistory(ORG_A, device.id, '24h')).rejects.toMatchObject({
+            await expect(sensorService.getDeviceHistory(ORG_A, device.id, '24h', 'user-1', 'ADMIN')).rejects.toMatchObject({
                 code: 'NOT_FOUND',
             });
         });
@@ -676,7 +676,7 @@ describe('cross-organization tenancy isolation', () => {
         it('resolves history when the device belongs to the requesting org', async () => {
             const device = seedSensorDevice({ organizationId: ORG_A });
 
-            const result = await sensorService.getDeviceHistory(ORG_A, device.id, '24h');
+            const result = await sensorService.getDeviceHistory(ORG_A, device.id, '24h', 'user-1', 'ADMIN');
 
             expect(result).toEqual([]);
         });
