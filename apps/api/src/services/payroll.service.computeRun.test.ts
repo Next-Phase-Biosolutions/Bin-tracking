@@ -9,9 +9,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //
 // ponytail: this suite verifies the JS aggregation/rate-resolution/rounding/
 // classification logic by feeding canned $queryRaw rows — it does NOT exercise
-// the actual DST-aware SQL bucketing (the WHERE/GROUP BY text itself), since
-// this repo has no real-Postgres integration test harness. If the raw SQL
-// itself needs regression coverage, add a testcontainers-backed suite then.
+// the actual DST-aware SQL bucketing (the WHERE/GROUP BY text itself). That
+// text would need a DATABASE_URL-gated suite that the existing CI Postgres
+// job (see .github/workflows/ci.yml, migrate-and-test) would pick up for
+// free — note that such a suite would skip silently on dev machines without
+// a DB, which is why it wasn't free to add here.
 
 interface FakeSettings {
     organizationId: string;
@@ -205,7 +207,12 @@ vi.mock('@bin-tracker/db', () => {
         payrollRun,
         payrollLineItem,
         payrollException,
-        $queryRaw: () => Promise.resolve(store.queryRawQueue.shift() ?? []),
+        $queryRaw: () => {
+            if (store.queryRawQueue.length === 0) {
+                throw new Error('queryRawQueue exhausted — did the test call queueRows() enough times?');
+            }
+            return Promise.resolve(store.queryRawQueue.shift());
+        },
         $transaction: (cb) => cb(prisma),
     };
     return { prisma };
@@ -251,6 +258,9 @@ describe('payrollService.computeRun', () => {
         expect(result.totalMinutes).toBe(120);
         expect(result.totalGrossCents).toBe(5000); // 2h * 2500
         expect(result.lineItems[0]).toMatchObject({ employeeId: 'emp-1', rateCents: 2500, grossCents: 5000 });
+        expect(result.rateCents).toBe(2500);
+        expect(result.currency).toBe('CAD');
+        expect(result.computedAt).not.toBeNull();
     });
 
     it('a per-employee hourly rate override wins over the org flat rate and is snapshotted onto the line item', async () => {
@@ -355,5 +365,57 @@ describe('payrollService.computeRun', () => {
         await expect(payrollService.computeRun(ORG_A, { period: '2026-07' })).rejects.toMatchObject({
             code: 'FORBIDDEN',
         });
+    });
+
+    it('sums pay across multiple employees and coexists with an exception in the same run', async () => {
+        seedSettings({ flatHourlyRateCents: 2000 });
+        store.employees.set('emp-3', { employeeCode: 'E3', fullName: 'Dirty Session' });
+        store.sessions.set('sess-c', { checkInAt: new Date('2026-07-12T14:00:00Z') });
+        queueRows(
+            [
+                { employeeId: 'emp-1', minutes: 120, hourlyRateCents: null }, // 2h @ $20 = 4000
+                { employeeId: 'emp-2', minutes: 60, hourlyRateCents: null },  // 1h @ $20 = 2000
+            ],
+            [{ id: 'sess-c', employeeId: 'emp-3', checkOutAt: null }],
+        );
+
+        const result = await payrollService.computeRun(ORG_A, { period: '2026-07' });
+
+        expect(result.totalEmployees).toBe(2);
+        expect(result.totalMinutes).toBe(180);
+        expect(result.totalGrossCents).toBe(6000);
+        const byId = new Map(result.lineItems.map((l) => [l.employeeId, l]));
+        expect(byId.get('emp-1')).toMatchObject({ grossCents: 4000 });
+        expect(byId.get('emp-2')).toMatchObject({ grossCents: 2000 });
+        expect(result.exceptions).toHaveLength(1);
+        expect(result.exceptions[0]).toMatchObject({ employeeId: 'emp-3', type: 'NO_CHECKOUT' });
+    });
+
+    it('recompute discards stale line items and stale unresolved exceptions before rebuilding them', async () => {
+        seedSettings({ flatHourlyRateCents: 2500 });
+        store.runs.push({
+            id: 'run-1', organizationId: ORG_A, period: '2026-07', status: 'DRAFT',
+            rateCents: 2500, currency: 'CAD', totalEmployees: 1, totalMinutes: 999, totalGrossCents: 999999,
+            computedAt: new Date(), createdAt: new Date(),
+        });
+        // Stale data from a prior compute — must be wiped, not accumulated onto.
+        store.lineItems.push({
+            id: 'stale-li', runId: 'run-1', employeeId: 'emp-stale', minutes: 999, hours: 16.65,
+            rateCents: 2500, grossCents: 999999, payoutStatus: 'PENDING', payoutRef: null, paidAt: null,
+        });
+        store.employees.set('emp-stale', { employeeCode: 'ES', fullName: 'Stale Employee' });
+        store.sessions.set('sess-stale', { checkInAt: new Date('2026-07-05T14:00:00Z') });
+        store.exceptions.push({
+            id: 'stale-ex', runId: 'run-1', employeeId: 'emp-stale', sessionId: 'sess-stale',
+            type: 'NO_CHECKOUT', resolved: false, note: null,
+        });
+        queueRows([{ employeeId: 'emp-fresh', minutes: 60, hourlyRateCents: null }], []);
+        store.employees.set('emp-fresh', { employeeCode: 'EF', fullName: 'Fresh Employee' });
+
+        const result = await payrollService.computeRun(ORG_A, { period: '2026-07' });
+
+        expect(result.lineItems).toHaveLength(1);
+        expect(result.lineItems[0]).toMatchObject({ employeeId: 'emp-fresh', grossCents: 2500 });
+        expect(result.exceptions).toHaveLength(0); // stale unresolved exception was cleared, not resurrected
     });
 });
