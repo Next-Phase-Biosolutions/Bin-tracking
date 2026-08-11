@@ -211,7 +211,8 @@ vi.mock('@bin-tracker/db', () => {
             if (store.queryRawQueue.length === 0) {
                 throw new Error('queryRawQueue exhausted — did the test call queueRows() enough times?');
             }
-            return Promise.resolve(store.queryRawQueue.shift());
+            // Non-null assertion is safe: the length check above guarantees shift() returns a value.
+            return Promise.resolve(store.queryRawQueue.shift()!);
         },
         $transaction: (cb) => cb(prisma),
     };
