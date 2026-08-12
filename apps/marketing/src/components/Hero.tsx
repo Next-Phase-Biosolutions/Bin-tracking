@@ -1,6 +1,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { CTAButton } from "./ui/atoms";
+import { PartnersBar } from "./PartnersBar";
 import { HeroDashboard } from "./dashboard/HeroDashboard";
 
 const headlineLines = ["Nothing wasted.", "One source of truth."];
@@ -98,6 +99,15 @@ export function Hero() {
             <CTAButton href="#contact" variant="primary">
               Contact Sales
             </CTAButton>
+          </motion.div>
+
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={reduce ? false : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.65 }}
+            className="mt-10"
+          >
+            <PartnersBar />
           </motion.div>
         </div>
 
