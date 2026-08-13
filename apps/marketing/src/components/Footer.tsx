@@ -1,4 +1,5 @@
 import { Logo } from "./ui/atoms";
+import { PartnersBar } from "./PartnersBar";
 
 const cols = [
   {
@@ -58,6 +59,10 @@ export function Footer() {
               </ul>
             </div>
           ))}
+        </div>
+
+        <div className="mt-12 border-t border-bone/15 pt-12">
+          <PartnersBar align="center" fill dividers />
         </div>
 
         <div className="mt-12 flex flex-col gap-3 border-t border-bone/15 pt-6 text-xs text-bone/55 sm:flex-row sm:items-center sm:justify-between">
