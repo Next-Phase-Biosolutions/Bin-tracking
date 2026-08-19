@@ -47,7 +47,7 @@ export const farmerService = {
         try {
             const result = await assemblyai.transcripts.transcribe({
                 audio: audioBuffer,
-                speech_models: ['universal-3-pro'],
+                speech_models: ['universal-3-5-pro'],
             });
 
             if (result.status === 'error' || !result.text) {

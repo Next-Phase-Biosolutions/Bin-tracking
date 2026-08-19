@@ -432,7 +432,7 @@ export const formVoiceFillService = {
         try {
             const result = await assemblyai.transcripts.transcribe({
                 audio: audioBuffer,
-                speech_models: ['universal-3-pro'],
+                speech_models: ['universal-3-5-pro'],
                 keyterms_prompt: buildKeyterms(schema),
             });
             if (result.status === 'error' || !result.text) {
