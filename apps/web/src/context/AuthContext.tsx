@@ -29,13 +29,26 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * Local dev bypass. The API has honoured DISABLE_AUTH for a while (it picks
+ * the first ADMIN user and skips token checks) and trpc.ts already drops the
+ * Authorization header for it, but this provider still required a real
+ * Supabase session — so RootRedirect/AppShellLayout bounced every route to
+ * the marketing site's login, which is a separate app on another port. That
+ * made the flag unusable on its own. Standing in a placeholder user here
+ * completes the bypass; DEV-gated so a production build can never take it.
+ */
+const AUTH_DISABLED = import.meta.env.DEV && import.meta.env.VITE_DISABLE_AUTH === 'true';
+const DEV_USER: AuthUser = { id: 'dev-bypass', email: 'dev@localhost' };
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const queryClient = useQueryClient();
-    const [user, setUser] = useState<AuthUser | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<AuthUser | null>(AUTH_DISABLED ? DEV_USER : null);
+    const [loading, setLoading] = useState(!AUTH_DISABLED);
 
     // Restore session on mount
     useEffect(() => {
+        if (AUTH_DISABLED) return;
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
                 setUser({ id: session.user.id, email: session.user.email ?? '' });
