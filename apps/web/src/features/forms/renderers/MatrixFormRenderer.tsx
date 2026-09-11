@@ -81,29 +81,33 @@ export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
         setFooterValues((prev) => ({ ...prev, ...footer }));
         setFlaggedFields((prev) => new Set([...prev, ...nextFlagged]));
 
-        const nextCells: Record<string, CellState> = { ...cells };
         const nextBlanket = new Set<string>();
         const nextFlaggedCells = new Set<string>();
-        for (const row of schema.rows) {
-            for (const col of schema.columns) {
-                const answer = result.fields[cellKey(row.id, col.id)];
-                const ingredient = result.fields[voiceKeys.matrixIngredient(row.id, col.id)];
-                if (!answer && !ingredient) continue;
+        // Merged against `prev`, not an outer snapshot of cells, so a tap the
+        // worker made while the fill was in flight isn't dropped.
+        setCells((prev) => {
+            const nextCells: Record<string, CellState> = { ...prev };
+            for (const row of schema.rows) {
+                for (const col of schema.columns) {
+                    const answer = result.fields[cellKey(row.id, col.id)];
+                    const ingredient = result.fields[voiceKeys.matrixIngredient(row.id, col.id)];
+                    if (!answer && !ingredient) continue;
 
-                const key = cellKey(row.id, col.id);
-                const current = nextCells[key] ?? EMPTY_CELL;
-                nextCells[key] = {
-                    // The service only ever emits an exact 'Yes' or 'No' here —
-                    // it drops anything else rather than let this branch coerce
-                    // an unclear answer into "allergen not present".
-                    answer: answer ? (answer.value === 'Yes' ? 'YES' : 'NO') : current.answer,
-                    ingredient: ingredient?.value ?? current.ingredient,
-                };
-                if (answer?.source === 'blanket') nextBlanket.add(key);
-                else if (answer?.confidence === 'low') nextFlaggedCells.add(key);
+                    const key = cellKey(row.id, col.id);
+                    const current = nextCells[key] ?? EMPTY_CELL;
+                    nextCells[key] = {
+                        // The service only ever emits an exact 'Yes' or 'No' here —
+                        // it drops anything else rather than let this branch coerce
+                        // an unclear answer into "allergen not present".
+                        answer: answer ? (answer.value === 'Yes' ? 'YES' : 'NO') : current.answer,
+                        ingredient: ingredient?.value ?? current.ingredient,
+                    };
+                    if (answer?.source === 'blanket') nextBlanket.add(key);
+                    else if (answer?.confidence === 'low') nextFlaggedCells.add(key);
+                }
             }
-        }
-        setCells(nextCells);
+            return nextCells;
+        });
         setBlanketCells((prev) => new Set([...prev, ...nextBlanket]));
         setFlaggedCells((prev) => new Set([...prev, ...nextFlaggedCells]));
     };

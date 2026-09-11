@@ -5,6 +5,7 @@ import { VoiceFormFillButton } from '../VoiceFormFillButton';
 import {
     SectionRepeatingTable,
     emptyTableRow,
+    placeVoiceRow,
     validateTableRows,
     type TableRow,
 } from '../SectionRepeatingTable';
@@ -93,24 +94,39 @@ export function StandardFormRenderer({
         }
         setValues((prev) => ({ ...prev, ...filledValues }));
 
-        const newFlaggedCells = new Set<string>();
-        const nextRows: Record<string, TableRow[]> = { ...tableRows };
-        for (const section of tableSections) {
-            const cols = result.tableRows[section.id];
-            if (!cols || !section.tableColumns) continue;
-            const row = emptyTableRow(section.tableColumns);
-            for (const [colId, filled] of Object.entries(cols)) row[colId] = filled.value;
-            const existing = nextRows[section.id] ?? [emptyTableRow(section.tableColumns)];
-            const rowIdx = existing.length; // the row we are about to append
-            for (const [colId, filled] of Object.entries(cols)) {
-                if (filled.confidence === 'low') newFlaggedCells.add(`${section.id}_${rowIdx}_${colId}`);
+        // Where each section's row landed, filled in by the updater below.
+        // Read afterwards by the flag updater, which React processes in the
+        // same queue right after this one — so the indices are always the
+        // ones actually used, never a stale outer-state guess.
+        const landedAt: Record<string, number> = {};
+        setTableRows((prev) => {
+            const next = { ...prev };
+            for (const section of tableSections) {
+                const cols = result.tableRows[section.id];
+                if (!cols || !section.tableColumns) continue;
+                const row = emptyTableRow(section.tableColumns);
+                for (const [colId, filled] of Object.entries(cols)) row[colId] = filled.value;
+                const existing = next[section.id] ?? [emptyTableRow(section.tableColumns)];
+                const placed = placeVoiceRow(section.tableColumns, existing, row);
+                next[section.id] = placed.rows;
+                landedAt[section.id] = placed.index;
             }
-            nextRows[section.id] = [...existing, row];
-        }
-        setTableRows(nextRows);
+            return next;
+        });
 
         setFlaggedFields((prev) => new Set([...prev, ...newFlaggedFields]));
-        setFlaggedCells((prev) => new Set([...prev, ...newFlaggedCells]));
+        setFlaggedCells((prev) => {
+            const next = new Set(prev);
+            for (const section of tableSections) {
+                const cols = result.tableRows[section.id];
+                const rowIdx = landedAt[section.id];
+                if (!cols || rowIdx === undefined) continue;
+                for (const [colId, filled] of Object.entries(cols)) {
+                    if (filled.confidence === 'low') next.add(`${section.id}_${rowIdx}_${colId}`);
+                }
+            }
+            return next;
+        });
     };
 
     const isSectionVisible = (section: StandardSchema['sections'][number]): boolean => {

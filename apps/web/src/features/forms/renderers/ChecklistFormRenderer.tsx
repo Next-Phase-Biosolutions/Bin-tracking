@@ -75,29 +75,33 @@ export function ChecklistFormRenderer({ schema, onSubmit, formId }: Props) {
         setHeaderValues((prev) => ({ ...prev, ...nextHeaders }));
         setFlaggedHeaders((prev) => new Set([...prev, ...nextFlagged]));
 
-        const nextItems: Record<string, ItemState> = { ...itemStates };
         const nextBlanket = new Set<string>();
         const nextFlaggedItems = new Set<string>();
-        for (const group of schema.groups) {
-            for (const item of group.items) {
-                const answer = result.fields[voiceKeys.checklistAnswer(item.id)];
-                const deviation = result.fields[voiceKeys.checklistDeviation(item.id)];
-                const corrective = result.fields[voiceKeys.checklistCorrective(item.id)];
-                if (!answer && !deviation && !corrective) continue;
+        // Merged against `prev`, not an outer snapshot of itemStates, so a
+        // tap the worker made while the fill was in flight isn't dropped.
+        setItemStates((prev) => {
+            const nextItems: Record<string, ItemState> = { ...prev };
+            for (const group of schema.groups) {
+                for (const item of group.items) {
+                    const answer = result.fields[voiceKeys.checklistAnswer(item.id)];
+                    const deviation = result.fields[voiceKeys.checklistDeviation(item.id)];
+                    const corrective = result.fields[voiceKeys.checklistCorrective(item.id)];
+                    if (!answer && !deviation && !corrective) continue;
 
-                const current = nextItems[item.id] ?? EMPTY_ITEM;
-                nextItems[item.id] = {
-                    // The service only ever emits an exact 'Yes' or 'No' here —
-                    // it drops anything else rather than let this branch coerce it.
-                    answer: answer ? (answer.value === 'Yes' ? 'yes' : 'no') : current.answer,
-                    deviation: deviation?.value ?? current.deviation,
-                    corrective: corrective?.value ?? current.corrective,
-                };
-                if (answer?.source === 'blanket') nextBlanket.add(item.id);
-                else if (answer?.confidence === 'low') nextFlaggedItems.add(item.id);
+                    const current = nextItems[item.id] ?? EMPTY_ITEM;
+                    nextItems[item.id] = {
+                        // The service only ever emits an exact 'Yes' or 'No' here —
+                        // it drops anything else rather than let this branch coerce it.
+                        answer: answer ? (answer.value === 'Yes' ? 'yes' : 'no') : current.answer,
+                        deviation: deviation?.value ?? current.deviation,
+                        corrective: corrective?.value ?? current.corrective,
+                    };
+                    if (answer?.source === 'blanket') nextBlanket.add(item.id);
+                    else if (answer?.confidence === 'low') nextFlaggedItems.add(item.id);
+                }
             }
-        }
-        setItemStates(nextItems);
+            return nextItems;
+        });
         setBlanketItems((prev) => new Set([...prev, ...nextBlanket]));
         setFlaggedItems((prev) => new Set([...prev, ...nextFlaggedItems]));
     };

@@ -198,13 +198,22 @@ export const formTranscribeFieldSchema = z.object({
 });
 
 /**
+ * Per-field cap on a recorded clip, the audio counterpart to
+ * IMAGE_BASE64_MAX_CHARS above. The recorders cap a single take at 60s, which
+ * is ~1-2MB of base64 webm/opus, so this leaves generous headroom while still
+ * rejecting a payload that only exists to burn transcription spend. The
+ * Fastify bodyLimit (20MB) remains the outer bound.
+ */
+const AUDIO_BASE64_MAX_CHARS = 8 * 1024 * 1024;
+
+/**
  * Whole-form voice fill: one utterance fills every field on a standard/repeating
  * form. The schema is loaded server-side from `formId` (trusted), so only the
  * audio crosses the wire here.
  */
 export const formFillByVoiceSchema = z.object({
     formId: z.string().cuid(),
-    audioBase64: z.string().min(1),
+    audioBase64: z.string().min(1).max(AUDIO_BASE64_MAX_CHARS),
     mimeType: z.string().default('audio/webm'),
 });
 

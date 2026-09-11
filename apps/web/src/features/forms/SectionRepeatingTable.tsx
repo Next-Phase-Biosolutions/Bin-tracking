@@ -21,6 +21,34 @@ export function emptyTableRow(columns: RepeatingColumn[]): TableRow {
     return row;
 }
 
+/** True when a row still holds exactly what emptyTableRow seeded it with — nobody has typed in it. */
+export function isPristineRow(columns: RepeatingColumn[], row: TableRow | undefined): boolean {
+    if (!row) return false;
+    const blank = emptyTableRow(columns);
+    return columns.every((col) => (row[col.id] ?? '') === (blank[col.id] ?? ''));
+}
+
+/**
+ * Where a voice-filled row should land: on top of the single untouched row
+ * the renderer seeds on mount, if it's still untouched, otherwise appended.
+ *
+ * Appending unconditionally left that seeded blank row sitting above the
+ * spoken data — harmless to look at, but if any column is `required` it
+ * fails validation on Submit, so a worker who filled the whole table
+ * hands-free had to go find and delete a row they never touched. Returns the
+ * index the row landed at so the caller can flag its low-confidence cells.
+ */
+export function placeVoiceRow(
+    columns: RepeatingColumn[],
+    existing: TableRow[],
+    row: TableRow,
+): { rows: TableRow[]; index: number } {
+    if (existing.length === 1 && isPristineRow(columns, existing[0])) {
+        return { rows: [row], index: 0 };
+    }
+    return { rows: [...existing, row], index: existing.length };
+}
+
 interface Props {
     columns: RepeatingColumn[];
     rows: TableRow[];

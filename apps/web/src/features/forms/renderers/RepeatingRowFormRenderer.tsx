@@ -46,21 +46,42 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
         }
     };
 
-    // Whole-form voice fill: append one row from the spoken reading, flagging
+    /**
+     * Put a voice-filled row on top of the single untouched row seeded on
+     * mount, if it's still untouched, rather than below it — an appended row
+     * left that blank one failing required-column validation on Submit, so a
+     * worker who filled the table hands-free had to find and delete a row
+     * they never touched. Flags low-confidence cells at whichever index the
+     * row actually landed at.
+     */
+    const placeRow = (row: Row, confidence: Record<string, 'high' | 'low'>) => {
+        let rowIdx = 0;
+        setRows((prev) => {
+            const pristine = prev.length === 1 && schema.columns.every((c) => (prev[0]?.[c.id] ?? '') === (emptyRow(schema)[c.id] ?? ''));
+            rowIdx = pristine ? 0 : prev.length;
+            return pristine ? [row] : [...prev, row];
+        });
+        setFlaggedCells((prev) => {
+            const next = new Set(prev);
+            for (const [colId, level] of Object.entries(confidence)) {
+                if (level === 'low') next.add(`${rowIdx}_${colId}`);
+            }
+            return next;
+        });
+    };
+
+    // Whole-form voice fill: one row from the spoken reading, flagging
     // low-confidence cells for review.
     const applyVoiceFill = (result: FormVoiceFillResult) => {
         const cols = result.tableRows[VOICE_FILL_REPEATING_KEY];
         if (!cols) return;
         const row = emptyRow(schema);
-        for (const [colId, filled] of Object.entries(cols)) row[colId] = filled.value;
-
-        const rowIdx = rows.length; // the appended row index
-        const newFlagged = new Set<string>();
+        const confidence: Record<string, 'high' | 'low'> = {};
         for (const [colId, filled] of Object.entries(cols)) {
-            if (filled.confidence === 'low') newFlagged.add(`${rowIdx}_${colId}`);
+            row[colId] = filled.value;
+            confidence[colId] = filled.confidence;
         }
-        setRows((prev) => [...prev, row]);
-        setFlaggedCells((prev) => new Set([...prev, ...newFlagged]));
+        placeRow(row, confidence);
     };
 
     const addRow = () => setRows((prev) => [...prev, emptyRow(schema)]);
