@@ -1,14 +1,25 @@
 import { useState } from 'react';
-import { voiceKeys, type ChecklistSchema, type FormVoiceFillResult } from '@bin-tracker/types';
+import {
+    voiceKeys,
+    type ChecklistSchema,
+    type FormVoiceFillResult,
+    type FormSubmissionValues,
+} from '@bin-tracker/types';
 import { FieldInput } from '../FieldComponents';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 import { VoiceBlanketBanner, VoiceBlanketMark } from '../VoiceBlanketNotice';
 
+type ChecklistValues = Extract<FormSubmissionValues, { formType: 'checklist' }>;
+
 interface Props {
     schema: ChecklistSchema;
-    onSubmit: () => void;
+    onSubmit: (values: FormSubmissionValues) => void;
     /** Form id — enables the whole-form voice fill button. Omit in preview. */
     formId?: string;
+    /** Pre-fill from a past submission (SubmissionDetailPage view/edit). */
+    initialValues?: ChecklistValues;
+    /** Disables every field and hides Submit — SubmissionDetailPage's default view. */
+    readOnly?: boolean;
 }
 
 interface ItemState {
@@ -22,10 +33,10 @@ const EMPTY_ITEM: ItemState = { answer: null, deviation: '', corrective: '' };
 /** DOM id for a checklist item row — the banner's jump target. */
 const itemAnchorId = (itemId: string) => `checklist-item-${itemId}`;
 
-export function ChecklistFormRenderer({ schema, onSubmit, formId }: Props) {
-    const [headerValues, setHeaderValues] = useState<Record<string, string>>({});
+export function ChecklistFormRenderer({ schema, onSubmit, formId, initialValues, readOnly = false }: Props) {
+    const [headerValues, setHeaderValues] = useState<Record<string, string>>(() => initialValues?.headerValues ?? {});
     const [headerErrors, setHeaderErrors] = useState<Record<string, string>>({});
-    const [itemStates, setItemStates] = useState<Record<string, ItemState>>({});
+    const [itemStates, setItemStates] = useState<Record<string, ItemState>>(() => initialValues?.itemStates ?? {});
     // Header fields the voice fill was unsure about — amber "check this".
     const [flaggedHeaders, setFlaggedHeaders] = useState<Set<string>>(new Set());
     // Item answers a spoken blanket filled rather than the worker naming them.
@@ -122,7 +133,7 @@ export function ChecklistFormRenderer({ schema, onSubmit, formId }: Props) {
             setHeaderErrors(errs);
             return;
         }
-        onSubmit();
+        onSubmit({ formType: 'checklist', headerValues, itemStates });
     };
 
     const firstBlanketId =
@@ -131,8 +142,8 @@ export function ChecklistFormRenderer({ schema, onSubmit, formId }: Props) {
             .find((item) => blanketItems.has(item.id))?.id ?? null;
 
     return (
-        <div className="flex flex-col gap-5">
-            {formId && (
+        <fieldset disabled={readOnly} className="flex flex-col gap-5 border-0 p-0 m-0">
+            {formId && !readOnly && (
                 <VoiceFormFillButton
                     formId={formId}
                     onFill={applyVoiceFill}
@@ -250,13 +261,15 @@ export function ChecklistFormRenderer({ schema, onSubmit, formId }: Props) {
                 </div>
             ))}
 
-            <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
-            >
-                Submit Form
-            </button>
-        </div>
+            {!readOnly && (
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
+                >
+                    {initialValues ? 'Save Changes' : 'Submit Form'}
+                </button>
+            )}
+        </fieldset>
     );
 }

@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { router, orgProcedure, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
+import { router, orgProcedure, orgOpsProcedure, orgAdminProcedure, requireModule } from '../trpc/trpc.js';
 import { aiRateLimit } from '../trpc/rate-limit.js';
 import {
     formListByStageSchema,
@@ -10,6 +10,10 @@ import {
     formCreateSchema,
     formTranscribeFieldSchema,
     formFillByVoiceSchema,
+    formSubmitSchema,
+    formListSubmissionsSchema,
+    formGetSubmissionSchema,
+    formUpdateSubmissionSchema,
 } from '@bin-tracker/validators';
 import { formService } from '../services/form.service.js';
 import { formVoiceFillService } from '../services/form-voice-fill.service.js';
@@ -150,5 +154,43 @@ export const formRouter = router({
                 ctx.orgId,
                 input.mimeType,
             );
+        }),
+
+    /** Write-once from this side (no update procedure here — see updateSubmission, admin-only). */
+    submit: orgProcedure
+        .use(requireModule('FORMS'))
+        .input(formSubmitSchema)
+        .mutation(async ({ input, ctx }) => {
+            return formService.submit(ctx.prisma, input, ctx.orgId, ctx.user?.id ?? null);
+        }),
+
+    listSubmissions: orgProcedure
+        .use(requireModule('FORMS'))
+        .input(formListSubmissionsSchema)
+        .query(async ({ input, ctx }) => {
+            return formService.listSubmissions(ctx.prisma, ctx.orgId, input);
+        }),
+
+    getSubmission: orgProcedure
+        .use(requireModule('FORMS'))
+        .input(formGetSubmissionSchema)
+        .query(async ({ input, ctx }) => {
+            const detail = await formService.getSubmission(ctx.prisma, ctx.orgId, input.id);
+            if (!detail) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Submission not found' });
+            }
+            return detail;
+        }),
+
+    /**
+     * Org admin only, per product decision — corrects a wrong value after
+     * the fact. Always leaves a FormSubmissionAuditLog row (old/new
+     * snapshot), so a correction is visible, never a silent overwrite.
+     */
+    updateSubmission: orgAdminProcedure
+        .use(requireModule('FORMS'))
+        .input(formUpdateSubmissionSchema)
+        .mutation(async ({ input, ctx }) => {
+            return formService.updateSubmission(ctx.prisma, input, ctx.orgId, ctx.user?.id ?? null);
         }),
 });

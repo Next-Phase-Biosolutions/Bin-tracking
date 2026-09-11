@@ -98,6 +98,13 @@ export function FormListPage() {
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Link
+                            to="/app/forms/submissions"
+                            className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-bone transition-colors hover:bg-white/25"
+                        >
+                            <Icon name="check" width={15} height={15} />
+                            Submissions
+                        </Link>
+                        <Link
                             to="/app/forms/import"
                             className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-olive-deep transition-colors hover:bg-bone-light"
                         >

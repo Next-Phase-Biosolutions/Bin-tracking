@@ -4,15 +4,22 @@ import {
     VOICE_FILL_REPEATING_KEY,
     type RepeatingSchema,
     type FormVoiceFillResult,
+    type FormSubmissionValues,
 } from '@bin-tracker/types';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 
+type RepeatingValues = Extract<FormSubmissionValues, { formType: 'repeating' }>;
+
 interface Props {
     schema: RepeatingSchema;
-    onSubmit: () => void;
+    onSubmit: (values: FormSubmissionValues) => void;
     /** Form id — enables the whole-form voice fill button. Omit in preview. */
     formId?: string;
     previewMode?: boolean;
+    /** Pre-fill from a past submission (SubmissionDetailPage view/edit). */
+    initialValues?: RepeatingValues;
+    /** Disables every field and hides Submit — SubmissionDetailPage's default view. */
+    readOnly?: boolean;
 }
 
 type Row = Record<string, string>;
@@ -25,8 +32,8 @@ function emptyRow(schema: RepeatingSchema): Row {
     return row;
 }
 
-export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode }: Props) {
-    const [rows, setRows] = useState<Row[]>([emptyRow(schema)]);
+export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode, initialValues, readOnly = false }: Props) {
+    const [rows, setRows] = useState<Row[]>(() => initialValues?.rows ?? [emptyRow(schema)]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     // Cells (`${rowIdx}_${colId}`) the voice fill was unsure about.
     const [flaggedCells, setFlaggedCells] = useState<Set<string>>(new Set());
@@ -104,7 +111,7 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
             setErrors(errs);
             return;
         }
-        onSubmit();
+        onSubmit({ formType: 'repeating', rows });
     };
 
     const cellBorder = 'border border-edge';
@@ -114,8 +121,8 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
         }`;
 
     return (
-        <div className="flex flex-col gap-5">
-            {formId && !previewMode && (
+        <fieldset disabled={readOnly} className="flex flex-col gap-5 border-0 p-0 m-0">
+            {formId && !previewMode && !readOnly && (
                 <VoiceFormFillButton formId={formId} onFill={applyVoiceFill} />
             )}
             {/* Instructions banner */}
@@ -243,15 +250,15 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
 
             <p className="text-xs text-muted text-center">{rows.length} {rows.length === 1 ? 'entry' : 'entries'}</p>
 
-            {!previewMode && (
+            {!previewMode && !readOnly && (
                 <button
                     type="button"
                     onClick={handleSubmit}
                     className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors"
                 >
-                    Submit Form
+                    {initialValues ? 'Save Changes' : 'Submit Form'}
                 </button>
             )}
-        </div>
+        </fieldset>
     );
 }

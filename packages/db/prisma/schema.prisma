@@ -130,6 +130,7 @@ model Organization {
   employees           Employee[]
   shipments           Shipment[]
   formTemplates       FormTemplate[]
+  formSubmissions     FormSubmission[]
   animalRegistrations AnimalRegistration[]
   settings            Settings?
   payrollRuns         PayrollRun[]
@@ -242,10 +243,11 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  facilities   UserFacility[]
-  driverCycles BinCycle[]
-  driverEvents EventLog[]           @relation("EventDriver")
-  memberships  OrganizationMember[]
+  facilities      UserFacility[]
+  driverCycles    BinCycle[]
+  driverEvents    EventLog[]           @relation("EventDriver")
+  memberships     OrganizationMember[]
+  formSubmissions FormSubmission[]
 
   @@map("users")
 }
@@ -629,11 +631,60 @@ model FormTemplate {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  submissions  FormSubmission[]
 
   @@index([stage, isActive])
   @@index([organizationId])
   @@map("form_templates")
+}
+
+// A filled-out instance of a FormTemplate. Write-once from the submitting
+// side (no update/delete in the employee-facing API) — org ADMIN corrects a
+// wrong value via `updateSubmission`, which always leaves a
+// FormSubmissionAuditLog row behind rather than silently overwriting.
+//
+// The only "who" recorded is the logged-in user. submittedByUserId is
+// nullable: ctx.user is `User | null` (DISABLE_AUTH mode explicitly
+// tolerates a null user), so a required FK here would make submission
+// impossible in that mode.
+model FormSubmission {
+  id                String   @id @default(cuid())
+  formId            String
+  organizationId    String
+  submittedByUserId String?
+  values            Json
+  createdAt         DateTime @default(now())
+
+  form         FormTemplate             @relation(fields: [formId], references: [id])
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  submittedBy  User?                    @relation(fields: [submittedByUserId], references: [id])
+  auditLogs    FormSubmissionAuditLog[]
+
+  @@index([organizationId])
+  @@index([formId])
+  @@map("form_submissions")
+}
+
+// One row per admin correction to a FormSubmission — mirrors
+// PayrollAuditLog's shape (oldValue/newValue Json snapshots), the existing
+// pattern in this codebase for "track who changed what" in a regulated
+// domain. actorId is nullable for the same DISABLE_AUTH reason as
+// FormSubmission.submittedByUserId above.
+model FormSubmissionAuditLog {
+  id           String   @id @default(cuid())
+  submissionId String
+  orgId        String
+  actorId      String?
+  oldValue     Json
+  newValue     Json
+  createdAt    DateTime @default(now())
+
+  submission FormSubmission @relation(fields: [submissionId], references: [id])
+
+  @@index([submissionId])
+  @@index([orgId, createdAt])
+  @@map("form_submission_audit_logs")
 }
 
 // ─── Payroll ──────────────────────────────────────────────────────

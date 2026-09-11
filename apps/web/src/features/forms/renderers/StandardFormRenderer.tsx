@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { StandardSchema, FormField, FormVoiceFillResult } from '@bin-tracker/types';
+import type { StandardSchema, FormField, FormVoiceFillResult, FormSubmissionValues } from '@bin-tracker/types';
 import { FieldInput } from '../FieldComponents';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 import {
@@ -10,16 +10,22 @@ import {
     type TableRow,
 } from '../SectionRepeatingTable';
 
+type StandardValues = Extract<FormSubmissionValues, { formType: 'standard' }>;
+
 interface Props {
     schema: StandardSchema;
     instructions?: string | null;
-    onSubmit: () => void;
+    onSubmit: (values: FormSubmissionValues) => void;
     /** Form id — enables the whole-form voice fill button. Omit in preview. */
     formId?: string;
     /** Read-only layout preview (import flow); hides submit */
     previewMode?: boolean;
     /** When false, instructions are shown by FormFillLayout instead */
     showInstructions?: boolean;
+    /** Pre-fill from a past submission (SubmissionDetailPage view/edit). */
+    initialValues?: StandardValues;
+    /** Disables every field and hides Submit — SubmissionDetailPage's default view. */
+    readOnly?: boolean;
 }
 
 function validateFields(fields: FormField[], values: Record<string, string>): Record<string, string> {
@@ -43,8 +49,10 @@ export function StandardFormRenderer({
     formId,
     previewMode,
     showInstructions = true,
+    initialValues,
+    readOnly = false,
 }: Props) {
-    const [values, setValues] = useState<Record<string, string>>({});
+    const [values, setValues] = useState<Record<string, string>>(() => initialValues?.values ?? {});
     const [errors, setErrors] = useState<Record<string, string>>({});
     // Fields / cells the voice fill was unsure about — highlighted for review.
     const [flaggedFields, setFlaggedFields] = useState<Set<string>>(new Set());
@@ -56,6 +64,7 @@ export function StandardFormRenderer({
     );
 
     const [tableRows, setTableRows] = useState<Record<string, TableRow[]>>(() => {
+        if (initialValues?.tableRows) return initialValues.tableRows;
         const init: Record<string, TableRow[]> = {};
         for (const s of tableSections) {
             if (s.tableColumns?.length) {
@@ -152,12 +161,12 @@ export function StandardFormRenderer({
             setErrors(allErrors);
             return;
         }
-        onSubmit();
+        onSubmit({ formType: 'standard', values, tableRows });
     };
 
     return (
-        <div className="flex flex-col gap-6">
-            {formId && !previewMode && (
+        <fieldset disabled={readOnly} className="flex flex-col gap-6 border-0 p-0 m-0">
+            {formId && !previewMode && !readOnly && (
                 <VoiceFormFillButton formId={formId} onFill={applyVoiceFill} />
             )}
             {showInstructions && instructions?.trim() && (
@@ -228,15 +237,15 @@ export function StandardFormRenderer({
                 );
             })}
 
-            {!previewMode && (
+            {!previewMode && !readOnly && (
                 <button
                     type="button"
                     onClick={handleSubmit}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-olive-deep py-4 text-lg font-bold text-bone-light shadow-md transition-colors hover:bg-olive-deep/90"
                 >
-                    Submit Form
+                    {initialValues ? 'Save Changes' : 'Submit Form'}
                 </button>
             )}
-        </div>
+        </fieldset>
     );
 }

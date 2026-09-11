@@ -8,6 +8,8 @@ import AnimalRecordsPage from './features/farmer-registration/AnimalRecordsPage'
 import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
 import FormImportPage from './features/forms/import/FormImportPage';
+import SubmissionsListPage from './features/forms/SubmissionsListPage';
+import SubmissionDetailPage from './features/forms/SubmissionDetailPage';
 import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
 import EmployeesPage from './features/employees/EmployeesPage';
 import BankDetailsPage from './features/employees/BankDetailsPage';
@@ -79,6 +81,8 @@ export function App() {
                 <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
                 <Route path="/app/forms/new" element={<FormBuilderPage />} />
                 <Route path="/app/forms/import" element={<FormImportPage />} />
+                <Route path="/app/forms/submissions" element={<SubmissionsListPage />} />
+                <Route path="/app/forms/submissions/:id" element={<SubmissionDetailPage />} />
                 <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
                 <Route path="/app/admin/payroll" element={<PayrollAdminPage />} />
                 <Route path="/app/settings" element={<SettingsPage />} />

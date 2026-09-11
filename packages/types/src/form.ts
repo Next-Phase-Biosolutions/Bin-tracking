@@ -183,3 +183,88 @@ export interface FormVoiceFillResult {
      */
     tableRows: Record<string, Record<string, VoiceFilledValue>>;
 }
+
+// ─── Form submission (persisted) ───────────────────────────────────────────────
+
+/** One checklist item's answer + free-text follow-ups. Mirrors ChecklistFormRenderer's local ItemState. */
+export interface ChecklistItemValue {
+    answer: 'yes' | 'no' | null;
+    deviation: string;
+    corrective: string;
+}
+
+/** One matrix cell's answer + ingredient text. Mirrors MatrixFormRenderer's local CellState. */
+export interface MatrixCellValue {
+    answer: 'YES' | 'NO' | null;
+    ingredient: string;
+}
+
+/** A repeating table row: columnId -> value. Mirrors SectionRepeatingTable's TableRow / RepeatingRowFormRenderer's Row. */
+export type FormSubmissionTableRow = Record<string, string>;
+
+/**
+ * The persisted shape of a submitted form's `values`, discriminated on
+ * `formType` exactly like `FormSchema` — each renderer holds a genuinely
+ * different local state shape (confirmed by reading all four), so a
+ * single flat `Record<string, string>` would silently lose data for 3 of
+ * the 4 form types. Voice-confidence markers (flagged/blanket sets) are
+ * deliberately NOT part of this — once a human hits Submit, the value is
+ * accepted as-is.
+ */
+export type FormSubmissionValues =
+    | {
+          formType: 'standard';
+          values: Record<string, string>;
+          tableRows: Record<string, FormSubmissionTableRow[]>;
+      }
+    | {
+          formType: 'checklist';
+          headerValues: Record<string, string>;
+          itemStates: Record<string, ChecklistItemValue>;
+      }
+    | {
+          formType: 'matrix';
+          headerValues: Record<string, string>;
+          footerValues: Record<string, string>;
+          cells: Record<string, MatrixCellValue>;
+      }
+    | {
+          formType: 'repeating';
+          rows: FormSubmissionTableRow[];
+      };
+
+export interface FormSubmission {
+    id: string;
+    formId: string;
+    submittedByUserId: string | null;
+    values: FormSubmissionValues;
+    createdAt: Date;
+}
+
+export interface FormSubmissionAuditLog {
+    id: string;
+    submissionId: string;
+    actorId: string | null;
+    oldValue: FormSubmissionValues;
+    newValue: FormSubmissionValues;
+    createdAt: Date;
+}
+
+/** One row in the submissions list page — deliberately lighter than FormSubmission (no full `values`). */
+export interface FormSubmissionListItem {
+    id: string;
+    formId: string;
+    formTitle: string;
+    /** Name of the logged-in user who submitted it; null when submitted without a user. */
+    submittedByName: string | null;
+    createdAt: Date;
+}
+
+/** Everything the detail/edit view needs in one response: the submission, its form's live title/schema (to render read-only or as an edit form), the submitter's name, and its full audit trail. */
+export interface FormSubmissionDetail {
+    submission: FormSubmission;
+    formTitle: string;
+    formSchema: FormSchema;
+    submittedByName: string | null;
+    auditLogs: FormSubmissionAuditLog[];
+}
