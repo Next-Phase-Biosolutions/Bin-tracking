@@ -19,6 +19,7 @@ import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import PayrollAdminPage from './features/admin/PayrollAdminPage';
 import PayrollPage from './features/payroll/PayrollPage';
+import ApprovePage from './features/payroll/ApprovePage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
@@ -57,6 +58,8 @@ export function App() {
             <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
             {/* Public: the employee has no login — the link token is the sole credential. */}
             <Route path="/app/bank-details/:token" element={<BankDetailsPage />} />
+            {/* Public: the manager has no login here either — the run id + one-time code are the sole credential. */}
+            <Route path="/app/payroll/approve" element={<ApprovePage />} />
 
             <Route element={<AppShellLayout />}>
                 <Route path="/app/bin" element={<TabletPage />} />

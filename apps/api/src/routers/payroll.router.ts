@@ -1,10 +1,12 @@
 import { TRPCError } from '@trpc/server';
-import { router, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
+import { router, orgOpsProcedure, publicProcedure, requireModule } from '../trpc/trpc.js';
+import { bankTokenRateLimit } from '../trpc/rate-limit.js';
 import {
     payrollPeriodSchema,
     payrollListSchema,
     payrollJobStatusSchema,
     payrollResolveExceptionSchema,
+    payrollApprovalContextSchema,
 } from '@bin-tracker/validators';
 import { payrollService } from '../services/payroll.service.js';
 import { getHeavyJobsQueue, PAYROLL_COMPUTE_RUN_JOB, reviveJobResultDates } from '../lib/queue.js';
@@ -80,5 +82,19 @@ export const payrollRouter = router({
         .input(payrollResolveExceptionSchema)
         .mutation(async ({ ctx, input }) => {
             return payrollService.resolveException(ctx.orgId, input);
+        }),
+
+    /**
+     * Public: resolve the emailed approval link for the landing page. A
+     * MUTATION, not a query — same reasoning as employee.bankLinkContext:
+     * tRPC queries put input in the URL, which would put the one-time code
+     * straight into access logs. Reuses the bank-link IP rate limiter — same
+     * shape of risk (unauthenticated, token-guarded, guessable-attempt surface).
+     */
+    approvalContext: publicProcedure
+        .use(bankTokenRateLimit())
+        .input(payrollApprovalContextSchema)
+        .mutation(async ({ input }) => {
+            return payrollService.getApprovalContext(input.runId, input.code);
         }),
 });

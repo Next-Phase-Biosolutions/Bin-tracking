@@ -116,10 +116,12 @@ export {
     payrollListSchema,
     payrollJobStatusSchema,
     payrollResolveExceptionSchema,
+    payrollApprovalContextSchema,
     type PayrollPeriodInput,
     type PayrollListInput,
     type PayrollJobStatusInput,
     type PayrollResolveExceptionInput,
+    type PayrollApprovalContextInput,
 } from './payroll.schema.js';
 
 export {
