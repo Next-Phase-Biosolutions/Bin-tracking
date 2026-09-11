@@ -27,6 +27,16 @@ vi.mock('../services/form.service.js', () => ({
         refineFromRegion: vi.fn(),
         create: vi.fn(),
         transcribeField: vi.fn(),
+        submit: vi.fn(),
+        listSubmissions: vi.fn(),
+        getSubmission: vi.fn(),
+        updateSubmission: vi.fn(),
+    },
+}));
+
+vi.mock('../services/form-voice-fill.service.js', () => ({
+    formVoiceFillService: {
+        fillFromVoice: vi.fn(),
     },
 }));
 
@@ -36,13 +46,13 @@ const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeCtx(orgId: string): any {
+function makeCtx(orgId: string, orgRole: string = 'ADMIN'): any {
     return {
         orgId,
-        user: { role: 'ADMIN' },
+        user: { id: 'user-1', role: 'ADMIN' },
         // Task 25: orgOpsProcedure now gates on ctx.orgRole (the caller's
         // per-org membership role), not ctx.user.role.
-        orgRole: 'ADMIN',
+        orgRole,
         prisma: {
             organizationModule: {
                 findUnique: vi.fn().mockResolvedValue({ enabled: true }),
@@ -180,5 +190,75 @@ describe('per-org AI rate limit on digitizeFromPhoto', () => {
         const result = await caller.digitizeFromPhoto({ imageBase64: 'base64==', mimeType: 'image/png' });
 
         expect(result).toEqual({ jobId: 'job-y' });
+    });
+});
+
+describe('form.submit', () => {
+    it('passes ctx.user.id through as the acting user', async () => {
+        const { formService } = await import('../services/form.service.js');
+        vi.mocked(formService.submit).mockResolvedValue({
+            id: 'cljsubmission1000000000001',
+            formId: 'cljform1000000000000000001',
+            submittedByUserId: 'user-1',
+            values: { formType: 'standard', values: {}, tableRows: {} },
+            createdAt: new Date(),
+        });
+
+        const caller = formRouter.createCaller(makeCtx(ORG_A));
+        await caller.submit({
+            formId: 'cljform1000000000000000001',
+            values: { formType: 'standard', values: {}, tableRows: {} },
+        });
+
+        expect(formService.submit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ formId: 'cljform1000000000000000001' }),
+            ORG_A,
+            'user-1',
+        );
+    });
+});
+
+describe('form.getSubmission', () => {
+    it('surfaces NOT_FOUND when the service reports no submission (cross-org or missing)', async () => {
+        const { formService } = await import('../services/form.service.js');
+        vi.mocked(formService.getSubmission).mockResolvedValue(null);
+
+        const caller = formRouter.createCaller(makeCtx(ORG_A));
+
+        await expect(caller.getSubmission({ id: 'cljsubmissionb000000000001' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+});
+
+describe('form.updateSubmission', () => {
+    it('denies a non-admin org role with FORBIDDEN before the service is ever called', async () => {
+        const { formService } = await import('../services/form.service.js');
+        vi.mocked(formService.updateSubmission).mockClear();
+
+        const caller = formRouter.createCaller(makeCtx(ORG_A, 'OPS_MANAGER'));
+
+        await expect(
+            caller.updateSubmission({ id: 'cljsubmission1000000000001', values: { formType: 'standard', values: {}, tableRows: {} } }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        expect(formService.updateSubmission).not.toHaveBeenCalled();
+    });
+
+    it('allows an ADMIN org role through to the service', async () => {
+        const { formService } = await import('../services/form.service.js');
+        vi.mocked(formService.updateSubmission).mockResolvedValue({
+            id: 'cljsubmission1000000000001',
+            formId: 'cljform1000000000000000001',
+            submittedByUserId: 'user-1',
+            values: { formType: 'standard', values: { name: 'Fixed' }, tableRows: {} },
+            createdAt: new Date(),
+        });
+
+        const caller = formRouter.createCaller(makeCtx(ORG_A, 'ADMIN'));
+        const result = await caller.updateSubmission({
+            id: 'cljsubmission1000000000001',
+            values: { formType: 'standard', values: { name: 'Fixed' }, tableRows: {} },
+        });
+
+        expect(result.values).toEqual({ formType: 'standard', values: { name: 'Fixed' }, tableRows: {} });
     });
 });

@@ -316,6 +316,7 @@ export const employeeService = {
                 where: { id: employee.id },
                 data: {
                     ...encrypted,
+                    bankName: input.bankName,
                     accountType: input.accountType,
                     bankAccountLast4: last4(input.bankAccount),
                     bankDetailsAt: new Date(),

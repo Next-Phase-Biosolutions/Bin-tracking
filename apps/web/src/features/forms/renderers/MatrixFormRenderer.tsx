@@ -1,14 +1,25 @@
 import { useState } from 'react';
-import { voiceKeys, type MatrixSchema, type FormVoiceFillResult } from '@bin-tracker/types';
+import {
+    voiceKeys,
+    type MatrixSchema,
+    type FormVoiceFillResult,
+    type FormSubmissionValues,
+} from '@bin-tracker/types';
 import { FieldInput } from '../FieldComponents';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 import { VoiceBlanketBanner, VoiceBlanketMark } from '../VoiceBlanketNotice';
 
+type MatrixValues = Extract<FormSubmissionValues, { formType: 'matrix' }>;
+
 interface Props {
     schema: MatrixSchema;
-    onSubmit: () => void;
+    onSubmit: (values: FormSubmissionValues) => void;
     /** Form id — enables the whole-form voice fill button. Omit in preview. */
     formId?: string;
+    /** Pre-fill from a past submission (SubmissionDetailPage view/edit). */
+    initialValues?: MatrixValues;
+    /** Disables every field and hides Submit — SubmissionDetailPage's default view. */
+    readOnly?: boolean;
 }
 
 interface CellState {
@@ -24,13 +35,13 @@ const cellKey = voiceKeys.matrixCell;
 /** DOM id for a matrix row — the banner's jump target. */
 const rowAnchorId = (rowId: string) => `matrix-row-${rowId}`;
 
-export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
-    const [headerValues, setHeaderValues] = useState<Record<string, string>>({});
+export function MatrixFormRenderer({ schema, onSubmit, formId, initialValues, readOnly = false }: Props) {
+    const [headerValues, setHeaderValues] = useState<Record<string, string>>(() => initialValues?.headerValues ?? {});
     const [headerErrors, setHeaderErrors] = useState<Record<string, string>>({});
-    const [footerValues, setFooterValues] = useState<Record<string, string>>({});
+    const [footerValues, setFooterValues] = useState<Record<string, string>>(() => initialValues?.footerValues ?? {});
     const [footerErrors, setFooterErrors] = useState<Record<string, string>>({});
     // key: `${rowId}__${colId}`
-    const [cells, setCells] = useState<Record<string, CellState>>({});
+    const [cells, setCells] = useState<Record<string, CellState>>(() => initialValues?.cells ?? {});
     // Header/footer fields the voice fill was unsure about — amber "check this".
     const [flaggedFields, setFlaggedFields] = useState<Set<string>>(new Set());
     // Cell keys a spoken blanket filled rather than the worker naming them.
@@ -81,29 +92,33 @@ export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
         setFooterValues((prev) => ({ ...prev, ...footer }));
         setFlaggedFields((prev) => new Set([...prev, ...nextFlagged]));
 
-        const nextCells: Record<string, CellState> = { ...cells };
         const nextBlanket = new Set<string>();
         const nextFlaggedCells = new Set<string>();
-        for (const row of schema.rows) {
-            for (const col of schema.columns) {
-                const answer = result.fields[cellKey(row.id, col.id)];
-                const ingredient = result.fields[voiceKeys.matrixIngredient(row.id, col.id)];
-                if (!answer && !ingredient) continue;
+        // Merged against `prev`, not an outer snapshot of cells, so a tap the
+        // worker made while the fill was in flight isn't dropped.
+        setCells((prev) => {
+            const nextCells: Record<string, CellState> = { ...prev };
+            for (const row of schema.rows) {
+                for (const col of schema.columns) {
+                    const answer = result.fields[cellKey(row.id, col.id)];
+                    const ingredient = result.fields[voiceKeys.matrixIngredient(row.id, col.id)];
+                    if (!answer && !ingredient) continue;
 
-                const key = cellKey(row.id, col.id);
-                const current = nextCells[key] ?? EMPTY_CELL;
-                nextCells[key] = {
-                    // The service only ever emits an exact 'Yes' or 'No' here —
-                    // it drops anything else rather than let this branch coerce
-                    // an unclear answer into "allergen not present".
-                    answer: answer ? (answer.value === 'Yes' ? 'YES' : 'NO') : current.answer,
-                    ingredient: ingredient?.value ?? current.ingredient,
-                };
-                if (answer?.source === 'blanket') nextBlanket.add(key);
-                else if (answer?.confidence === 'low') nextFlaggedCells.add(key);
+                    const key = cellKey(row.id, col.id);
+                    const current = nextCells[key] ?? EMPTY_CELL;
+                    nextCells[key] = {
+                        // The service only ever emits an exact 'Yes' or 'No' here —
+                        // it drops anything else rather than let this branch coerce
+                        // an unclear answer into "allergen not present".
+                        answer: answer ? (answer.value === 'Yes' ? 'YES' : 'NO') : current.answer,
+                        ingredient: ingredient?.value ?? current.ingredient,
+                    };
+                    if (answer?.source === 'blanket') nextBlanket.add(key);
+                    else if (answer?.confidence === 'low') nextFlaggedCells.add(key);
+                }
             }
-        }
-        setCells(nextCells);
+            return nextCells;
+        });
         setBlanketCells((prev) => new Set([...prev, ...nextBlanket]));
         setFlaggedCells((prev) => new Set([...prev, ...nextFlaggedCells]));
     };
@@ -138,7 +153,7 @@ export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
             );
             return;
         }
-        onSubmit();
+        onSubmit({ formType: 'matrix', headerValues, footerValues, cells });
     };
 
     const firstBlanketRow =
@@ -147,8 +162,8 @@ export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
         )?.id ?? null;
 
     return (
-        <div className="flex flex-col gap-5">
-            {formId && (
+        <fieldset disabled={readOnly} className="flex flex-col gap-5 border-0 p-0 m-0">
+            {formId && !readOnly && (
                 <VoiceFormFillButton
                     formId={formId}
                     onFill={applyVoiceFill}
@@ -282,13 +297,15 @@ export function MatrixFormRenderer({ schema, onSubmit, formId }: Props) {
                 </div>
             )}
 
-            <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
-            >
-                Submit Form
-            </button>
-        </div>
+            {!readOnly && (
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors mt-2"
+                >
+                    {initialValues ? 'Save Changes' : 'Submit Form'}
+                </button>
+            )}
+        </fieldset>
     );
 }

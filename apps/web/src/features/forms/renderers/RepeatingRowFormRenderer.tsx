@@ -4,15 +4,22 @@ import {
     VOICE_FILL_REPEATING_KEY,
     type RepeatingSchema,
     type FormVoiceFillResult,
+    type FormSubmissionValues,
 } from '@bin-tracker/types';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 
+type RepeatingValues = Extract<FormSubmissionValues, { formType: 'repeating' }>;
+
 interface Props {
     schema: RepeatingSchema;
-    onSubmit: () => void;
+    onSubmit: (values: FormSubmissionValues) => void;
     /** Form id — enables the whole-form voice fill button. Omit in preview. */
     formId?: string;
     previewMode?: boolean;
+    /** Pre-fill from a past submission (SubmissionDetailPage view/edit). */
+    initialValues?: RepeatingValues;
+    /** Disables every field and hides Submit — SubmissionDetailPage's default view. */
+    readOnly?: boolean;
 }
 
 type Row = Record<string, string>;
@@ -25,8 +32,8 @@ function emptyRow(schema: RepeatingSchema): Row {
     return row;
 }
 
-export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode }: Props) {
-    const [rows, setRows] = useState<Row[]>([emptyRow(schema)]);
+export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode, initialValues, readOnly = false }: Props) {
+    const [rows, setRows] = useState<Row[]>(() => initialValues?.rows ?? [emptyRow(schema)]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     // Cells (`${rowIdx}_${colId}`) the voice fill was unsure about.
     const [flaggedCells, setFlaggedCells] = useState<Set<string>>(new Set());
@@ -46,21 +53,42 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
         }
     };
 
-    // Whole-form voice fill: append one row from the spoken reading, flagging
+    /**
+     * Put a voice-filled row on top of the single untouched row seeded on
+     * mount, if it's still untouched, rather than below it — an appended row
+     * left that blank one failing required-column validation on Submit, so a
+     * worker who filled the table hands-free had to find and delete a row
+     * they never touched. Flags low-confidence cells at whichever index the
+     * row actually landed at.
+     */
+    const placeRow = (row: Row, confidence: Record<string, 'high' | 'low'>) => {
+        let rowIdx = 0;
+        setRows((prev) => {
+            const pristine = prev.length === 1 && schema.columns.every((c) => (prev[0]?.[c.id] ?? '') === (emptyRow(schema)[c.id] ?? ''));
+            rowIdx = pristine ? 0 : prev.length;
+            return pristine ? [row] : [...prev, row];
+        });
+        setFlaggedCells((prev) => {
+            const next = new Set(prev);
+            for (const [colId, level] of Object.entries(confidence)) {
+                if (level === 'low') next.add(`${rowIdx}_${colId}`);
+            }
+            return next;
+        });
+    };
+
+    // Whole-form voice fill: one row from the spoken reading, flagging
     // low-confidence cells for review.
     const applyVoiceFill = (result: FormVoiceFillResult) => {
         const cols = result.tableRows[VOICE_FILL_REPEATING_KEY];
         if (!cols) return;
         const row = emptyRow(schema);
-        for (const [colId, filled] of Object.entries(cols)) row[colId] = filled.value;
-
-        const rowIdx = rows.length; // the appended row index
-        const newFlagged = new Set<string>();
+        const confidence: Record<string, 'high' | 'low'> = {};
         for (const [colId, filled] of Object.entries(cols)) {
-            if (filled.confidence === 'low') newFlagged.add(`${rowIdx}_${colId}`);
+            row[colId] = filled.value;
+            confidence[colId] = filled.confidence;
         }
-        setRows((prev) => [...prev, row]);
-        setFlaggedCells((prev) => new Set([...prev, ...newFlagged]));
+        placeRow(row, confidence);
     };
 
     const addRow = () => setRows((prev) => [...prev, emptyRow(schema)]);
@@ -83,7 +111,7 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
             setErrors(errs);
             return;
         }
-        onSubmit();
+        onSubmit({ formType: 'repeating', rows });
     };
 
     const cellBorder = 'border border-edge';
@@ -93,8 +121,8 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
         }`;
 
     return (
-        <div className="flex flex-col gap-5">
-            {formId && !previewMode && (
+        <fieldset disabled={readOnly} className="flex flex-col gap-5 border-0 p-0 m-0">
+            {formId && !previewMode && !readOnly && (
                 <VoiceFormFillButton formId={formId} onFill={applyVoiceFill} />
             )}
             {/* Instructions banner */}
@@ -222,15 +250,15 @@ export function RepeatingRowFormRenderer({ schema, onSubmit, formId, previewMode
 
             <p className="text-xs text-muted text-center">{rows.length} {rows.length === 1 ? 'entry' : 'entries'}</p>
 
-            {!previewMode && (
+            {!previewMode && !readOnly && (
                 <button
                     type="button"
                     onClick={handleSubmit}
                     className="w-full bg-olive-deep hover:bg-olive-deep/90 text-bone-light py-4 rounded-xl text-lg font-bold transition-colors"
                 >
-                    Submit Form
+                    {initialValues ? 'Save Changes' : 'Submit Form'}
                 </button>
             )}
-        </div>
+        </fieldset>
     );
 }

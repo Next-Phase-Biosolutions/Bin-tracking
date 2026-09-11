@@ -69,8 +69,17 @@ export type {
     FormDigitizeDraft,
     VoiceFilledValue,
     FormVoiceFillResult,
+    ChecklistItemValue,
+    MatrixCellValue,
+    FormSubmissionTableRow,
+    FormSubmissionValues,
+    FormSubmission,
+    FormSubmissionAuditLog,
+    FormSubmissionListItem,
+    FormSubmissionDetail,
 } from './form.js';
 export { VOICE_FILL_REPEATING_KEY, voiceKeys } from './form.js';
+export { getMissingRequiredFields } from './form-validation.js';
 export type { Plan, SubscriptionStatus, ModuleKey, PlanLimits } from './entitlements.js';
 export { PLAN_LIMITS, PLAN_DEFAULT_MODULES, ALL_MODULE_KEYS, MODULE_LABELS, MODULE_SUBLABELS, defaultModulesForPlan, isSubscriptionUsable } from './entitlements.js';
 export type { ThresholdStatus } from './sensor-thresholds.js';

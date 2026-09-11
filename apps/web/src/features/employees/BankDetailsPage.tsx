@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { trpc } from '../../lib/trpc';
+import { TRPCClientError } from '@trpc/client';
+import { apiClient, trpc, RouterOutputs } from '../../lib/trpc';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Button } from '../../components/ui/primitives';
 import { Field } from './Field';
+
+type BankLinkContext = RouterOutputs['employee']['bankLinkContext'];
 
 /**
  * Public, unauthenticated page where an employee submits their OWN bank
@@ -19,20 +22,20 @@ import { Field } from './Field';
 type Step = 'form' | 'review' | 'done';
 
 interface FormState {
-    accountHolderName: string;
-    bankInstitution: string;
-    bankTransit: string;
     bankAccount: string;
-    accountType: 'CHEQUING' | 'SAVINGS';
+    accountHolderName: string;
+    bankName: string;
+    bankTransit: string;
+    bankInstitution: string;
     email: string;
 }
 
 const EMPTY_FORM: FormState = {
-    accountHolderName: '',
-    bankInstitution: '',
-    bankTransit: '',
     bankAccount: '',
-    accountType: 'CHEQUING',
+    accountHolderName: '',
+    bankName: '',
+    bankTransit: '',
+    bankInstitution: '',
     email: '',
 };
 
@@ -48,10 +51,11 @@ function stripSeparators(value: string): string {
 
 function validate(form: FormState): Partial<Record<keyof FormState, string>> {
     const errors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.accountHolderName.trim()) errors.accountHolderName = 'Required — as printed on the account';
-    if (!/^\d{3}$/.test(form.bankInstitution)) errors.bankInstitution = 'Must be exactly 3 digits';
-    if (!/^\d{5}$/.test(form.bankTransit)) errors.bankTransit = 'Must be exactly 5 digits';
     if (!/^\d{7,12}$/.test(form.bankAccount)) errors.bankAccount = 'Must be 7 to 12 digits';
+    if (!form.accountHolderName.trim()) errors.accountHolderName = 'Required — as printed on the account';
+    if (!form.bankName.trim()) errors.bankName = 'Required — e.g. TD Canada Trust';
+    if (!/^\d{5}$/.test(form.bankTransit)) errors.bankTransit = 'Must be exactly 5 digits';
+    if (!/^\d{3}$/.test(form.bankInstitution)) errors.bankInstitution = 'Must be exactly 3 digits';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address';
     return errors;
 }
@@ -62,36 +66,48 @@ export default function BankDetailsPage() {
     const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
     const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
-    const contextMutation = trpc.employee.bankLinkContext.useMutation();
     const submitMutation = trpc.employee.submitBankDetails.useMutation({
         onSuccess: () => setStep('done'),
     });
+
+    const [context, setContext] = useState<BankLinkContext | null>(null);
+    const [contextError, setContextError] = useState<string | null>(null);
+    const [contextLoading, setContextLoading] = useState(true);
 
     // The token lives in the URL path, so it's resolved via a POST (mutation)
     // rather than a query — a tRPC query would put it in the query string and
     // straight into the server's access logs.
     //
-    // The ref guard is required, not defensive: StrictMode (main.tsx) runs
-    // effects twice in dev, and this is a MUTATION, so without it every page
-    // load spends two of the caller's 20/hour token-endpoint budget. Same
-    // pattern as AcceptInvitePage's `requested` ref.
-    const { mutate: loadContext } = contextMutation;
+    // Uses the vanilla apiClient (imperative, outside the React Query hook
+    // tree) rather than trpc.employee.bankLinkContext.useMutation() — the
+    // hook form's mutation observer here never settled after a genuinely
+    // successful response (same issue found and fixed on ApprovePage), so
+    // this sidesteps it with a plain fetch-once-on-mount pattern instead.
+    //
+    // The ref guard is required, not defensive: this is a rate-limited
+    // endpoint (20/hour), so a duplicate call must never fire.
     const requested = useRef(false);
     useEffect(() => {
         if (!token || requested.current) return;
         requested.current = true;
-        loadContext(
-            { token },
-            {
+        apiClient.employee.bankLinkContext
+            .mutate({ token })
+            .then((data) => {
+                setContext(data);
                 // Prefill the address the link was sent to. Without this, a
                 // typo on a blank field silently overwrites the employer's
                 // good contact email for this employee on submit.
-                onSuccess: (data) => setForm((prev) => ({ ...prev, email: prev.email || data.email })),
-            },
-        );
-    }, [token, loadContext]);
-
-    const context = contextMutation.data;
+                setForm((prev) => ({ ...prev, email: prev.email || data.email }));
+            })
+            .catch((e: unknown) => {
+                setContextError(
+                    e instanceof TRPCClientError
+                        ? e.message
+                        : 'Bank details links work once and expire after 7 days. Ask your employer to send a new one.',
+                );
+            })
+            .finally(() => setContextLoading(false));
+    }, [token]);
 
     const update = (field: keyof FormState, value: string) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -103,10 +119,11 @@ export default function BankDetailsPage() {
         // account, not an 8-character rejection.
         const normalized: FormState = {
             ...form,
-            accountHolderName: form.accountHolderName.trim(),
-            bankInstitution: stripSeparators(form.bankInstitution),
-            bankTransit: stripSeparators(form.bankTransit),
             bankAccount: stripSeparators(form.bankAccount),
+            accountHolderName: form.accountHolderName.trim(),
+            bankName: form.bankName.trim(),
+            bankTransit: stripSeparators(form.bankTransit),
+            bankInstitution: stripSeparators(form.bankInstitution),
             email: form.email.trim(),
         };
         const found = validate(normalized);
@@ -115,11 +132,11 @@ export default function BankDetailsPage() {
         if (Object.keys(found).length === 0) setStep('review');
     };
 
-    if (contextMutation.isPending) {
+    if (contextLoading) {
         return <Shell><p className="text-center text-muted">Checking your link…</p></Shell>;
     }
 
-    if (contextMutation.isError) {
+    if (contextError || !context) {
         return (
             <Shell>
                 <div className="text-center">
@@ -158,11 +175,11 @@ export default function BankDetailsPage() {
                 </p>
 
                 <dl className="mt-5 divide-y divide-edge/50 rounded-xl border border-edge bg-white">
-                    <ReviewRow label="Account holder" value={form.accountHolderName} />
-                    <ReviewRow label="Institution" value={form.bankInstitution} mono />
-                    <ReviewRow label="Transit" value={form.bankTransit} mono />
                     <ReviewRow label="Account number" value={form.bankAccount} mono />
-                    <ReviewRow label="Account type" value={form.accountType === 'CHEQUING' ? 'Chequing' : 'Savings'} />
+                    <ReviewRow label="Account name" value={form.accountHolderName} />
+                    <ReviewRow label="Bank name" value={form.bankName} />
+                    <ReviewRow label="Routing number" value={form.bankTransit} mono />
+                    <ReviewRow label="Institution number" value={form.bankInstitution} mono />
                     <ReviewRow label="Email" value={form.email} />
                 </dl>
 
@@ -197,44 +214,6 @@ export default function BankDetailsPage() {
         <Shell org={context?.organizationName} employee={context?.employeeFullName}>
             <form onSubmit={handleNext} className="space-y-4" autoComplete="off">
                 <Field
-                    label="Account holder name"
-                    required
-                    value={form.accountHolderName}
-                    onChange={(v) => update('accountHolderName', v)}
-                    placeholder="Jane Doe"
-                    hint={errors.accountHolderName ?? 'Exactly as it appears on your bank account'}
-                    error={Boolean(errors.accountHolderName)}
-                    autoComplete="off"
-                />
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                        label="Institution number"
-                        required
-                        value={form.bankInstitution}
-                        onChange={(v) => update('bankInstitution', v)}
-                        placeholder="004"
-                        inputMode="numeric"
-                        maxLength={5}
-                        hint={errors.bankInstitution ?? '3 digits — identifies your bank'}
-                        error={Boolean(errors.bankInstitution)}
-                        autoComplete="off"
-                    />
-                    <Field
-                        label="Transit number"
-                        required
-                        value={form.bankTransit}
-                        onChange={(v) => update('bankTransit', v)}
-                        placeholder="12345"
-                        inputMode="numeric"
-                        maxLength={8}
-                        hint={errors.bankTransit ?? '5 digits — identifies your branch'}
-                        error={Boolean(errors.bankTransit)}
-                        autoComplete="off"
-                    />
-                </div>
-
-                <Field
                     label="Account number"
                     required
                     value={form.bankAccount}
@@ -247,33 +226,54 @@ export default function BankDetailsPage() {
                     autoComplete="off"
                 />
 
-                <fieldset>
-                    <legend className="mb-1.5 block text-xs font-semibold text-olive-deep">
-                        Account type<span className="text-rust"> *</span>
-                    </legend>
-                    <div className="flex gap-3">
-                        {(['CHEQUING', 'SAVINGS'] as const).map((type) => (
-                            <label
-                                key={type}
-                                className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium transition-colors ${
-                                    form.accountType === type
-                                        ? 'border-rust bg-rust/10 text-olive-deep'
-                                        : 'border-edge bg-white text-muted hover:bg-bone-light'
-                                }`}
-                            >
-                                <input
-                                    type="radio"
-                                    name="accountType"
-                                    value={type}
-                                    checked={form.accountType === type}
-                                    onChange={() => update('accountType', type)}
-                                    className="sr-only"
-                                />
-                                {type === 'CHEQUING' ? 'Chequing' : 'Savings'}
-                            </label>
-                        ))}
-                    </div>
-                </fieldset>
+                <Field
+                    label="Account name"
+                    required
+                    value={form.accountHolderName}
+                    onChange={(v) => update('accountHolderName', v)}
+                    placeholder="Jane Doe"
+                    hint={errors.accountHolderName ?? 'Exactly as it appears on your bank account'}
+                    error={Boolean(errors.accountHolderName)}
+                    autoComplete="off"
+                />
+
+                <Field
+                    label="Bank name"
+                    required
+                    value={form.bankName}
+                    onChange={(v) => update('bankName', v)}
+                    placeholder="TD Canada Trust"
+                    hint={errors.bankName}
+                    error={Boolean(errors.bankName)}
+                    autoComplete="off"
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field
+                        label="Routing number"
+                        required
+                        value={form.bankTransit}
+                        onChange={(v) => update('bankTransit', v)}
+                        placeholder="12345"
+                        inputMode="numeric"
+                        maxLength={8}
+                        hint={errors.bankTransit ?? '5 digits — identifies your branch'}
+                        error={Boolean(errors.bankTransit)}
+                        autoComplete="off"
+                    />
+                    <Field
+                        label="Institution number"
+                        required
+                        value={form.bankInstitution}
+                        onChange={(v) => update('bankInstitution', v)}
+                        placeholder="004"
+                        inputMode="numeric"
+                        maxLength={5}
+                        hint={errors.bankInstitution ?? '3 digits — identifies your bank'}
+                        error={Boolean(errors.bankInstitution)}
+                        autoComplete="off"
+                    />
+                </div>
 
                 <Field
                     label="Email"
@@ -295,8 +295,8 @@ export default function BankDetailsPage() {
                 </button>
 
                 <p className="text-center text-xs text-muted">
-                    Your details are encrypted before they are stored and are never shown to your employer — they only
-                    see the last 4 digits.
+                    Your account and routing numbers are encrypted before they're stored and never shown to your
+                    employer — they only see your bank name and the last 4 digits of your account.
                 </p>
             </form>
         </Shell>

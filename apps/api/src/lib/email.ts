@@ -70,7 +70,7 @@ export async function sendBankDetailsRequestEmail(to: string, url: string, orgNa
         html: [
             `<p><strong>${safeOrgName}</strong> is setting up direct deposit so your pay can be sent straight to your bank account.</p>`,
             `<p><a href="${url}">Add your bank details</a></p>`,
-            `<p>You'll need your institution (3 digits), transit (5 digits) and account number — all three are on a cheque, or under "direct deposit info" in most online banking apps.</p>`,
+            `<p>You'll need your account number, account name, bank name, routing number (5 digits) and institution number (3 digits) — all of these are on a cheque, or under "direct deposit info" in most online banking apps.</p>`,
             `<p>This link works once and expires in 7 days. Never send your bank details by email reply.</p>`,
         ].join(''),
     });

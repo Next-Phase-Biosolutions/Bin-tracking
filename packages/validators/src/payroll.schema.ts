@@ -42,3 +42,11 @@ export const payrollResolveExceptionSchema = z
     });
 
 export type PayrollResolveExceptionInput = z.infer<typeof payrollResolveExceptionSchema>;
+
+/** Public: resolve a payroll approval-email link (run id + one-time code) for the landing page. */
+export const payrollApprovalContextSchema = z.object({
+    runId: z.string().min(1),
+    code: z.string().min(1),
+});
+
+export type PayrollApprovalContextInput = z.infer<typeof payrollApprovalContextSchema>;

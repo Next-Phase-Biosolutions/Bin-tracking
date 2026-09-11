@@ -141,6 +141,15 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            monitors every org's payroll). There is no caller org to scope
 #            to; the org is derived from the run's own organizationId and
 #            returned for display. Not an org-tenant leak vector.
+#
+# Payroll approval landing page (payroll.service.ts) entry:
+#   [TOKEN]  const run = await prisma.payrollRun.findUnique({ where: { id: runId } });
+#            in getApprovalContext — PUBLIC endpoint (payroll.approvalContext)
+#            behind the manager's emailed approval link, with no session and no
+#            caller-asserted org. A DRAFT run's summary is only returned after
+#            verifyApprovalCode checks the one-time hashed code; a non-DRAFT run
+#            reveals period and status only (no amounts), keyed by an
+#            unguessable cuid runId. See the [TOKEN] category above.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
@@ -197,6 +206,7 @@ apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.find
 apps/api/src/services/form.service.ts	const rows = await prisma.formTemplate.findMany({
 apps/api/src/services/payroll.service.ts	const existing = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({
+apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({ where: { id: runId } });
 apps/api/src/services/payroll.service.ts	const runs = await prisma.payrollRun.findMany({
 apps/api/src/services/settings.service.ts	prisma.settings.upsert({
 apps/api/src/services/shipment.service.ts	const row = await prisma.shipment.create({

@@ -146,6 +146,7 @@ const VALID_DETAILS = {
     bankTransit: '12345',
     bankAccount: '7001234',
     accountHolderName: 'Jane Doe',
+    bankName: 'TD Canada Trust',
     accountType: 'CHEQUING' as const,
     email: 'jane@acme.com',
 };

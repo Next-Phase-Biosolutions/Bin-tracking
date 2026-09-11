@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import type { FormTemplate } from '@bin-tracker/types';
+import { useMutation } from '@tanstack/react-query';
+import type { FormTemplate, FormSubmissionValues } from '@bin-tracker/types';
+import { apiClient } from '../../lib/trpc';
 import { StandardFormRenderer } from './renderers/StandardFormRenderer';
 import { ChecklistFormRenderer } from './renderers/ChecklistFormRenderer';
 import { MatrixFormRenderer } from './renderers/MatrixFormRenderer';
@@ -16,9 +18,17 @@ interface Props {
 export function FormRenderer({ form, onBack }: Props) {
     const [submitted, setSubmitted] = useState(false);
 
+    const submitMutation = useMutation({
+        mutationFn: (values: FormSubmissionValues) =>
+            apiClient.form.submit.mutate({ formId: form.id, values }),
+        onSuccess: () => setSubmitted(true),
+    });
+
     if (submitted) {
         return <FormSuccessScreen formTitle={form.title} onBack={onBack} />;
     }
+
+    const handleSubmit = (values: FormSubmissionValues) => submitMutation.mutate(values);
 
     const renderForm = () => {
         switch (form.schema.formType) {
@@ -27,17 +37,17 @@ export function FormRenderer({ form, onBack }: Props) {
                     <StandardFormRenderer
                         schema={form.schema}
                         instructions={form.description}
-                        onSubmit={() => setSubmitted(true)}
+                        onSubmit={handleSubmit}
                         formId={form.id}
                         showInstructions={false}
                     />
                 );
             case 'checklist':
-                return <ChecklistFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
+                return <ChecklistFormRenderer schema={form.schema} onSubmit={handleSubmit} formId={form.id} />;
             case 'matrix':
-                return <MatrixFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
+                return <MatrixFormRenderer schema={form.schema} onSubmit={handleSubmit} formId={form.id} />;
             case 'repeating':
-                return <RepeatingRowFormRenderer schema={form.schema} onSubmit={() => setSubmitted(true)} formId={form.id} />;
+                return <RepeatingRowFormRenderer schema={form.schema} onSubmit={handleSubmit} formId={form.id} />;
         }
     };
 
@@ -56,7 +66,17 @@ export function FormRenderer({ form, onBack }: Props) {
 
             <div className="w-full pb-12">
                 <FormFillLayout title={form.title} instructions={form.description}>
-                    {renderForm()}
+                    <div className="flex flex-col gap-6">
+                        {submitMutation.isError && (
+                            <p role="alert" className="rounded-xl border border-rust/30 bg-rust/10 px-4 py-3 text-sm text-rust">
+                                {submitMutation.error.message}
+                            </p>
+                        )}
+                        {/* Native fieldset-disable blocks every descendant control (including the
+                            renderers' own Submit buttons) while the mutation is in flight — cheaper
+                            than threading an isSubmitting prop through all four renderer components. */}
+                        <fieldset disabled={submitMutation.isPending}>{renderForm()}</fieldset>
+                    </div>
                 </FormFillLayout>
             </div>
         </div>

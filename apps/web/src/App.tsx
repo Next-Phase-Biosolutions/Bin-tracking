@@ -8,6 +8,8 @@ import AnimalRecordsPage from './features/farmer-registration/AnimalRecordsPage'
 import FormListPage from './features/forms/FormListPage';
 import FormBuilderPage from './features/forms/FormBuilderPage';
 import FormImportPage from './features/forms/import/FormImportPage';
+import SubmissionsListPage from './features/forms/SubmissionsListPage';
+import SubmissionDetailPage from './features/forms/SubmissionDetailPage';
 import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
 import EmployeesPage from './features/employees/EmployeesPage';
 import BankDetailsPage from './features/employees/BankDetailsPage';
@@ -19,6 +21,7 @@ import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import PayrollAdminPage from './features/admin/PayrollAdminPage';
 import PayrollPage from './features/payroll/PayrollPage';
+import ApprovePage from './features/payroll/ApprovePage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import OnboardingWizard from './features/onboarding/OnboardingWizard';
@@ -57,6 +60,8 @@ export function App() {
             <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
             {/* Public: the employee has no login — the link token is the sole credential. */}
             <Route path="/app/bank-details/:token" element={<BankDetailsPage />} />
+            {/* Public: the manager has no login here either — the run id + one-time code are the sole credential. */}
+            <Route path="/app/payroll/approve" element={<ApprovePage />} />
 
             <Route element={<AppShellLayout />}>
                 <Route path="/app/bin" element={<TabletPage />} />
@@ -76,6 +81,8 @@ export function App() {
                 <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
                 <Route path="/app/forms/new" element={<FormBuilderPage />} />
                 <Route path="/app/forms/import" element={<FormImportPage />} />
+                <Route path="/app/forms/submissions" element={<SubmissionsListPage />} />
+                <Route path="/app/forms/submissions/:id" element={<SubmissionDetailPage />} />
                 <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
                 <Route path="/app/admin/payroll" element={<PayrollAdminPage />} />
                 <Route path="/app/settings" element={<SettingsPage />} />

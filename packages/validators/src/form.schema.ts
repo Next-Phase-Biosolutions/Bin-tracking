@@ -198,14 +198,96 @@ export const formTranscribeFieldSchema = z.object({
 });
 
 /**
+ * Per-field cap on a recorded clip, the audio counterpart to
+ * IMAGE_BASE64_MAX_CHARS above. The recorders cap a single take at 60s, which
+ * is ~1-2MB of base64 webm/opus, so this leaves generous headroom while still
+ * rejecting a payload that only exists to burn transcription spend. The
+ * Fastify bodyLimit (20MB) remains the outer bound.
+ */
+const AUDIO_BASE64_MAX_CHARS = 8 * 1024 * 1024;
+
+/**
  * Whole-form voice fill: one utterance fills every field on a standard/repeating
  * form. The schema is loaded server-side from `formId` (trusted), so only the
  * audio crosses the wire here.
  */
 export const formFillByVoiceSchema = z.object({
     formId: z.string().cuid(),
-    audioBase64: z.string().min(1),
+    audioBase64: z.string().min(1).max(AUDIO_BASE64_MAX_CHARS),
     mimeType: z.string().default('audio/webm'),
+});
+
+// ─── Form submission ────────────────────────────────────────────────────────
+
+const submissionTableRowSchema = z.record(z.string());
+
+const checklistItemValueSchema = z.object({
+    answer: z.enum(['yes', 'no']).nullable(),
+    deviation: z.string(),
+    corrective: z.string(),
+});
+
+const matrixCellValueSchema = z.object({
+    answer: z.enum(['YES', 'NO']).nullable(),
+    ingredient: z.string(),
+});
+
+/** Mirrors packages/types' FormSubmissionValues discriminated union exactly. */
+export const formSubmissionValuesSchema = z.discriminatedUnion('formType', [
+    z.object({
+        formType: z.literal('standard'),
+        values: z.record(z.string()),
+        tableRows: z.record(z.array(submissionTableRowSchema)),
+    }),
+    z.object({
+        formType: z.literal('checklist'),
+        headerValues: z.record(z.string()),
+        itemStates: z.record(checklistItemValueSchema),
+    }),
+    z.object({
+        formType: z.literal('matrix'),
+        headerValues: z.record(z.string()),
+        footerValues: z.record(z.string()),
+        cells: z.record(matrixCellValueSchema),
+    }),
+    z.object({
+        formType: z.literal('repeating'),
+        rows: z.array(submissionTableRowSchema),
+    }),
+]);
+
+/**
+ * A submission's `values` is stored verbatim as JSONB, and every admin
+ * correction stores TWO more copies of it in the audit log — so an unbounded
+ * blob compounds. 256KB is far beyond any real filled form (the largest
+ * built-in template is a 10x3 allergen matrix) while keeping one org member
+ * from writing megabytes per submit up to the 20MB body limit.
+ */
+const SUBMISSION_VALUES_MAX_CHARS = 256 * 1024;
+
+const boundedSubmissionValues = formSubmissionValuesSchema.refine(
+    (v) => JSON.stringify(v).length <= SUBMISSION_VALUES_MAX_CHARS,
+    { message: 'Submission values are too large' },
+);
+
+export const formSubmitSchema = z.object({
+    formId: z.string().cuid(),
+    values: boundedSubmissionValues,
+});
+
+export const formListSubmissionsSchema = z.object({
+    formId: z.string().cuid().optional(),
+    stage: z.string().optional(),
+});
+
+export const formGetSubmissionSchema = z.object({
+    id: z.string().cuid(),
+});
+
+/** Admin-only correction — re-submits the full values, never a partial patch, so the audit log's oldValue/newValue are always complete snapshots. */
+export const formUpdateSubmissionSchema = z.object({
+    id: z.string().cuid(),
+    values: boundedSubmissionValues,
 });
 
 export type FormListByStageInput = z.infer<typeof formListByStageSchema>;
@@ -216,3 +298,7 @@ export type FormRefineFromRegionInput = z.infer<typeof formRefineFromRegionSchem
 export type FormCreateInput = z.infer<typeof formCreateSchema>;
 export type FormTranscribeFieldInput = z.infer<typeof formTranscribeFieldSchema>;
 export type FormFillByVoiceInput = z.infer<typeof formFillByVoiceSchema>;
+export type FormSubmitInput = z.infer<typeof formSubmitSchema>;
+export type FormListSubmissionsInput = z.infer<typeof formListSubmissionsSchema>;
+export type FormGetSubmissionInput = z.infer<typeof formGetSubmissionSchema>;
+export type FormUpdateSubmissionInput = z.infer<typeof formUpdateSubmissionSchema>;

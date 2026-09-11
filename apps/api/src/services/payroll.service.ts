@@ -7,6 +7,7 @@ import type {
     PayrollResolveExceptionInput,
 } from '@bin-tracker/validators';
 import type { PayrollRunView, PayrollRunSummary } from '@bin-tracker/types';
+import { verifyApprovalCode } from '../lib/approvalCode.js';
 
 const MINUTES_PER_HOUR = 60;
 
@@ -370,5 +371,47 @@ export const payrollService = {
             computedAt: run.computedAt,
             createdAt: run.createdAt,
         }));
+    },
+
+    /**
+     * Public: resolve the approval-email landing page. Mirrors the payment-agent
+     * Edge Function's own disclosure order exactly — a non-DRAFT run reports only
+     * period+status (no amount, no code check needed), while a DRAFT run only
+     * reveals the summary once the one-time code verifies. The actual approve
+     * mutation still happens in that Edge Function; this is read-only.
+     */
+    async getApprovalContext(
+        runId: string,
+        code: string,
+    ): Promise<{
+        period: string;
+        status: string;
+        totalEmployees: number;
+        totalGrossCents: number;
+        currency: string;
+    }> {
+        const run = await prisma.payrollRun.findUnique({ where: { id: runId } });
+        if (!run) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'This approval link is not valid.' });
+        }
+        if (run.status !== 'DRAFT') {
+            return {
+                period: run.period,
+                status: run.status,
+                totalEmployees: 0,
+                totalGrossCents: 0,
+                currency: run.currency,
+            };
+        }
+        if (!verifyApprovalCode(code, run.approvalCodeHash, run.approvalExpiresAt)) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'This approval link is invalid or expired.' });
+        }
+        return {
+            period: run.period,
+            status: run.status,
+            totalEmployees: run.totalEmployees,
+            totalGrossCents: run.totalGrossCents,
+            currency: run.currency,
+        };
     },
 };

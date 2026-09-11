@@ -4,9 +4,23 @@ import { TRPCError } from '@trpc/server';
 import type { Prisma } from '@prisma/client';
 import type { DbClient } from '@bin-tracker/db';
 import { prisma } from '@bin-tracker/db';
-import type { FormTemplate, FormDigitizeDraft } from '@bin-tracker/types';
-import { PLAN_LIMITS } from '@bin-tracker/types';
-import type { FormCreateInput, FormTranscribeFieldInput } from '@bin-tracker/validators';
+import type {
+    FormTemplate,
+    FormDigitizeDraft,
+    FormSchema,
+    FormSubmission,
+    FormSubmissionValues,
+    FormSubmissionListItem,
+    FormSubmissionDetail,
+} from '@bin-tracker/types';
+import { PLAN_LIMITS, getMissingRequiredFields } from '@bin-tracker/types';
+import type {
+    FormCreateInput,
+    FormTranscribeFieldInput,
+    FormSubmitInput,
+    FormListSubmissionsInput,
+    FormUpdateSubmissionInput,
+} from '@bin-tracker/validators';
 import { formSchemaSchema } from '@bin-tracker/validators';
 import { applyVoiceEnabledToSchema, generateFieldIds } from '../lib/form-schema-utils.js';
 import { formDigitizeService } from './form-digitize.service.js';
@@ -51,6 +65,22 @@ function toFormTemplate(raw: {
         sortOrder: raw.sortOrder,
         createdAt: raw.createdAt,
         updatedAt: raw.updatedAt,
+    };
+}
+
+function toFormSubmission(raw: {
+    id: string;
+    formId: string;
+    submittedByUserId: string | null;
+    values: unknown;
+    createdAt: Date;
+}): FormSubmission {
+    return {
+        id: raw.id,
+        formId: raw.formId,
+        submittedByUserId: raw.submittedByUserId,
+        values: raw.values as FormSubmissionValues,
+        createdAt: raw.createdAt,
     };
 }
 
@@ -216,5 +246,162 @@ Rules:
                 message: 'Claude field extraction error',
             });
         }
+    },
+
+    /**
+     * Write-once from the submitting side — there is no update/delete here
+     * (see updateSubmission, admin-only, below). formId is re-verified
+     * against orgId server-side rather than trusted from the client, same
+     * discipline as getById's cross-org NOT_FOUND.
+     */
+    async submit(
+        prisma: DbClient,
+        input: FormSubmitInput,
+        orgId: string,
+        submittedByUserId: string | null,
+    ): Promise<FormSubmission> {
+        const form = await this.getById(prisma, orgId, input.formId);
+        if (!form) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Form not found' });
+        }
+
+        const missing = getMissingRequiredFields(form.schema, input.values);
+        if (missing.length > 0) {
+            throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Missing required fields: ${missing.join(', ')}`,
+            });
+        }
+
+        const row = await prisma.formSubmission.create({
+            data: {
+                formId: input.formId,
+                organizationId: orgId,
+                submittedByUserId,
+                values: input.values as unknown as Prisma.InputJsonValue,
+            },
+        });
+
+        return toFormSubmission(row);
+    },
+
+    async listSubmissions(
+        prisma: DbClient,
+        orgId: string,
+        input: FormListSubmissionsInput,
+    ): Promise<FormSubmissionListItem[]> {
+        const rows = await prisma.formSubmission.findMany({
+            where: {
+                organizationId: orgId,
+                ...(input.formId ? { formId: input.formId } : {}),
+                ...(input.stage ? { form: { stage: input.stage } } : {}),
+            },
+            include: {
+                form: { select: { title: true } },
+                submittedBy: { select: { name: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return rows.map((row) => ({
+            id: row.id,
+            formId: row.formId,
+            formTitle: row.form.title,
+            submittedByName: row.submittedBy?.name ?? null,
+            createdAt: row.createdAt,
+        }));
+    },
+
+    /** Cross-org mismatch reads as "not found" — same discipline as getById. */
+    async getSubmission(prisma: DbClient, orgId: string, id: string): Promise<FormSubmissionDetail | null> {
+        const row = await prisma.formSubmission.findUnique({
+            where: { id },
+            include: {
+                form: { select: { title: true, schema: true } },
+                submittedBy: { select: { name: true } },
+                auditLogs: { orderBy: { createdAt: 'desc' } },
+            },
+        });
+        if (!row || row.organizationId !== orgId) return null;
+
+        return {
+            submission: toFormSubmission(row),
+            formTitle: row.form.title,
+            formSchema: row.form.schema as unknown as FormSchema,
+            submittedByName: row.submittedBy?.name ?? null,
+            auditLogs: row.auditLogs.map((log) => ({
+                id: log.id,
+                submissionId: log.submissionId,
+                actorId: log.actorId,
+                oldValue: log.oldValue as unknown as FormSubmissionValues,
+                newValue: log.newValue as unknown as FormSubmissionValues,
+                createdAt: log.createdAt,
+            })),
+        };
+    },
+
+    /**
+     * Admin-only correction (gated by orgAdminProcedure at the router).
+     * Always writes a FormSubmissionAuditLog row alongside the update, in
+     * the same transaction, so a correction is never a silent overwrite —
+     * mirrors PayrollAuditLog's oldValue/newValue snapshot discipline.
+     * submittedByUserId is intentionally immutable here: this corrects what
+     * was recorded, not who it's attributed to.
+     */
+    async updateSubmission(
+        prisma: DbClient,
+        input: FormUpdateSubmissionInput,
+        orgId: string,
+        actorId: string | null,
+    ): Promise<FormSubmission> {
+        const existing = await prisma.formSubmission.findUnique({
+            where: { id: input.id },
+            include: { form: { select: { schema: true } } },
+        });
+        if (!existing || existing.organizationId !== orgId) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Submission not found' });
+        }
+
+        const schema = existing.form.schema as unknown as FormSchema;
+        const missing = getMissingRequiredFields(schema, input.values);
+        if (missing.length > 0) {
+            throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Missing required fields: ${missing.join(', ')}`,
+            });
+        }
+
+        const updated = await prisma.$transaction(async (tx) => {
+            // Re-read INSIDE the transaction so `oldValue` is the row this
+            // update actually replaces. Reading it outside (as the validation
+            // above does, where a stale read only costs a redundant check) let
+            // two admins correcting the same submission both record the same
+            // pre-edit snapshot, so the audit trail claimed the second edit
+            // started from a value the first had already overwritten.
+            const current = await tx.formSubmission.findUnique({
+                where: { id: existing.id },
+                select: { values: true },
+            });
+            if (!current) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Submission not found' });
+            }
+
+            await tx.formSubmissionAuditLog.create({
+                data: {
+                    submissionId: existing.id,
+                    orgId,
+                    actorId,
+                    oldValue: current.values as Prisma.InputJsonValue,
+                    newValue: input.values as unknown as Prisma.InputJsonValue,
+                },
+            });
+
+            return tx.formSubmission.update({
+                where: { id: existing.id },
+                data: { values: input.values as unknown as Prisma.InputJsonValue },
+            });
+        });
+
+        return toFormSubmission(updated);
     },
 };

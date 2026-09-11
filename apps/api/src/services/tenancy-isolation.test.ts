@@ -116,6 +116,15 @@ interface FakeFormTemplate {
     updatedAt: Date;
 }
 
+interface FakeFormSubmission {
+    id: string;
+    formId: string;
+    organizationId: string;
+    submittedByUserId: string | null;
+    values: unknown;
+    createdAt: Date;
+}
+
 const store = vi.hoisted(() => {
     return {
         employees: [] as FakeEmployee[],
@@ -127,6 +136,7 @@ const store = vi.hoisted(() => {
         shipments: [] as FakeShipment[],
         sensorDevices: [] as FakeSensorDevice[],
         formTemplates: [] as FakeFormTemplate[],
+        formSubmissions: [] as FakeFormSubmission[],
         seq: 0,
     };
 });
@@ -285,6 +295,39 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
 
+    const hydrateSubmission = (row: FakeFormSubmission) => {
+        const form = store.formTemplates.find((f) => f.id === row.formId);
+        return {
+            ...row,
+            form: { title: form?.title ?? '', schema: form?.schema ?? {}, stage: form?.stage ?? '' },
+            submittedBy: null,
+            auditLogs: [] as unknown[],
+        };
+    };
+
+    const formSubmission = {
+        findMany: ({ where }: { where: { organizationId: string; formId?: string; form?: { stage?: string } } }) => {
+            // Without this the "never returns another org's submissions" test
+            // below would pass even if the service dropped its org scoping
+            // entirely (an undefined organizationId simply matches nothing).
+            if (!where.organizationId) throw new Error('listSubmissions must scope by organizationId');
+            return Promise.resolve(
+                store.formSubmissions
+                    .filter(
+                        (r) =>
+                            r.organizationId === where.organizationId &&
+                            (!where.formId || r.formId === where.formId),
+                    )
+                    .map(hydrateSubmission)
+                    .filter((r) => !where.form?.stage || r.form.stage === where.form.stage),
+            );
+        },
+        findUnique: ({ where }: { where: { id: string } }) => {
+            const found = store.formSubmissions.find((r) => r.id === where.id);
+            return Promise.resolve(found ? hydrateSubmission(found) : null);
+        },
+    };
+
     const userFacility = {
         // Every test below uses ADMIN, which skips this check entirely.
         findUnique: () => Promise.resolve(null),
@@ -316,6 +359,7 @@ vi.mock('@bin-tracker/db', () => {
     };
 
     Object.assign(fakePrisma, {
+        formSubmission,
         employee,
         payrollRun,
         // Rate visibility checks the org's PAYROLL module; enabled here so the
@@ -477,6 +521,20 @@ function seedSensorDevice(overrides: Partial<FakeSensorDevice> = {}): FakeSensor
     return device;
 }
 
+function seedFormSubmission(overrides: Partial<FakeFormSubmission> = {}): FakeFormSubmission {
+    const submission: FakeFormSubmission = {
+        id: nextId('sub'),
+        formId: nextId('form'),
+        organizationId: ORG_A,
+        submittedByUserId: null,
+        values: { formType: 'standard', values: {}, tableRows: {} },
+        createdAt: new Date(),
+        ...overrides,
+    };
+    store.formSubmissions.push(submission);
+    return submission;
+}
+
 function seedFormTemplate(overrides: Partial<FakeFormTemplate> = {}): FakeFormTemplate {
     const formTemplate: FakeFormTemplate = {
         id: nextId('form'),
@@ -510,6 +568,7 @@ beforeEach(() => {
     store.shipments.length = 0;
     store.sensorDevices.length = 0;
     store.formTemplates.length = 0;
+    store.formSubmissions.length = 0;
     store.seq = 0;
 });
 
@@ -708,6 +767,50 @@ describe('cross-organization tenancy isolation', () => {
             const result = await formService.getById(fakePrisma as unknown as PrismaClient, ORG_A, formTemplate.id);
 
             expect(result?.id).toBe(formTemplate.id);
+        });
+    });
+
+    describe('formService.listSubmissions', () => {
+        it('never includes a filled-out submission belonging to a different org', async () => {
+            const formA = seedFormTemplate({ organizationId: ORG_A });
+            const formB = seedFormTemplate({ organizationId: ORG_B });
+            seedFormSubmission({ id: 'sub-a', organizationId: ORG_A, formId: formA.id });
+            seedFormSubmission({ id: 'sub-b', organizationId: ORG_B, formId: formB.id });
+
+            const result = await formService.listSubmissions(fakePrisma as unknown as PrismaClient, ORG_A, {});
+
+            expect(result.map((r) => r.id)).toEqual(['sub-a']);
+        });
+
+        it('cannot be steered at another org\'s submissions by passing that org\'s formId', async () => {
+            const formB = seedFormTemplate({ organizationId: ORG_B });
+            seedFormSubmission({ organizationId: ORG_B, formId: formB.id });
+
+            const result = await formService.listSubmissions(fakePrisma as unknown as PrismaClient, ORG_A, {
+                formId: formB.id,
+            });
+
+            expect(result).toEqual([]);
+        });
+    });
+
+    describe('formService.getSubmission', () => {
+        it('returns null (never the row) for a submission in another org', async () => {
+            const formB = seedFormTemplate({ organizationId: ORG_B });
+            const submission = seedFormSubmission({ organizationId: ORG_B, formId: formB.id });
+
+            const result = await formService.getSubmission(fakePrisma as unknown as PrismaClient, ORG_A, submission.id);
+
+            expect(result).toBeNull();
+        });
+
+        it('resolves the submission when it belongs to the requesting org', async () => {
+            const formA = seedFormTemplate({ organizationId: ORG_A });
+            const submission = seedFormSubmission({ organizationId: ORG_A, formId: formA.id });
+
+            const result = await formService.getSubmission(fakePrisma as unknown as PrismaClient, ORG_A, submission.id);
+
+            expect(result?.submission.id).toBe(submission.id);
         });
     });
 });
