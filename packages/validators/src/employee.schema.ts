@@ -56,16 +56,21 @@ const digitsOnly = (schema: z.ZodString) =>
         .pipe(schema);
 
 export const employeeBankDetailsSchema = z.object({
-    bankInstitution: digitsOnly(z.string().regex(/^\d{3}$/, 'Institution number must be exactly 3 digits')),
-    bankTransit: digitsOnly(z.string().regex(/^\d{5}$/, 'Transit number must be exactly 5 digits')),
     bankAccount: digitsOnly(z.string().regex(/^\d{7,12}$/, 'Account number must be 7 to 12 digits')),
     accountHolderName: z
         .string()
         .trim()
-        .min(1, 'Account holder name is required')
+        .min(1, 'Account name is required')
         .max(120)
         .describe('Must match the name on the bank account'),
-    accountType: z.enum(['CHEQUING', 'SAVINGS']),
+    bankName: z.string().trim().min(1, 'Bank name is required').max(120),
+    // Labeled "Routing Number" to the employee — same real Canadian transit
+    // number Zum Rails' EFT API requires, just friendlier wording on screen.
+    bankTransit: digitsOnly(z.string().regex(/^\d{5}$/, 'Routing number must be exactly 5 digits')),
+    bankInstitution: digitsOnly(z.string().regex(/^\d{3}$/, 'Institution number must be exactly 3 digits')),
+    // Not collected on the form — every account defaults to CHEQUING, which is
+    // also what loadDestination.ts already falls back to for a missing value.
+    accountType: z.enum(['CHEQUING', 'SAVINGS']).default('CHEQUING'),
     email: z.string().email('Invalid email'),
 });
 

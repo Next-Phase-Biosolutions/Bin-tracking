@@ -51,6 +51,7 @@ describe('employeeBankDetailsSchema', () => {
         bankTransit: '12345',
         bankAccount: '7001234',
         accountHolderName: 'Jane Doe',
+        bankName: 'TD Canada Trust',
         accountType: 'CHEQUING',
         email: 'jane@acme.com',
     };
@@ -110,6 +111,7 @@ describe('employeeBankSubmitSchema', () => {
             bankTransit: '12345',
             bankAccount: '7001234',
             accountHolderName: 'Jane Doe',
+            bankName: 'TD Canada Trust',
             accountType: 'CHEQUING',
             email: 'jane@acme.com',
         };

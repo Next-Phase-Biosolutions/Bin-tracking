@@ -331,7 +331,7 @@ function BankDetailsCell({ employee, pending, onRequest }: BankDetailsCellProps)
             {hasDetails ? (
                 <span className="flex items-center gap-1.5 font-mono text-xs text-live">
                     <Icon name="check" width={13} height={13} />
-                    ****{employee.bankAccountLast4}
+                    {employee.bankName ? `${employee.bankName} ` : ''}****{employee.bankAccountLast4}
                 </span>
             ) : (
                 <span className="font-mono text-xs text-muted">— not set</span>

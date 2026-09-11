@@ -511,11 +511,12 @@ model Employee {
   // The four PII values are AES-256-GCM ciphertext at rest
   // (apps/api/src/lib/bank-crypto.ts), never logged and never returned by the
   // API — packages/db/src/client.ts omits them from every Prisma read.
-  bankInstitution   String? // 3 digits, e.g. "004"
-  bankTransit       String? // 5 digits, e.g. "12345"
+  bankInstitution   String? // 3 digits, e.g. "004" — shown to the employee as "Institution Number"
+  bankTransit       String? // 5 digits, e.g. "12345" — shown to the employee as "Routing Number"
   bankAccount       String? // 7-12 digits
-  accountHolderName String? // name exactly as printed on the bank account
-  accountType       String? // "CHEQUING" | "SAVINGS" — not PII, stored plain
+  accountHolderName String? // name exactly as printed on the bank account — shown as "Account Name"
+  bankName          String? // e.g. "TD Canada Trust" — display/reference only, not PII, not sent to Zum Rails
+  accountType       String? // "CHEQUING" | "SAVINGS" — not PII, stored plain, defaults to CHEQUING
   bankAccountLast4  String? // display-only mask source; avoids a decrypt per list row
   bankDetailsAt     DateTime? // when the employee submitted them
 
