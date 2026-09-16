@@ -25,6 +25,22 @@ export interface FormField {
     placeholder?: string;
     options?: string[];
     voiceEnabled?: boolean;
+    /**
+     * Show this field only while another field in the same form holds one of
+     * `values` — same shape and semantics as StandardSection.showIf, one level
+     * down, so a follow-up question can sit directly under the answer that
+     * triggers it (e.g. a comments box under a check answered "X Not
+     * Completed"). Honoured by StandardFormRenderer; a hidden field is not
+     * rendered and not validated.
+     */
+    showIf?: ShowIfCondition;
+    /**
+     * Seed a `date` field with today on a blank form — the paper equivalent of
+     * a monitor writing the date at the top of the sheet. Opt-in per field, so
+     * "Planned completion date" style fields stay empty. Ignored on any other
+     * field type and when a past submission is being viewed or edited.
+     */
+    defaultToday?: boolean;
 }
 
 // ─── Standard Form (multi-section with optional conditional logic) ─────────
