@@ -83,6 +83,7 @@ export function App() {
                 <Route path="/app/forms/import" element={<FormImportPage />} />
                 <Route path="/app/forms/submissions" element={<SubmissionsListPage />} />
                 <Route path="/app/forms/submissions/:id" element={<SubmissionDetailPage />} />
+                <Route path="/app/forms/:formId" element={<FormListPage />} />
                 <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
                 <Route path="/app/admin/payroll" element={<PayrollAdminPage />} />
                 <Route path="/app/settings" element={<SettingsPage />} />

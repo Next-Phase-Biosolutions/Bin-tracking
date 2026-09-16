@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { StandardSchema, FormField, FormVoiceFillResult, FormSubmissionValues } from '@bin-tracker/types';
 import { FieldInput } from '../FieldComponents';
+import { defaultFieldValues, isFieldVisible } from '../field-conditions';
 import { VoiceFormFillButton } from '../VoiceFormFillButton';
 import {
     SectionRepeatingTable,
@@ -31,6 +32,10 @@ interface Props {
 function validateFields(fields: FormField[], values: Record<string, string>): Record<string, string> {
     const errors: Record<string, string> = {};
     for (const f of fields) {
+        // A hidden follow-up field is not on screen, so a worker can neither
+        // see nor clear an error on it — skip it the same way handleSubmit
+        // skips a hidden section.
+        if (!isFieldVisible(f, values)) continue;
         if (f.required && !values[f.id]?.trim()) {
             errors[f.id] = 'This field is required';
         }
@@ -52,7 +57,11 @@ export function StandardFormRenderer({
     initialValues,
     readOnly = false,
 }: Props) {
-    const [values, setValues] = useState<Record<string, string>>(() => initialValues?.values ?? {});
+    // A past submission wins outright: its stored answers are the record, so
+    // defaultToday never overwrites a date somebody already filled in.
+    const [values, setValues] = useState<Record<string, string>>(
+        () => initialValues?.values ?? defaultFieldValues(schema.sections),
+    );
     const [errors, setErrors] = useState<Record<string, string>>({});
     // Fields / cells the voice fill was unsure about — highlighted for review.
     const [flaggedFields, setFlaggedFields] = useState<Set<string>>(new Set());
@@ -203,7 +212,7 @@ export function StandardFormRenderer({
                                         : 'mb-4 flex flex-col gap-4'
                                 }
                             >
-                                {section.fields.map((field) => (
+                                {section.fields.filter((field) => isFieldVisible(field, values)).map((field) => (
                                     <FieldInput
                                         key={field.id}
                                         field={field}

@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../../lib/trpc';
 import type { FormTemplate, FormTypeValue } from '@bin-tracker/types';
 import { FormRenderer } from './FormRenderer';
-import { FormBuilder } from './FormBuilder';
+import { resolveOpenForm } from './open-form';
 import { Icon } from '../../components/ui/Icon';
 import { Badge } from '../../components/ui/primitives';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
@@ -46,8 +45,11 @@ function FormCard({ form, onOpen }: { form: FormTemplate; onOpen: () => void }) 
 }
 
 export function FormListPage() {
-    const [openForm, setOpenForm] = useState<FormTemplate | null>(null);
-    const [showBuilder, setShowBuilder] = useState(false);
+    // The open form lives in the url (/app/forms/:formId), not in component
+    // state — otherwise opening one adds no history entry, so the browser's
+    // Back button jumps out of Forms entirely instead of returning to the list.
+    const { formId } = useParams();
+    const navigate = useNavigate();
     // Direct-URL guard: the sidebar already hides this link for orgs without
     // FORMS, but the page itself must refuse too (same pattern as GuardScannerPage).
     const { hasModule, isLoading: modulesLoading } = useSubscription();
@@ -74,12 +76,9 @@ export function FormListPage() {
         );
     }
 
-    if (showBuilder) {
-        return <FormBuilder onBack={() => setShowBuilder(false)} />;
-    }
-
+    const openForm = resolveOpenForm(forms as FormTemplate[] | undefined, formId);
     if (openForm) {
-        return <FormRenderer form={openForm} onBack={() => setOpenForm(null)} />;
+        return <FormRenderer form={openForm} onBack={() => navigate('/app/forms')} />;
     }
 
     return (
@@ -87,9 +86,9 @@ export function FormListPage() {
             {/* Header */}
             <div className="relative overflow-hidden bg-olive-deep px-4 pb-6 pt-10">
                 <div aria-hidden className="pointer-events-none absolute inset-0 data-grid-bg-dark opacity-60" />
-                <Link to="/app/bin" className="relative mb-4 flex items-center gap-2 text-sm text-bone/70 transition-colors hover:text-bone">
+                <Link to="/app/dashboard" className="relative mb-4 flex items-center gap-2 text-sm text-bone/70 transition-colors hover:text-bone">
                     <Icon name="arrow" width={15} height={15} className="rotate-180" />
-                    Back to Scanner
+                    Back to Dashboard
                 </Link>
                 <div className="relative flex items-end justify-between">
                     <div>
@@ -113,7 +112,7 @@ export function FormListPage() {
                         </Link>
                         <button
                             type="button"
-                            onClick={() => setShowBuilder(true)}
+                            onClick={() => navigate('/app/forms/new')}
                             className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-bone transition-colors hover:bg-white/25"
                         >
                             <Icon name="form" width={15} height={15} />
@@ -151,7 +150,7 @@ export function FormListPage() {
                 {forms && forms.length > 0 && (
                     <div className="flex flex-col gap-4">
                         {(forms as FormTemplate[]).map((form) => (
-                            <FormCard key={form.id} form={form} onOpen={() => setOpenForm(form)} />
+                            <FormCard key={form.id} form={form} onOpen={() => navigate(`/app/forms/${form.id}`)} />
                         ))}
                     </div>
                 )}

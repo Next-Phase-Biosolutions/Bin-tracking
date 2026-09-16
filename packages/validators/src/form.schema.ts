@@ -4,6 +4,11 @@ import { z } from 'zod';
 
 export const fieldTypeSchema = z.enum(['text', 'textarea', 'number', 'select', 'radio', 'date', 'time', 'yes_no']);
 
+export const showIfConditionSchema = z.object({
+    fieldId: z.string(),
+    values: z.array(z.string()),
+});
+
 export const formFieldSchema = z.object({
     id: z.string(),
     type: fieldTypeSchema,
@@ -12,6 +17,8 @@ export const formFieldSchema = z.object({
     placeholder: z.string().optional(),
     options: z.array(z.string()).optional(),
     voiceEnabled: z.boolean().optional(),
+    showIf: showIfConditionSchema.optional(),
+    defaultToday: z.boolean().optional(),
 });
 
 // ─── Repeating column (shared by repeating forms & standard table sections) ───
@@ -26,11 +33,6 @@ export const repeatingColumnSchema = z.object({
 });
 
 // ─── Standard Schema ─────────────────────────────────────────────────────────
-
-export const showIfConditionSchema = z.object({
-    fieldId: z.string(),
-    values: z.array(z.string()),
-});
 
 export const standardSectionSchema = z
     .object({
