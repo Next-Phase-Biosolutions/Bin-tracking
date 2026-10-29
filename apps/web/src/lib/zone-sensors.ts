@@ -1,5 +1,5 @@
 /**
- * Facility zone → EcoSafeSense device mapping.
+ * Facility zone → sensor device mapping.
  *
  * `SensorDevice` carries `organizationId` and `facilityId` but has no zone
  * column, and facility zones are frontend-only constants (facility-zones-data.ts)
@@ -14,13 +14,13 @@
 import { SENSOR_THRESHOLDS, type ThresholdStatus } from '@bin-tracker/types';
 import type { RouterOutputs } from './trpc';
 
-/** Zone id (see `zones` in facility-zones-data.ts) → vendor device `externalId`. */
+/** Zone id (see `zones` in facility-zones-data.ts) → device `externalId`. */
 const ZONE_SENSOR_EXTERNAL_IDS: Record<string, string | undefined> = {
   wetaging: import.meta.env.VITE_ZONE_SENSOR_WETAGING,
 };
 
 /**
- * The vendor device id wired to this zone, or `undefined` when the zone has no
+ * The device id wired to this zone, or `undefined` when the zone has no
  * sensor configured — callers fall back to the zone's mock readings rather than
  * firing a query that can only come back empty.
  */

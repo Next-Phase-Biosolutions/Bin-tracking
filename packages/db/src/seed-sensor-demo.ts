@@ -1,10 +1,9 @@
 /**
  * Seeds a SYNTHETIC sensor device and reading history for local UI work.
  *
- * This is not vendor data. `backfill-sensors.ts` is the real ingestion path;
- * it needs EcoSafeSense credentials, which not every dev has. This script
- * exists so the environment cards on the facility-zone pages can be built and
- * verified without them.
+ * This is not real device data. It exists so the environment cards on the
+ * facility-zone pages can be built and verified without a physical sensor
+ * posting readings.
  *
  * Values are shaped like a wet-aging cooler rather than like the demo device's
  * actual readings (which sit at room temperature, ~24-34 °C, and therefore

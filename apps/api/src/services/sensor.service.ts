@@ -11,8 +11,7 @@ const READINGS_TAKE_LIMIT = 2000;
  * Devices visible to every organization, bypassing the org/facility scoping
  * below entirely — an explicit, opt-in exception, not a weakening of it.
  *
- * Product decision: until each customer has their own physical EcoSafeSense
- * sensor, every org's Wet Aging tab shows this one shared device's real
+ * Product decision: until each customer has their own physical sensor, every org's Wet Aging tab shows this one shared device's real
  * readings. Every OTHER device — including any future per-customer sensor —
  * stays strictly org-scoped exactly as before; this allowlist is additive.
  * A device's internal `id` must be added here deliberately
