@@ -5,6 +5,7 @@ export type { ProvisionOrganizationInput, ProvisionOrganizationResult } from './
 export { reconcileModulesForPlan, getEnabledModules, setModuleOverride } from './module-service.js';
 export { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
 export type {
+    Prisma,
     Facility,
     Station,
     BinType,

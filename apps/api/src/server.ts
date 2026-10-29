@@ -10,6 +10,7 @@ import {
 import { appRouter, type AppRouter } from './routers/index.js';
 import { createContext } from './trpc/context.js';
 import { registerStripeWebhook } from './routes/stripe-webhook.js';
+import { registerSensorIngest } from './routes/sensor-ingest.js';
 import { initSentry, captureError } from './lib/sentry.js';
 import { validateEnv } from './lib/env.js';
 
@@ -68,6 +69,9 @@ async function buildServer() {
         runFirst: true,
     });
     await registerStripeWebhook(server);
+
+    // ─── Device sensor push (shared API key, no user auth) ───
+    await registerSensorIngest(server);
 
     // ─── tRPC ────────────────────────────────────────────────
     await server.register(fastifyTRPCPlugin, {
