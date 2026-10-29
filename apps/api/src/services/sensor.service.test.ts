@@ -246,88 +246,38 @@ describe('sensorService.listDevicesForOrg', () => {
   });
 });
 
-// Reads SHARED_SENSOR_DEVICE_IDS at module-load time (apps/api/src/services/
-// sensor.service.ts), so these tests set the env var and re-import via
-// resetModules — same pattern sensor.router.test.ts uses for its
-// DISABLE_AUTH-dependent case — rather than mutating process.env after the
-// module (and its already-frozen Set) is loaded.
-describe('shared-device allowlist (SHARED_SENSOR_DEVICE_IDS)', () => {
-  const SHARED_ID = 'dev-shared';
+// Regression guard: an env-var allowlist used to make named devices visible to
+// every org, skipping the org and facility checks. It was removed — tenant
+// isolation is now unconditional — so setting the old variable must change
+// nothing. (Module-level state in the old design is why these re-import fresh.)
+describe('tenant isolation is unconditional (legacy SHARED_SENSOR_DEVICE_IDS is ignored)', () => {
+  const FOREIGN_ID = 'dev-foreign';
 
   beforeEach(() => {
-    store.devices = [];
+    store.devices = [{ id: FOREIGN_ID, organizationId: 'org-owner', facilityId: 'fac-owner' }];
     store.readings = [];
     store.userFacilities = [];
     vi.resetModules();
-    process.env['SHARED_SENSOR_DEVICE_IDS'] = SHARED_ID;
+    process.env['SHARED_SENSOR_DEVICE_IDS'] = FOREIGN_ID;
   });
 
   afterEach(() => {
     delete process.env['SHARED_SENSOR_DEVICE_IDS'];
   });
 
-  it('listDevicesForOrg includes the shared device for an org that owns nothing', async () => {
-    store.devices.push({ id: SHARED_ID, organizationId: 'org-owner', facilityId: 'fac-owner' });
+  it("listDevicesForOrg does not list another org's device even if named in the old env var", async () => {
     const { sensorService: freshSensorService } = await import('./sensor.service.js');
 
     const result = await freshSensorService.listDevicesForOrg('org-that-owns-nothing', []);
 
-    expect(result.devices.map((d) => d.id)).toEqual([SHARED_ID]);
+    expect(result.devices).toEqual([]);
   });
 
-  it('does not duplicate the shared device when the caller also owns it', async () => {
-    store.devices.push({ id: SHARED_ID, organizationId: ORG_A, facilityId: 'fac-a' });
-    const { sensorService: freshSensorService } = await import('./sensor.service.js');
-
-    const result = await freshSensorService.listDevicesForOrg(ORG_A, ['fac-a']);
-
-    expect(result.devices).toHaveLength(1);
-  });
-
-  it("a NON-shared device from a foreign org still does not leak — the allowlist doesn't widen the general check", async () => {
-    store.devices.push({ id: SHARED_ID, organizationId: 'org-owner', facilityId: 'fac-owner' });
-    store.devices.push({ id: 'dev-private', organizationId: 'org-owner', facilityId: 'fac-owner' });
-    const { sensorService: freshSensorService } = await import('./sensor.service.js');
-
-    const result = await freshSensorService.listDevicesForOrg('org-that-owns-nothing', []);
-
-    expect(result.devices.map((d) => d.id)).toEqual([SHARED_ID]);
-    expect(result.devices.some((d) => d.id === 'dev-private')).toBe(false);
-  });
-
-  it('getDeviceHistory resolves the shared device for any organizationId', async () => {
-    store.devices.push({ id: SHARED_ID, organizationId: 'org-owner' });
-    store.readings.push({
-      id: 'r-1',
-      deviceId: SHARED_ID,
-      timestamp: new Date(),
-      tempC: 30,
-      humidityPct: 40,
-      nh3Ppm: 0.05,
-    });
-    const { sensorService: freshSensorService } = await import('./sensor.service.js');
-
-    // Non-ADMIN, no UserFacility row anywhere in the store — proves the shared
-    // bypass skips the facility check too, not just the org check.
-    const result = await freshSensorService.getDeviceHistory(
-      'org-that-owns-nothing',
-      SHARED_ID,
-      '24h',
-      'user-1',
-      'WORKER',
-    );
-
-    expect(result).toHaveLength(1);
-  });
-
-  it('getDeviceHistory still rejects a NON-shared foreign-org device with NOT_FOUND', async () => {
-    store.devices.push({ id: 'dev-private', organizationId: 'org-owner' });
+  it("getDeviceHistory rejects another org's device with NOT_FOUND even if named in the old env var", async () => {
     const { sensorService: freshSensorService } = await import('./sensor.service.js');
 
     await expect(
-      freshSensorService.getDeviceHistory('org-that-owns-nothing', 'dev-private', '24h', 'user-1', 'WORKER'),
-    ).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
+      freshSensorService.getDeviceHistory('org-that-owns-nothing', FOREIGN_ID, '24h', 'user-1', 'WORKER'),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
