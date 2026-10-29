@@ -336,8 +336,10 @@ model SensorReading {
   id          String   @id @default(cuid())
   deviceId    String
   timestamp   DateTime
-  tempC       Float
-  humidityPct Float
+  // Nullable: a device reporting a fault (e.g. sensor read timeout) can send a
+  // reading with no valid temp/humidity. Readers must handle null.
+  tempC       Float?
+  humidityPct Float?
   nh3Ppm      Float?
   tvoc        Float?
   eco2Ppm     Float?
@@ -346,13 +348,20 @@ model SensorReading {
   pressure    Float?
   pm25        Float?
 
+  // Radio link quality and fault reporting from push-ingested devices.
+  // errorCode 0 or null = nominal reading.
+  rssi         Float?
+  snr          Float?
+  filteredRssi Float?
+  errorCode    Int?
+  errorMessage String?
+  // Full device payload, kept for debugging. Size-capped at ingest.
+  rawPayload   Json?
+
   device SensorDevice @relation(fields: [deviceId], references: [id])
 
-  // Unique-constraint decision (Action Item 1, step 3, v6): vendor confirmed
-  // legitimate backlog-catchup rows have distinct timestamps — only garbage
-  // rows from the device's one-time Wi-Fi-setup period share a timestamp.
-  // This constraint therefore only ever collapses confirmed-junk rows, never
-  // legitimate data. Action Item 3 must insert via
+  // One reading per (device, timestamp): a device retry that resends the same
+  // timestamp collapses instead of duplicating. Insert via
   // createMany({ skipDuplicates: true }), not a hand-rolled in-memory dedup.
   @@unique([deviceId, timestamp])
   @@map("sensor_readings")

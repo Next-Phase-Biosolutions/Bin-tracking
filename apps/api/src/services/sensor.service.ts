@@ -32,8 +32,8 @@ const SHARED_DEVICE_IDS = new Set(
 );
 
 interface ReadingLike {
-  tempC: number;
-  humidityPct: number;
+  tempC: number | null;
+  humidityPct: number | null;
   nh3Ppm: number | null;
   tvoc: number | null;
   eco2Ppm: number | null;

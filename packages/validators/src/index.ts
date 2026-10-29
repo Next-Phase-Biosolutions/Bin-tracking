@@ -166,6 +166,9 @@ export {
 export {
     listDevicesSchema,
     sensorReadingRangeSchema,
+    ingestSensorReadingSchema,
+    RAW_PAYLOAD_MAX_BYTES,
     type ListDevicesInput,
     type SensorReadingRangeInput,
+    type IngestSensorReadingInput,
 } from './sensor.schema.js';

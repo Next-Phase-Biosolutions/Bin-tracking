@@ -52,8 +52,12 @@ export interface ZoneEnvRow {
  */
 export function toEnvRows(reading: SensorReading): ZoneEnvRow[] {
   const rows: Array<ZoneEnvRow | null> = [
-    { label: 'temperature', value: reading.tempC, unit: '°C', decimals: 1 },
-    { label: 'humidity', value: reading.humidityPct, unit: '%', decimals: 0 },
+    reading.tempC === null
+      ? null
+      : { label: 'temperature', value: reading.tempC, unit: '°C', decimals: 1 },
+    reading.humidityPct === null
+      ? null
+      : { label: 'humidity', value: reading.humidityPct, unit: '%', decimals: 0 },
     reading.nh3Ppm === null
       ? null
       : { label: 'ammonia', value: reading.nh3Ppm, unit: 'ppm', decimals: 4 },

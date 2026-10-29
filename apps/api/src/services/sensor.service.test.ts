@@ -162,6 +162,25 @@ describe('computeThresholdStatus — boundaries', () => {
   });
 });
 
+describe('computeThresholdStatus — fault-only readings (null temp/humidity)', () => {
+  it('is UNKNOWN when nothing measurable is present', () => {
+    expect(computeThresholdStatus({ tempC: null, humidityPct: null, nh3Ppm: null })).toBe('UNKNOWN');
+  });
+
+  it('judges on the metrics that are present, ignoring a null one', () => {
+    expect(computeThresholdStatus({ tempC: 5, humidityPct: null, nh3Ppm: null })).toBe('OK');
+    expect(
+      computeThresholdStatus({ tempC: SENSOR_THRESHOLDS.temp.alertHigh + 1, humidityPct: null, nh3Ppm: null }),
+    ).toBe('ALERT');
+  });
+
+  it('still escalates on nh3 when temp and humidity are both missing', () => {
+    expect(
+      computeThresholdStatus({ tempC: null, humidityPct: null, nh3Ppm: SENSOR_THRESHOLDS.nh3.alertPpm + 1 }),
+    ).toBe('ALERT');
+  });
+});
+
 describe('sensorService.getDeviceHistory — facility scoping', () => {
   it('rejects a non-ADMIN caller with no UserFacility row for the device — same org, wrong facility', async () => {
     store.devices.push({ id: 'dev-1', organizationId: ORG_A, facilityId: 'fac-b' });
