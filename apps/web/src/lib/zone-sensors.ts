@@ -1,71 +1,36 @@
 /**
- * Facility zone → sensor device mapping.
+ * Facility zone ↔ sensor device linkage.
  *
- * `SensorDevice` carries `organizationId` and `facilityId` but has no zone
- * column, and facility zones are frontend-only constants (facility-zones-data.ts)
- * with no backend representation at all — so nothing in the API can answer
- * "which device is in Wet Aging". This map is that link until one exists.
+ * A device is assigned to a zone when it is registered (`SensorDevice.zone`,
+ * set by `pnpm --filter @bin-tracker/db register:sensor-device --zone ...`), and
+ * the zone page picks it from the org-scoped `sensor.listDevices` result — so
+ * each tenant sees its own sensor.
  *
- * ponytail: single-device demo mapping via env var. Replace with a
- * `SensorDevice.zone` column once a second zone gets a sensor — this shape
- * cannot express two devices in one zone, or one device shared across zones.
+ * ponytail: zones are org-wide UI constants with no facility context, so when
+ * several facilities in one org each have a device in the same zone, the most
+ * recently reporting one wins. Add a facility selector if that ever matters.
  */
 
 import { SENSOR_THRESHOLDS, type ThresholdStatus } from '@bin-tracker/types';
 import type { RouterOutputs } from './trpc';
 
-/** Zone id (see `zones` in facility-zones-data.ts) → device `externalId`. */
-const ZONE_SENSOR_EXTERNAL_IDS: Record<string, string | undefined> = {
-  wetaging: import.meta.env.VITE_ZONE_SENSOR_WETAGING,
-};
-
 /**
- * The device id wired to this zone, or `undefined` when the zone has no
- * sensor configured — callers fall back to the zone's mock readings rather than
- * firing a query that can only come back empty.
+ * The device assigned to this zone, or `undefined` when none is — callers fall
+ * back to the zone's mock readings. Several matches: the most recently
+ * reporting wins, and a device that has never reported ranks last.
  */
-export function sensorIdForZone(zoneId: string): string | undefined {
-  return ZONE_SENSOR_EXTERNAL_IDS[zoneId] || undefined;
-}
-
-type SensorDevice = RouterOutputs['sensor']['listDevices']['devices'][number];
-type SensorReading = SensorDevice['readings'][number];
-
-/** Same shape as `ZoneEnv` so the zone page renders live and mock rows through one loop. */
-export interface ZoneEnvRow {
-  label: string;
-  value: number;
-  unit: string;
-  decimals: number;
-}
-
-/**
- * The four metrics worth surfacing on a zone card, in the order the mock data
- * established (temperature, humidity, co2) plus ammonia — the one air-quality
- * reading that actually matters for aging meat. The other five the device
- * reports have no thresholds and no place on a summary card; they belong on a
- * dedicated environment page if one ever gets built.
- *
- * Temperature is shown in °C, not the mock's °F: the sensor reports Celsius and
- * every other zone's mock readings are already Celsius, so converting here would
- * make Wet Aging the only zone in a different unit.
- */
-export function toEnvRows(reading: SensorReading): ZoneEnvRow[] {
-  const rows: Array<ZoneEnvRow | null> = [
-    reading.tempC === null
-      ? null
-      : { label: 'temperature', value: reading.tempC, unit: '°C', decimals: 1 },
-    reading.humidityPct === null
-      ? null
-      : { label: 'humidity', value: reading.humidityPct, unit: '%', decimals: 0 },
-    reading.nh3Ppm === null
-      ? null
-      : { label: 'ammonia', value: reading.nh3Ppm, unit: 'ppm', decimals: 4 },
-    reading.eco2Ppm === null
-      ? null
-      : { label: 'co2_levels', value: reading.eco2Ppm, unit: 'ppm', decimals: 0 },
-  ];
-  return rows.filter((row): row is ZoneEnvRow => row !== null);
+export function pickZoneDevice<T extends { zone: string | null; lastSeenAt: Date | null }>(
+  devices: readonly T[] | undefined,
+  zoneId: string,
+): T | undefined {
+  let best: T | undefined;
+  for (const device of devices ?? []) {
+    if (device.zone !== zoneId) continue;
+    const seen = device.lastSeenAt?.getTime() ?? -Infinity;
+    const bestSeen = best?.lastSeenAt?.getTime() ?? -Infinity;
+    if (best === undefined || seen > bestSeen) best = device;
+  }
+  return best;
 }
 
 /** Past this, the card stops claiming the reading is current. Poll cadence is ~10 min. */

@@ -9,8 +9,7 @@ import {
   CORE_METRICS,
   describeLastSeen,
   metricSeries,
-  sensorIdForZone,
-  toEnvRows,
+  pickZoneDevice,
 } from '../../lib/zone-sensors';
 import { trpc } from '../../lib/trpc';
 import { useClock } from '../../lib/hooks';
@@ -20,26 +19,22 @@ import { SensorMetricChart } from './SensorMetricChart';
 /** Only these zones have a built-out view so far — the rest show a placeholder until wired up. */
 const ACCESSIBLE_ZONE_IDS = new Set(['killfloor', 'wetaging']);
 
-/** `UNKNOWN` must not read as green — a device that has never reported is not "OK". */
-const STATUS_TONE = { OK: 'good', WARN: 'warn', ALERT: 'alert', UNKNOWN: 'idle' } as const;
-
 export default function ZonePage() {
   const { zoneId } = useParams<{ zoneId: string }>();
   const zone = zoneId ? getZone(zoneId) : undefined;
 
   // Live sensor wiring. These hooks run before the early returns below, so
   // they must tolerate `zone` being undefined.
-  const sensorExternalId = zone ? sensorIdForZone(zone.id) : undefined;
   const { hasModule, modulesReady } = useSubscription();
+  // Skip the query entirely when the org lacks the module — it could only
+  // come back FORBIDDEN. Which device (if any) belongs to this zone is only
+  // known after the org-scoped device list returns.
+  const sensorsAvailable = modulesReady && hasModule('ENVIRONMENT_MONITORING');
   const devicesQuery = trpc.sensor.listDevices.useQuery(
     {},
     {
-      // Skip entirely when the zone has no device mapped or the org lacks
-      // the module — otherwise every zone visit fires a request that can
-      // only come back empty or FORBIDDEN.
-      enabled:
-        sensorExternalId !== undefined && modulesReady && hasModule('ENVIRONMENT_MONITORING'),
-      // The poller writes new rows every ~10 min; without this the card
+      enabled: sensorsAvailable,
+      // Devices push readings continuously; without this the card
       // freezes at whatever it showed on mount.
       refetchInterval: 60_000,
       // A module-gated 403 is a permanent answer, not a blip.
@@ -47,9 +42,7 @@ export default function ZonePage() {
     },
   );
 
-  const device = devicesQuery.data?.devices.find((d) => d.externalId === sensorExternalId);
-  const reading = device?.readings[0];
-  const lastSeen = device ? describeLastSeen(device.lastSeenAt) : null;
+  const device = zone ? pickZoneDevice(devicesQuery.data?.devices, zone.id) : undefined;
   const companyTimezone = devicesQuery.data?.companyTimezone ?? 'America/Toronto';
 
   const historyQuery = trpc.sensor.getReadings.useQuery(
@@ -64,8 +57,9 @@ export default function ZonePage() {
   // A zone with a sensor mapped gets the minimal charts-only view below,
   // instead of the mock stats/actions/environment layout — the charts
   // already carry that information, so showing both would be redundant.
-  const sensorEnabled =
-    sensorExternalId !== undefined && modulesReady && hasModule('ENVIRONMENT_MONITORING');
+  // While the device list is still loading we can't yet tell whether this zone
+  // has a sensor, so show the live view's loader rather than flashing mock data.
+  const sensorEnabled = device !== undefined || (sensorsAvailable && devicesQuery.isLoading);
   const isLoadingLiveData =
     sensorEnabled && (devicesQuery.isLoading || (device !== undefined && historyQuery.isLoading));
 
@@ -96,14 +90,9 @@ export default function ZonePage() {
     );
   }
 
-  // Real readings replace the zone's mock atmosphere wholesale when a device
-  // is mapped and reporting; otherwise the mock stands in unchanged, so zones
-  // without a sensor look exactly as they did before. A device that exists but
-  // has not reported yet shows nothing rather than mock numbers — presenting
-  // invented values under a real device's name is the one outcome to avoid.
-  const liveEnv = reading ? toEnvRows(reading) : null;
-  const envRows = liveEnv ?? (device ? [] : zone.env);
-
+  // A zone with a device assigned renders the charts-only view above, never
+  // mock numbers under a real device's name. Everything below this point is
+  // the mock layout, reached only by zones with no device.
   // Independently per metric, in case one channel has gaps another doesn't —
   // a device that's never reported ammonia shouldn't blank out its temperature chart.
   const history = historyQuery.data ?? [];
@@ -275,21 +264,12 @@ export default function ZonePage() {
                     <p className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-olive">
                       zone_environment
                     </p>
-                    {device ? (
-                      <Badge tone={STATUS_TONE[device.latestStatus]}>{device.latestStatus}</Badge>
-                    ) : (
-                      <span className="flex items-center gap-1.5 font-mono text-[0.56rem] uppercase tracking-[0.12em] text-live">
-                        <LiveDot /> {zone.envStable ? 'stable' : 'watch'}
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1.5 font-mono text-[0.56rem] uppercase tracking-[0.12em] text-live">
+                      <LiveDot /> {zone.envStable ? 'stable' : 'watch'}
+                    </span>
                   </div>
                   <div className="relative mt-4 space-y-3">
-                    {envRows.length === 0 ? (
-                      <p className="py-4 text-center font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted">
-                        awaiting first reading
-                      </p>
-                    ) : null}
-                    {envRows.map((e) => (
+                    {zone.env.map((e) => (
                       <div
                         key={e.label}
                         className="flex items-center justify-between border-b border-edge/60 pb-3 last:border-0 last:pb-0"
@@ -298,50 +278,17 @@ export default function ZonePage() {
                           {e.label}
                         </span>
                         <span className="font-display text-xl font-bold text-olive-deep">
-                          {liveEnv ? (
-                            <span className="tnum">
-                              {e.value.toLocaleString('en-US', {
-                                minimumFractionDigits: e.decimals ?? 1,
-                                maximumFractionDigits: e.decimals ?? 1,
-                              })}
-                              <span className="ml-0.5 text-[0.7em] opacity-60">{e.unit}</span>
-                            </span>
-                          ) : (
-                            // Mock readings only — never wobble a real sensor value.
-                            <TickValue base={e.value} unit={e.unit} decimals={e.decimals} />
-                          )}
+                          <TickValue base={e.value} unit={e.unit} decimals={e.decimals} />
                         </span>
                       </div>
                     ))}
                   </div>
-                  {lastSeen ? (
-                    <div
-                      className={`relative mt-4 flex items-center gap-2 rounded-lg px-3 py-2.5 ${
-                        lastSeen.isStale ? 'bg-warn/10' : 'bg-bone-light'
-                      }`}
-                    >
-                      <Icon
-                        name={lastSeen.isStale ? 'refresh' : 'check'}
-                        width={14}
-                        height={14}
-                        className={lastSeen.isStale ? 'text-warn' : 'text-live'}
-                      />
-                      <span
-                        className={`font-mono text-[0.6rem] uppercase tracking-[0.12em] ${
-                          lastSeen.isStale ? 'text-warn' : 'text-muted'
-                        }`}
-                      >
-                        {device?.label ?? 'sensor'} · {lastSeen.text}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="relative mt-4 flex items-center gap-2 rounded-lg bg-bone-light px-3 py-2.5">
-                      <Icon name="check" width={14} height={14} className="text-live" />
-                      <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted">
-                        environment stable
-                      </span>
-                    </div>
-                  )}
+                  <div className="relative mt-4 flex items-center gap-2 rounded-lg bg-bone-light px-3 py-2.5">
+                    <Icon name="check" width={14} height={14} className="text-live" />
+                    <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted">
+                      environment stable
+                    </span>
+                  </div>
                 </Card>
               </Reveal>
             </div>

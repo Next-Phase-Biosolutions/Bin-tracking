@@ -91,9 +91,10 @@ async function main(): Promise<void> {
   assertSensorDeviceOrgConsistency({ organizationId: org.id }, facility);
   const device = await prisma.sensorDevice.upsert({
     where: { externalId: EXTERNAL_ID },
-    update: {},
+    update: { zone: 'wetaging' },
     create: {
       externalId: EXTERNAL_ID,
+      zone: 'wetaging',
       organizationId: org.id,
       facilityId: facility.id,
       label: LABEL,
@@ -115,7 +116,7 @@ async function main(): Promise<void> {
   console.log(`org:        ${org.slug}`);
   console.log(`facility:   ${facility.name} (${facility.id})`);
   console.log(`device:     ${device.label}`);
-  console.log(`externalId: ${device.externalId}   <- set VITE_ZONE_SENSOR_WETAGING to this`);
+  console.log(`externalId: ${device.externalId}   (shown on the ${device.zone} zone page)`);
   console.log(
     `readings:   ${result.count} inserted, ${readings.length - result.count} already present`,
   );

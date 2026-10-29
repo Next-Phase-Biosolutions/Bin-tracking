@@ -317,6 +317,9 @@ model SensorDevice {
   externalId     String    @unique
   label          String
   status         String    @default("ACTIVE")
+  // Which facility-zone page shows this device (a SENSOR_ZONE_IDS value from
+  // @bin-tracker/types). Null = registered but not shown on any zone page.
+  zone           String?
   lastSeenAt     DateTime?
   createdAt      DateTime  @default(now())
 
