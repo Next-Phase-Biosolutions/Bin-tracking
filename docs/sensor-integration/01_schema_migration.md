@@ -1,3 +1,13 @@
+> **Superseded in part — read first.** The schema below is the *original* one. It has since changed (migration `20261030090000_sensor_fleet_management` and `20261029120000_sensor_push_ingest_columns`):
+>
+> - `SensorDevice.status` (string) is now `state` (`UNASSIGNED` / `ACTIVE` / `DEACTIVATED`), and `organizationId` / `facilityId` are **nullable** — a device exists before it belongs to a tenant. New `assignedAt`, and `zoneId` → the new per-facility `Zone` table (replaces the old zone text / env-var mapping). `label` is the tenant-facing device name.
+> - `SensorReading.tempC` / `humidityPct` are **nullable** (a fault-only reading has neither) and there are new `rssi`, `snr`, `filteredRssi`, `errorCode`, `errorMessage`, `rawPayload` columns, plus `organizationId` stamped at ingest.
+> - New tables: `zones`, `unknown_sensor_device_ids`, `sensor_device_audit_logs`, `platform_settings`.
+>
+> The "reassignment between organizations" question at the end of this file is answered: history stays with the previous tenant (see `00_cross_cutting_notes.md`). Current design: `docs/sensor-push-ingest/`.
+
+---
+
 # Action Item 1 — Sensor Schema Migration
 
 ## Branch Tree

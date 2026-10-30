@@ -1,3 +1,9 @@
+> **Superseded in part — read first.** The tenant-facing page is now the **zone page** (`/app/zones/:slug`), and a tenant sees **temperature and humidity only** (plus the device name, status and last seen) — not the nine-metric dashboard described below. The other channels, signal strength and fault detail are visible to **platform admins only**, on the Sensor Fleet screens (`/app/admin/sensors`).
+>
+> Also changed: data no longer comes from a 10-minute poller — devices push readings, so `refetchInterval` still applies but the "stale" threshold is the platform's configurable *offline after N minutes* setting (default 20), returned by `sensor.listDevices` as `offlineAfterMinutes`. Zones come from the database (`zone.listMine`), not from `facility-zones-data.ts`. See `10_frontend_data_handoff.md` for the current response shapes.
+
+---
+
 # Action Item 8 — Sensor Dashboard Page
 
 ## Branch Tree
