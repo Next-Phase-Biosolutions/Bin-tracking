@@ -28,8 +28,8 @@ const RANK: Record<ComputedStatus, number> = { OK: 0, WARN: 1, ALERT: 2 };
  * and displayed (Action Item 8) but not alert-gated.
  */
 export function computeThresholdStatus(reading: {
-    tempC: number;
-    humidityPct: number;
+    tempC: number | null;
+    humidityPct: number | null;
     nh3Ppm: number | null;
     tvoc?: number | null;
     eco2Ppm?: number | null;
@@ -38,27 +38,37 @@ export function computeThresholdStatus(reading: {
     pressure?: number | null;
     pm25?: number | null;
 }): ThresholdStatus {
-    const statuses: ComputedStatus[] = [
-        statusFor(
-            reading.tempC,
-            SENSOR_THRESHOLDS.temp.warnLow,
-            SENSOR_THRESHOLDS.temp.warnHigh,
-            SENSOR_THRESHOLDS.temp.alertLow,
-            SENSOR_THRESHOLDS.temp.alertHigh,
-        ),
-        statusFor(
-            reading.humidityPct,
-            SENSOR_THRESHOLDS.humidity.warnLow,
-            SENSOR_THRESHOLDS.humidity.warnHigh,
-            SENSOR_THRESHOLDS.humidity.alertLow,
-            SENSOR_THRESHOLDS.humidity.alertHigh,
-        ),
-    ];
+    // A fault-only reading can arrive with no temp/humidity: judge only what
+    // was actually measured, and report UNKNOWN when nothing was.
+    const statuses: ComputedStatus[] = [];
+    if (reading.tempC !== null) {
+        statuses.push(
+            statusFor(
+                reading.tempC,
+                SENSOR_THRESHOLDS.temp.warnLow,
+                SENSOR_THRESHOLDS.temp.warnHigh,
+                SENSOR_THRESHOLDS.temp.alertLow,
+                SENSOR_THRESHOLDS.temp.alertHigh,
+            ),
+        );
+    }
+    if (reading.humidityPct !== null) {
+        statuses.push(
+            statusFor(
+                reading.humidityPct,
+                SENSOR_THRESHOLDS.humidity.warnLow,
+                SENSOR_THRESHOLDS.humidity.warnHigh,
+                SENSOR_THRESHOLDS.humidity.alertLow,
+                SENSOR_THRESHOLDS.humidity.alertHigh,
+            ),
+        );
+    }
     if (reading.nh3Ppm !== null) {
         if (reading.nh3Ppm > SENSOR_THRESHOLDS.nh3.alertPpm) statuses.push('ALERT');
         else if (reading.nh3Ppm > SENSOR_THRESHOLDS.nh3.warnPpm) statuses.push('WARN');
         else statuses.push('OK');
     }
+    if (statuses.length === 0) return 'UNKNOWN';
 
     return statuses.reduce((worst, status) => (RANK[status] > RANK[worst] ? status : worst), 'OK' as ComputedStatus);
 }

@@ -1,3 +1,25 @@
+> **Superseded in part — read first.** The sections below describe the *original* `sensor.listDevices` / `getReadings` responses, which returned whole database rows (including the vendor device id and, later, raw payloads and signal values). **Tenants no longer receive those fields.** The current tenant contract:
+>
+> ```ts
+> // trpc.sensor.listDevices → { companyTimezone, offlineAfterMinutes, devices: TenantDevice[] }
+> interface TenantDevice {
+>   id: string;
+>   name: string;                                   // tenant-facing name — never the hardware id
+>   zone: { id: string; slug: string; name: string } | null;
+>   facility: { id: string; name: string };
+>   lastSeenAt: Date | null;                        // null until it reports after being assigned to this tenant
+>   latestStatus: 'OK' | 'WARN' | 'ALERT' | 'UNKNOWN';
+>   latest: { timestamp: Date; tempC: number | null; humidityPct: number | null } | null;
+> }
+> // trpc.sensor.getReadings → { timestamp: Date; tempC: number | null; humidityPct: number | null }[]
+> ```
+>
+> Only ACTIVE devices of the caller's own organization are listed, and only readings from the time the device was assigned to that organization. `tempC` / `humidityPct` can be `null` (a fault-only reading). The device list is no longer tied to one vendor device or to a single env-var-mapped zone: a device belongs to a **zone row** of a facility (`device.zone.id`). Ammonia and the other air-quality channels, RSSI/SNR and fault detail are **not** sent to tenants.
+>
+> The sample data, the 9-metric table and the staleness/polling notes further down come from the retired vendor integration and are kept for history only. Current design: `docs/sensor-push-ingest/`.
+
+---
+
 # Frontend Handoff — Sensor Data (Environment Monitoring)
 
 **Audience:** whoever is building the frontend for this feature. **Status:** the entire backend (Action Items 1–6) is built, live-tested against the real vendor API and a real running server, and merged. Nothing on the API side needs to change to build the UI. Action Items 7, 8, 9 (recharts install, dashboard page, nav/route) have **not** been started — that's the open work this document supports.

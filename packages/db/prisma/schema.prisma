@@ -136,6 +136,7 @@ model Organization {
   payrollRuns         PayrollRun[]
   modules             OrganizationModule[]
   sensorDevices       SensorDevice[]
+  sensorReadings      SensorReading[]
 
   @@map("organizations")
 }
@@ -209,7 +210,7 @@ model OrganizationModule {
   enabled   Boolean   @default(true)
   source    String    @default("plan") // 'plan' | 'manual' — manual survives plan changes
   updatedAt DateTime  @updatedAt
-  updatedBy String?   // platform admin's user id, set only when source = 'manual'
+  updatedBy String? // platform admin's user id, set only when source = 'manual'
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -223,8 +224,8 @@ model OrganizationModule {
 model UsageCounter {
   id        String   @id @default(cuid())
   orgId     String
-  metric    String   // 'form_digitize' | 'voice_transcribe'
-  period    String   // 'YYYY-MM'
+  metric    String // 'form_digitize' | 'voice_transcribe'
+  period    String // 'YYYY-MM'
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 
@@ -289,6 +290,7 @@ model Facility {
   deliveries    BinCycle[]     @relation("CycleDestination")
   shipments     Shipment[]     @relation("FacilityShipments")
   sensorDevices SensorDevice[]
+  zones         Zone[]
 
   @@index([organizationId])
   @@map("facilities")
@@ -310,51 +312,155 @@ model Station {
   @@map("stations")
 }
 
-model SensorDevice {
-  id             String    @id @default(cuid())
-  organizationId String
-  facilityId     String
-  externalId     String    @unique
-  label          String
-  status         String    @default("ACTIVE")
-  lastSeenAt     DateTime?
-  createdAt      DateTime  @default(now())
+enum SensorDeviceState {
+  UNASSIGNED
+  ACTIVE
+  DEACTIVATED
+}
 
-  organization Organization    @relation(fields: [organizationId], references: [id])
-  facility     Facility        @relation(fields: [facilityId], references: [id])
+model SensorDevice {
+  id             String            @id @default(cuid())
+  // Null while UNASSIGNED: a device is registered by a platform admin first and
+  // assigned to a tenant afterwards. The DB CHECK sensor_devices_active_is_assigned
+  // (migration SQL only; Prisma can't model CHECKs) forbids ACTIVE without these.
+  organizationId String?
+  facilityId     String?
+  externalId     String            @unique
+  // The tenant-facing device name. Defaults to the externalId until assigned.
+  label          String
+  state          SensorDeviceState @default(UNASSIGNED)
+  // Start of the current tenant's visibility window; tenants never see readings
+  // timestamped before it. Resets only when the owning organization changes.
+  assignedAt     DateTime?
+  zoneId         String?
+  lastSeenAt     DateTime?
+  createdAt      DateTime          @default(now())
+  // DEPRECATED, unused: the pre-fleet status/zone text columns, kept for one
+  // release so the previous API build keeps working between `migrate deploy` and
+  // its replacement. A later migration drops them (docs/sensor-push-ingest/ROLLOUT.md).
+  legacyStatus   String            @default("ACTIVE") @map("status")
+  legacyZone     String?           @map("zone")
+
+  organization Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  facility     Facility?              @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  zone         Zone?                  @relation(fields: [zoneId], references: [id], onDelete: Restrict)
   readings     SensorReading[]
+  auditLogs    SensorDeviceAuditLog[]
 
   @@index([organizationId])
   @@index([facilityId])
+  @@index([state])
   @@map("sensor_devices")
+}
+
+// A named area of a facility (Receiving, Kill Floor, ...). Zones belong to a
+// facility; a device is assigned to one. Seeded with the six defaults for every
+// facility; platform admins can add, rename, reorder and remove them.
+model Zone {
+  id         String   @id @default(cuid())
+  facilityId String
+  slug       String
+  name       String
+  icon       String   @default("grid")
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  facility Facility       @relation(fields: [facilityId], references: [id])
+  devices  SensorDevice[]
+
+  @@unique([facilityId, slug])
+  @@index([facilityId])
+  @@map("zones")
+}
+
+// Ids that arrived with a valid ingest key but match no registered device, so
+// platform admins can spot typos in the vendor's list. No payload is stored.
+// Capped and pruned on write (sensor unknown-device-log service).
+model UnknownSensorDeviceId {
+  externalId  String   @id
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  count       Int      @default(1)
+  // A small sample of the latest request, so an admin can tell test devices apart.
+  // Admin-only: never selected by a tenant-facing query.
+  lastTempC       Float?
+  lastHumidityPct Float?
+  lastRawExcerpt  String?
+
+  @@index([lastSeenAt])
+  @@map("unknown_sensor_device_ids")
+}
+
+// Who added/assigned/reassigned/deactivated/reactivated a device or changed its
+// zone, and when. Same shape as PayrollAuditLog.
+model SensorDeviceAuditLog {
+  id        String   @id @default(cuid())
+  deviceId  String
+  actorId   String
+  action    String
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  device SensorDevice @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, createdAt])
+  @@map("sensor_device_audit_logs")
+}
+
+// Platform-wide key/value settings (not per organization).
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("platform_settings")
 }
 
 // thresholdStatus is deliberately NOT a stored column — thresholds are
 // vendor-unconfirmed placeholders (see packages/types/src/sensor-thresholds.ts,
 // Action Item 4), so status is computed at read time only, never at insert.
 model SensorReading {
-  id          String   @id @default(cuid())
-  deviceId    String
-  timestamp   DateTime
-  tempC       Float
-  humidityPct Float
-  nh3Ppm      Float?
-  tvoc        Float?
-  eco2Ppm     Float?
-  aqhiPlus    Float?
-  ozonePpb    Float?
-  pressure    Float?
-  pm25        Float?
+  id             String   @id @default(cuid())
+  deviceId       String
+  // The organization that owned the device when this reading arrived (null while
+  // unassigned). Stamped at ingest so reassigning a device never moves history
+  // between tenants.
+  organizationId String?
+  timestamp      DateTime
+  // Nullable: a device reporting a fault (e.g. sensor read timeout) can send a
+  // reading with no valid temp/humidity. Readers must handle null.
+  tempC          Float?
+  humidityPct    Float?
+  nh3Ppm         Float?
+  tvoc           Float?
+  eco2Ppm        Float?
+  aqhiPlus       Float?
+  ozonePpb       Float?
+  pressure       Float?
+  pm25           Float?
 
-  device SensorDevice @relation(fields: [deviceId], references: [id])
+  // Radio link quality and fault reporting from push-ingested devices.
+  // errorCode 0 or null = nominal reading.
+  rssi         Float?
+  snr          Float?
+  filteredRssi Float?
+  errorCode    Int?
+  errorMessage String?
+  // Full device payload, kept for debugging. Size-capped at ingest.
+  rawPayload   Json?
 
-  // Unique-constraint decision (Action Item 1, step 3, v6): vendor confirmed
-  // legitimate backlog-catchup rows have distinct timestamps — only garbage
-  // rows from the device's one-time Wi-Fi-setup period share a timestamp.
-  // This constraint therefore only ever collapses confirmed-junk rows, never
-  // legitimate data. Action Item 3 must insert via
+  device       SensorDevice  @relation(fields: [deviceId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  // One reading per (device, timestamp): a device retry that resends the same
+  // timestamp collapses instead of duplicating. Insert via
   // createMany({ skipDuplicates: true }), not a hand-rolled in-memory dedup.
   @@unique([deviceId, timestamp])
+  @@index([organizationId, deviceId, timestamp])
+  @@index([timestamp])
   @@map("sensor_readings")
 }
 

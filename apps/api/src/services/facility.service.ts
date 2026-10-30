@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { prisma } from '@bin-tracker/db';
+import { prisma, seedDefaultZones } from '@bin-tracker/db';
 import { PLAN_LIMITS } from '@bin-tracker/types';
 import type { CreateFacilityInput, UpdateFacilityInput, ListFacilitiesInput } from '@bin-tracker/validators';
 import { handlePrismaError } from '../lib/errors.js';
@@ -78,7 +78,12 @@ export const facilityService = {
         }
 
         try {
-            return await prisma.facility.create({ data: { ...input, organizationId: orgId } });
+            // Every facility starts with the default zones, in the same transaction so there is never a zoneless facility.
+            return await prisma.$transaction(async (tx) => {
+                const facility = await tx.facility.create({ data: { ...input, organizationId: orgId } });
+                await seedDefaultZones(tx, facility.id);
+                return facility;
+            });
         } catch (error) {
             handlePrismaError(error);
         }

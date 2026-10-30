@@ -96,6 +96,8 @@ interface FakeShipment {
 interface FakeSensorDevice {
     id: string;
     organizationId: string;
+    state?: string;
+    assignedAt?: Date;
 }
 
 interface FakeFormTemplate {
@@ -269,8 +271,13 @@ vi.mock('@bin-tracker/db', () => {
     };
 
     const sensorDevice = {
-        findFirst: ({ where }: { where: { id: string; organizationId: string } }) => {
-            const found = store.sensorDevices.find((d) => d.id === where.id && d.organizationId === where.organizationId);
+        findFirst: ({ where }: { where: { id: string; organizationId: string; state?: string } }) => {
+            const found = store.sensorDevices.find(
+                (d) =>
+                    d.id === where.id &&
+                    d.organizationId === where.organizationId &&
+                    (where.state === undefined || d.state === where.state),
+            );
             return Promise.resolve(found ? { ...found } : null);
         },
     };
@@ -515,6 +522,8 @@ function seedSensorDevice(overrides: Partial<FakeSensorDevice> = {}): FakeSensor
     const device: FakeSensorDevice = {
         id: nextId('dev'),
         organizationId: ORG_A,
+        state: 'ACTIVE',
+        assignedAt: new Date('2026-01-01T00:00:00Z'),
         ...overrides,
     };
     store.sensorDevices.push(device);

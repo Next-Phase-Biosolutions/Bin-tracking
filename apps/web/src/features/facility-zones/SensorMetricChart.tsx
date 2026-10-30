@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -11,8 +11,8 @@ import {
 } from 'recharts';
 import { Card, Badge, Reveal } from '../../components/ui/primitives';
 import { Icon } from '../../components/ui/Icon';
-import type { CoreMetricKey, SeriesStats } from '../../lib/zone-sensors';
-import { metricStatus } from '../../lib/zone-sensors';
+import type { ThresholdStatus } from '@bin-tracker/types';
+import type { SeriesStats } from '../../lib/zone-sensors';
 
 const STATUS_TONE = { OK: 'good', WARN: 'warn', ALERT: 'alert', UNKNOWN: 'idle' } as const;
 
@@ -34,16 +34,44 @@ function downsample(points: readonly ChartDatum[], limit: number): ChartDatum[] 
 }
 
 interface SensorMetricChartProps {
-  metricKey: CoreMetricKey;
   label: string;
   icon: string;
   unit: string;
   decimals: number;
-  /** The OK band to shade behind the trace. `low: null` means no floor (ammonia). */
-  band: { low: number | null; high: number };
+  /** Threshold status badge for the latest value. Omit for metrics with no thresholds (signal strength, …). */
+  statusOf?: (value: number) => ThresholdStatus;
+  /** The OK band to shade behind the trace. Omit when the metric has no OK band. `low: null` means no floor. */
+  band?: { low: number | null; high: number };
+  /** Keep the Y axis from going below zero. Defaults to true except for °C; pass false for negative metrics like RSSI. */
+  floorAtZero?: boolean;
+  /** Spoken range for the accessible label, e.g. "last 7 days". Defaults to "last 24 hours". */
+  rangeLabel?: string;
   series: SeriesStats;
   /** Formats a point's timestamp for the x-axis, in the org's own timezone (not the browser's). */
   formatTime: (ms: number) => string;
+}
+
+interface EdgeAwareTickProps {
+  x?: number;
+  y?: number;
+  index?: number;
+  visibleTicksCount?: number;
+  payload?: { value: number };
+  formatTime: (ms: number) => string;
+}
+
+/**
+ * Time label for the x-axis. The first and last labels hang inward from the plot
+ * edges instead of being centred on them, so a long label ("Oct 30, 14:05" on a
+ * 7-day chart) is never cut off by the card.
+ */
+function EdgeAwareTick({ x = 0, y = 0, index = 0, visibleTicksCount = 1, payload, formatTime }: EdgeAwareTickProps) {
+  const anchor = index === 0 ? 'start' : index === visibleTicksCount - 1 ? 'end' : 'middle';
+  return (
+    <text x={x} y={y} dy="0.71em" textAnchor={anchor} fontSize={9} fontFamily="var(--font-mono)" fill="var(--color-muted)">
+      {payload ? formatTime(payload.value) : ''}
+    </text>
+  );
 }
 
 function TooltipCard({
@@ -75,16 +103,19 @@ function TooltipCard({
 }
 
 export function SensorMetricChart({
-  metricKey,
   label,
   icon,
   unit,
   decimals,
+  statusOf,
   band,
+  floorAtZero,
+  rangeLabel = 'last 24 hours',
   series,
   formatTime,
 }: SensorMetricChartProps) {
-  const status = metricStatus(series.latest, metricKey);
+  const status = statusOf?.(series.latest);
+  const nonNegative = floorAtZero ?? unit !== '°C';
   const fmt = (v: number) =>
     v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
@@ -99,18 +130,21 @@ export function SensorMetricChart({
     const rawSpan = series.max - series.min || Math.abs(series.max) * 0.1 || 1;
     let domainMin = series.min - rawSpan * 0.18;
     const domainMax = series.max + rawSpan * 0.18;
-    if (unit !== '°C') domainMin = Math.max(0, domainMin);
+    if (nonNegative) domainMin = Math.max(0, domainMin);
 
     // Band clipped to the visible domain — a threshold miles outside today's
     // readings has nothing meaningful to shade and would otherwise either
     // vanish entirely or paint the whole plot solid.
-    const bandLow = Math.max(band.low ?? domainMin, domainMin);
-    const bandHigh = Math.min(band.high, domainMax);
-    const hasBand = bandHigh > domainMin && bandLow < domainMax && bandHigh > bandLow;
+    const bandLow = Math.max(band?.low ?? domainMin, domainMin);
+    const bandHigh = Math.min(band?.high ?? domainMin, domainMax);
+    const hasBand = band !== undefined && bandHigh > domainMin && bandLow < domainMax && bandHigh > bandLow;
 
     const tickCount = 4;
-    const tickTimes = Array.from({ length: tickCount }, (_, i) => {
-      const idx = Math.round((i / (tickCount - 1)) * (plotted.length - 1));
+    // Three time labels (start, middle, end): the end labels hang inward, so a fourth
+    // would crowd the last one when the labels are long ("Oct 30, 14:05" on a 7-day chart).
+    const timeTickCount = 3;
+    const tickTimes = Array.from({ length: timeTickCount }, (_, i) => {
+      const idx = Math.round((i / (timeTickCount - 1)) * (plotted.length - 1));
       return plotted[idx]!.t;
     });
     // Computed explicitly rather than left to recharts' auto-tick generation —
@@ -129,9 +163,10 @@ export function SensorMetricChart({
       ticks: tickTimes,
       yTicks,
     };
-  }, [series, band, unit]);
+  }, [series, band, nonNegative]);
 
-  const gradientId = `sensor-gradient-${metricKey}`;
+  // useId yields ':r1:'; strip the colons so the id is safe inside url(#…).
+  const gradientId = `sensor-gradient-${useId().replace(/:/g, '')}`;
 
   return (
     <Reveal>
@@ -141,7 +176,7 @@ export function SensorMetricChart({
             <Icon name={icon} width={15} height={15} className="text-olive" />
             <span className="kicker">{label}</span>
           </div>
-          <Badge tone={STATUS_TONE[status]}>{status}</Badge>
+          {status ? <Badge tone={STATUS_TONE[status]}>{status}</Badge> : null}
         </div>
 
         <div className="mt-3 flex items-end justify-between">
@@ -156,7 +191,7 @@ export function SensorMetricChart({
           </div>
         </div>
 
-        <div className="mt-3 h-[168px] w-full" role="img" aria-label={`${label} trend, last 24 hours`}>
+        <div className="mt-3 h-[168px] w-full" role="img" aria-label={`${label} trend, ${rangeLabel}`}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
               <defs>
@@ -190,7 +225,7 @@ export function SensorMetricChart({
                 domain={['dataMin', 'dataMax']}
                 ticks={ticks}
                 tickFormatter={(v: number) => formatTime(v)}
-                tick={{ fontSize: 9, fontFamily: 'var(--font-mono)', fill: 'var(--color-muted)' }}
+                tick={<EdgeAwareTick formatTime={formatTime} />}
                 axisLine={{ stroke: 'var(--color-edge)', strokeOpacity: 0.5 }}
                 tickLine={false}
                 height={20}

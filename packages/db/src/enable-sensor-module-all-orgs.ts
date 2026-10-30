@@ -8,11 +8,9 @@ import { setModuleOverride } from './module-service.js';
  * enable-sensor-module-demo-org.ts for the single-org version this
  * generalizes.
  *
- * Needed because of the shared-sensor-device product decision (see
- * SHARED_DEVICE_IDS in apps/api/src/services/sensor.service.ts): every org's
- * Wet Aging tab should show that one device's real readings, which still
- * requires the org to hold the module grant — the shared-device allowlist
- * bypasses org/facility *device* scoping, not the module gate.
+ * Each org only ever sees its own devices (there is no cross-org visibility),
+ * and seeing them still requires the org to hold this module grant — so an org
+ * that gets a sensor registered also needs the module enabled.
  */
 async function main(): Promise<void> {
   const platformAdmin = await prisma.user.findFirst({ where: { isPlatformAdmin: true } });

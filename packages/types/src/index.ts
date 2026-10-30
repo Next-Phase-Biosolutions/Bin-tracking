@@ -84,3 +84,14 @@ export type { Plan, SubscriptionStatus, ModuleKey, PlanLimits } from './entitlem
 export { PLAN_LIMITS, PLAN_DEFAULT_MODULES, ALL_MODULE_KEYS, MODULE_LABELS, MODULE_SUBLABELS, defaultModulesForPlan, isSubscriptionUsable } from './entitlements.js';
 export type { ThresholdStatus } from './sensor-thresholds.js';
 export { SENSOR_THRESHOLDS, computeThresholdStatus } from './sensor-thresholds.js';
+export {
+    SENSOR_DEVICE_ID_MAX_LENGTH,
+    SENSOR_DEVICE_ID_PATTERN,
+    sensorDeviceIdProblem,
+    parseDeviceIdList,
+    nameIsHardwareId,
+    ZONE_ICON_NAMES,
+} from './sensor-device-id.js';
+export type { ZoneIconName } from './sensor-device-id.js';
+export { DEFAULT_OFFLINE_AFTER_MINUTES, isDeviceOnline, adminDeviceStatus } from './sensor-status.js';
+export type { AdminDeviceStatus } from './sensor-status.js';

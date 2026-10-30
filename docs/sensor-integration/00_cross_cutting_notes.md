@@ -1,3 +1,11 @@
+> **Superseded in part — read first.** Ingestion is no longer a poller that pulls from the EcoSafeSense vendor API. Devices now **push** readings to `POST /ingest/sensor-reading` with one shared key, and platform admins register and assign devices from the **Sensor Fleet** screens. The "backfill/poll" item in the build order below, and the vendor-call findings it relies on, are historical.
+>
+> Two things this file left open are now decided: **device reassignment** — every reading is stamped with the organization that owned the device when it arrived, so history stays with the previous tenant, and a tenant sees only readings from the time the device was assigned to them; **retention** is still open (see `docs/sensor-push-ingest/OPEN_ITEMS.md`).
+>
+> Current design, rollout and open questions: `docs/sensor-push-ingest/`.
+
+---
+
 # Cross-Cutting Notes — Sensor Integration
 
 These don't belong to any single action item but affect the workstream as a whole.

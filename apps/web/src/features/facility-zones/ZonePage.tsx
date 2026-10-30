@@ -1,384 +1,148 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/app/PageHeader';
-import { Card, Badge, Reveal, LiveDot, SectionHead } from '../../components/ui/primitives';
+import { Badge, Button, Card } from '../../components/ui/primitives';
 import { Icon } from '../../components/ui/Icon';
-import { TickValue } from '../../components/app/LiveValue';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { getZone } from '../../lib/facility-zones-data';
-import {
-  CORE_METRICS,
-  describeLastSeen,
-  metricSeries,
-  sensorIdForZone,
-  toEnvRows,
-} from '../../lib/zone-sensors';
+import { zoneDevices } from '../../lib/zone-sensors';
+import { facilitiesWithZone, resolveZoneFacility, sensorCountsByFacility, zonePageState, zoneViewMode } from '../../lib/zone-view';
 import { trpc } from '../../lib/trpc';
-import { useClock } from '../../lib/hooks';
 import { useSubscription } from '../../context/SubscriptionContext';
-import { SensorMetricChart } from './SensorMetricChart';
+import { MockZoneView } from './MockZoneView';
+import { LiveSinceReading } from './TenantSensorView';
+import { ZoneDeviceSection } from './ZoneDeviceSection';
 
-/** Only these zones have a built-out view so far — the rest show a placeholder until wired up. */
-const ACCESSIBLE_ZONE_IDS = new Set(['killfloor', 'wetaging']);
-
-/** `UNKNOWN` must not read as green — a device that has never reported is not "OK". */
-const STATUS_TONE = { OK: 'good', WARN: 'warn', ALERT: 'alert', UNKNOWN: 'idle' } as const;
+const DEFAULT_TIMEZONE = 'America/Toronto';
 
 export default function ZonePage() {
-  const { zoneId } = useParams<{ zoneId: string }>();
-  const zone = zoneId ? getZone(zoneId) : undefined;
+  // The route param is the zone SLUG (/app/zones/:zoneId), kept so existing links work.
+  const { zoneId: slug } = useParams<{ zoneId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedFacility = searchParams.get('facility');
 
-  // Live sensor wiring. These hooks run before the early returns below, so
-  // they must tolerate `zone` being undefined.
-  const sensorExternalId = zone ? sensorIdForZone(zone.id) : undefined;
+  const zonesQuery = trpc.zone.listMine.useQuery(undefined, { staleTime: 60_000 });
+  const zones = zonesQuery.data ?? [];
+
   const { hasModule, modulesReady } = useSubscription();
+  // Skip the query entirely when the org lacks the module — it could only come
+  // back FORBIDDEN. Which device (if any) belongs to this zone is only known
+  // after the org-scoped device list returns.
+  const sensorsAvailable = modulesReady && hasModule('ENVIRONMENT_MONITORING');
   const devicesQuery = trpc.sensor.listDevices.useQuery(
     {},
     {
-      // Skip entirely when the zone has no device mapped or the org lacks
-      // the module — otherwise every zone visit fires a request that can
-      // only come back empty or FORBIDDEN.
-      enabled:
-        sensorExternalId !== undefined && modulesReady && hasModule('ENVIRONMENT_MONITORING'),
-      // The poller writes new rows every ~10 min; without this the card
-      // freezes at whatever it showed on mount.
+      enabled: sensorsAvailable,
+      // Devices push readings continuously; without this the page freezes at whatever it showed on mount.
       refetchInterval: 60_000,
       // A module-gated 403 is a permanent answer, not a blip.
       retry: false,
     },
   );
 
-  const device = devicesQuery.data?.devices.find((d) => d.externalId === sensorExternalId);
-  const reading = device?.readings[0];
-  const lastSeen = device ? describeLastSeen(device.lastSeenAt) : null;
-  const companyTimezone = devicesQuery.data?.companyTimezone ?? 'America/Toronto';
+  // Without an explicit choice, open on the facility whose zone actually has a sensor.
+  const sensorCounts = slug ? sensorCountsByFacility(devicesQuery.data?.devices, slug) : new Map<string, number>();
+  const zoneRow = slug ? resolveZoneFacility(zones, slug, requestedFacility, sensorCounts) : undefined;
+  const facilityOptions = slug ? facilitiesWithZone(zones, slug, sensorCounts) : [];
 
-  const historyQuery = trpc.sensor.getReadings.useQuery(
-    { deviceId: device?.id ?? '', range: '24h' },
-    {
-      enabled: device !== undefined,
-      refetchInterval: 60_000,
-      retry: false,
-    },
+  const devices = zoneRow ? zoneDevices(devicesQuery.data?.devices, zoneRow.id) : [];
+  const companyTimezone = devicesQuery.data?.companyTimezone ?? DEFAULT_TIMEZONE;
+  const offlineAfterMinutes = devicesQuery.data?.offlineAfterMinutes ?? 20;
+  // The header chip follows whichever device reported most recently.
+  const freshest = devices.reduce<Date | null>(
+    (best, device) => (device.lastSeenAt && (!best || device.lastSeenAt > best) ? device.lastSeenAt : best),
+    null,
   );
 
-  // A zone with a sensor mapped gets the minimal charts-only view below,
-  // instead of the mock stats/actions/environment layout — the charts
-  // already carry that information, so showing both would be redundant.
-  const sensorEnabled =
-    sensorExternalId !== undefined && modulesReady && hasModule('ENVIRONMENT_MONITORING');
-  const isLoadingLiveData =
-    sensorEnabled && (devicesQuery.isLoading || (device !== undefined && historyQuery.isLoading));
-
   const formatTime = (ms: number) =>
-    new Date(ms).toLocaleTimeString('en-US', {
-      timeZone: companyTimezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+    new Date(ms).toLocaleTimeString('en-US', { timeZone: companyTimezone, hour: '2-digit', minute: '2-digit', hour12: false });
 
-  if (!zone) return <Navigate to="/app/dashboard" replace />;
-
-  if (!ACCESSIBLE_ZONE_IDS.has(zone.id)) {
+  const state = zonePageState({
+    zonesLoading: zonesQuery.isLoading,
+    zonesError: zonesQuery.isError,
+    devicesLoading: sensorsAvailable && devicesQuery.isLoading,
+    hasZone: Boolean(slug && zoneRow),
+  });
+  if (state === 'loading') {
     return (
-      <div className="mx-auto max-w-7xl">
-        <PageHeader
-          title={`${zone.name} Zone`}
-          subtitle={zone.tagline}
-          icon={<Icon name={zone.icon} width={22} height={22} />}
-        />
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Card className="w-full max-w-md p-8 text-center">
-            <Badge tone="idle">Not accessible</Badge>
-          </Card>
-        </div>
+      <div className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center">
+        <FacilityLoader variant="inline" label={slug} />
       </div>
     );
   }
+  if (state === 'error') {
+    return (
+      <div className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center">
+        <Card className="w-full max-w-md p-8 text-center">
+          <p className="text-sm text-muted">Couldn't load this zone. Check your connection and try again.</p>
+          <Button className="mt-4" variant="secondary" onClick={() => void zonesQuery.refetch()}>
+            Retry
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+  if (state === 'missing' || !slug || !zoneRow) return <Navigate to="/app/dashboard" replace />;
 
-  // Real readings replace the zone's mock atmosphere wholesale when a device
-  // is mapped and reporting; otherwise the mock stands in unchanged, so zones
-  // without a sensor look exactly as they did before. A device that exists but
-  // has not reported yet shows nothing rather than mock numbers — presenting
-  // invented values under a real device's name is the one outcome to avoid.
-  const liveEnv = reading ? toEnvRows(reading) : null;
-  const envRows = liveEnv ?? (device ? [] : zone.env);
+  const mock = getZone(slug);
+  const mode = zoneViewMode({ slug, hasDevice: devices.length > 0 });
+  const title = `${zoneRow.name} Zone`;
+  const subtitle = mock?.tagline ?? zoneRow.facilityName;
+  const icon = <Icon name={zoneRow.icon} width={22} height={22} />;
 
-  // Independently per metric, in case one channel has gaps another doesn't —
-  // a device that's never reported ammonia shouldn't blank out its temperature chart.
-  const history = historyQuery.data ?? [];
-  const coreCharts = CORE_METRICS.map((metric) => ({
-    metric,
-    series: metricSeries(history, metric.key),
-  })).filter(
-    (
-      c,
-    ): c is {
-      metric: (typeof CORE_METRICS)[number];
-      series: NonNullable<ReturnType<typeof metricSeries>>;
-    } => c.series !== null && c.series.points.length >= 2,
-  );
-
-  // Header status: a live "since last reading" timer whenever the zone's sensor
-  // has reported — its climb-and-reset cadence is directly comparable to the
-  // sensor's update interval. Falls back to the mock status only for genuinely
-  // non-sensor zones.
-  const lastReadingAt = device?.lastSeenAt ?? null;
-  const headerAction = lastReadingAt ? (
-    <LiveSinceReading lastSeenAt={lastReadingAt} />
-  ) : sensorEnabled ? (
+  const headerAction = freshest ? (
+    <LiveSinceReading lastSeenAt={freshest} offlineAfterMinutes={offlineAfterMinutes} />
+  ) : devices.length > 0 ? (
     <Badge tone="idle">awaiting first reading</Badge>
-  ) : (
-    <Badge tone={zone.status}>
-      {zone.status} · {zone.statusNote}
+  ) : mock && mode === 'mock' ? (
+    <Badge tone={mock.status}>
+      {mock.status} · {mock.statusNote}
     </Badge>
-  );
+  ) : undefined;
 
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title={`${zone.name} Zone`}
-        subtitle={zone.tagline}
-        icon={<Icon name={zone.icon} width={22} height={22} />}
-        actions={headerAction}
-      />
+      <PageHeader title={title} subtitle={subtitle} icon={icon} actions={headerAction} />
 
-      {sensorEnabled ? (
-        <div className="mt-2">
-          {isLoadingLiveData ? (
-            <div className="flex min-h-[30vh] items-center justify-center">
-              <FacilityLoader variant="inline" label={zone.name} />
-            </div>
-          ) : coreCharts.length > 0 ? (
-            <>
-              <p className="kicker">core — threshold monitored</p>
-              <div className="mt-3 grid gap-4 md:grid-cols-3">
-                {coreCharts.map(({ metric, series }) => (
-                  <SensorMetricChart
-                    key={metric.key}
-                    metricKey={metric.key}
-                    label={metric.label}
-                    icon={metric.icon}
-                    unit={metric.unit}
-                    decimals={metric.decimals}
-                    band={metric.band}
-                    series={series}
-                    formatTime={formatTime}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex min-h-[30vh] items-center justify-center">
-              <Card className="w-full max-w-md p-8 text-center">
-                <p className="font-mono text-xs uppercase tracking-[0.12em] text-muted">
-                  awaiting first reading
-                </p>
-              </Card>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {zone.stats.map((s, i) => (
-              <Reveal key={s.label} delay={i * 0.05}>
-                <Card className="p-6">
-                  <p className="kicker">{s.label}</p>
-                  <p className="mt-3 font-display text-[2.4rem] font-extrabold leading-none tracking-tight text-olive-deep tnum">
-                    {s.value}
-                    {s.unit ? (
-                      <span className="ml-1.5 text-base font-bold text-muted">{s.unit}</span>
-                    ) : null}
-                  </p>
-                </Card>
-              </Reveal>
+      {facilityOptions.length > 1 ? (
+        <label className="mb-4 mt-1 flex items-center gap-2 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-muted">
+          Facility
+          <select
+            value={zoneRow.facilityId}
+            onChange={(e) => setSearchParams({ facility: e.target.value })}
+            className="rounded-lg border border-edge bg-white px-3 py-1.5 text-sm font-semibold normal-case tracking-normal text-olive-deep"
+          >
+            {facilityOptions.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+                {f.sensorCount > 0 ? ` · ${f.sensorCount} sensor${f.sensorCount === 1 ? '' : 's'}` : ''}
+              </option>
             ))}
-          </div>
+          </select>
+        </label>
+      ) : null}
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <Reveal>
-              <Card className="overflow-hidden">
-                <div className="flex items-center justify-between border-b border-edge/60 p-6">
-                  <SectionHead title={zone.listTitle} />
-                  <span className="flex items-center gap-1.5 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-live">
-                    <LiveDot /> live_tracking
-                  </span>
-                </div>
-                <ul className="divide-y divide-edge/40">
-                  {zone.rows.map((r) => (
-                    <li key={r.id} className="flex flex-wrap items-center gap-4 p-6">
-                      <div className="min-w-[10rem] flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-display text-lg font-bold text-olive-deep">
-                            {r.title}
-                          </h3>
-                          <Badge tone={r.status.tone}>{r.status.label}</Badge>
-                        </div>
-                        <p className="mt-0.5 text-sm text-muted">{r.subtitle}</p>
-                      </div>
-                      <div className="flex gap-6">
-                        {r.metrics.map((m) => (
-                          <div key={m.label}>
-                            <p className="font-mono text-[0.56rem] uppercase tracking-[0.1em] text-muted">
-                              {m.label}
-                            </p>
-                            <p className="mt-0.5 font-mono text-sm font-semibold text-olive-deep">
-                              {m.value}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                      <button className="rounded-lg border border-edge px-3 py-2 text-xs font-semibold text-olive-deep transition-colors hover:bg-bone-light">
-                        Inspect
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </Reveal>
-
-            <div className="space-y-4">
-              <Reveal delay={0.05}>
-                <Card className="p-6">
-                  <SectionHead title="Zone Actions" />
-                  <div className="mt-4 space-y-2">
-                    {zone.actions.map((a, i) => (
-                      <button
-                        key={a}
-                        className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                          i === 0
-                            ? 'bg-olive-deep text-bone-light hover:bg-olive-deep/90'
-                            : 'border border-edge bg-white text-olive-deep hover:bg-bone-light'
-                        }`}
-                      >
-                        {a}
-                        <Icon
-                          name="arrow"
-                          width={15}
-                          height={15}
-                          className={i === 0 ? 'text-bone/70' : 'text-muted'}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </Card>
-              </Reveal>
-
-              <Reveal delay={0.1}>
-                <Card className="relative overflow-hidden p-6">
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 data-grid-bg opacity-40"
-                  />
-                  <div className="relative flex items-center justify-between">
-                    <p className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-olive">
-                      zone_environment
-                    </p>
-                    {device ? (
-                      <Badge tone={STATUS_TONE[device.latestStatus]}>{device.latestStatus}</Badge>
-                    ) : (
-                      <span className="flex items-center gap-1.5 font-mono text-[0.56rem] uppercase tracking-[0.12em] text-live">
-                        <LiveDot /> {zone.envStable ? 'stable' : 'watch'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative mt-4 space-y-3">
-                    {envRows.length === 0 ? (
-                      <p className="py-4 text-center font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted">
-                        awaiting first reading
-                      </p>
-                    ) : null}
-                    {envRows.map((e) => (
-                      <div
-                        key={e.label}
-                        className="flex items-center justify-between border-b border-edge/60 pb-3 last:border-0 last:pb-0"
-                      >
-                        <span className="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-olive">
-                          {e.label}
-                        </span>
-                        <span className="font-display text-xl font-bold text-olive-deep">
-                          {liveEnv ? (
-                            <span className="tnum">
-                              {e.value.toLocaleString('en-US', {
-                                minimumFractionDigits: e.decimals ?? 1,
-                                maximumFractionDigits: e.decimals ?? 1,
-                              })}
-                              <span className="ml-0.5 text-[0.7em] opacity-60">{e.unit}</span>
-                            </span>
-                          ) : (
-                            // Mock readings only — never wobble a real sensor value.
-                            <TickValue base={e.value} unit={e.unit} decimals={e.decimals} />
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {lastSeen ? (
-                    <div
-                      className={`relative mt-4 flex items-center gap-2 rounded-lg px-3 py-2.5 ${
-                        lastSeen.isStale ? 'bg-warn/10' : 'bg-bone-light'
-                      }`}
-                    >
-                      <Icon
-                        name={lastSeen.isStale ? 'refresh' : 'check'}
-                        width={14}
-                        height={14}
-                        className={lastSeen.isStale ? 'text-warn' : 'text-live'}
-                      />
-                      <span
-                        className={`font-mono text-[0.6rem] uppercase tracking-[0.12em] ${
-                          lastSeen.isStale ? 'text-warn' : 'text-muted'
-                        }`}
-                      >
-                        {device?.label ?? 'sensor'} · {lastSeen.text}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="relative mt-4 flex items-center gap-2 rounded-lg bg-bone-light px-3 py-2.5">
-                      <Icon name="check" width={14} height={14} className="text-live" />
-                      <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted">
-                        environment stable
-                      </span>
-                    </div>
-                  )}
-                </Card>
-              </Reveal>
-            </div>
-          </div>
-        </>
+      {mode === 'sensor' ? (
+        <div className="grid gap-8">
+          {devices.map((device) => (
+            <ZoneDeviceSection
+              key={device.id}
+              device={device}
+              zoneName={zoneRow.name}
+              showName={devices.length > 1}
+              offlineAfterMinutes={offlineAfterMinutes}
+              formatTime={formatTime}
+            />
+          ))}
+        </div>
+      ) : mode === 'mock' && mock ? (
+        <MockZoneView zone={mock} />
+      ) : (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Card className="w-full max-w-md p-8 text-center">
+            <Badge tone="idle">{mode === 'placeholder' ? 'Not accessible' : 'No sensor assigned to this zone'}</Badge>
+          </Card>
+        </div>
       )}
     </div>
-  );
-}
-
-/**
- * Ticking "time since the last sensor reading" chip for the zone header.
- * Counts up every second (via `useClock`) and resets whenever `lastSeenAt`
- * changes — i.e. when the 60s refetch pulls in a fresher reading — so its
- * reset cadence mirrors the sensor's own update interval. Green while fresh,
- * amber once the feed goes stale (shared `describeLastSeen` threshold).
- */
-function LiveSinceReading({ lastSeenAt }: { lastSeenAt: Date }) {
-  const now = useClock();
-  const { isStale } = describeLastSeen(lastSeenAt);
-  const elapsedMs = Math.max(0, (now?.getTime() ?? Date.now()) - new Date(lastSeenAt).getTime());
-  const totalSec = Math.floor(elapsedMs / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const elapsed = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] ${
-        isStale ? 'bg-warn/10 text-warn' : 'bg-live/10 text-live'
-      }`}
-    >
-      {isStale ? <Icon name="refresh" width={11} height={11} /> : <LiveDot />}
-      <span className="tnum">{elapsed}</span>
-      <span className="opacity-70">since last reading</span>
-    </span>
   );
 }

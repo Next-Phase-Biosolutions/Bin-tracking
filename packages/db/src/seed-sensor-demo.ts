@@ -1,10 +1,9 @@
 /**
  * Seeds a SYNTHETIC sensor device and reading history for local UI work.
  *
- * This is not vendor data. `backfill-sensors.ts` is the real ingestion path;
- * it needs EcoSafeSense credentials, which not every dev has. This script
- * exists so the environment cards on the facility-zone pages can be built and
- * verified without them.
+ * This is not real device data. It exists so the environment cards on the
+ * facility-zone pages can be built and verified without a physical sensor
+ * posting readings.
  *
  * Values are shaped like a wet-aging cooler rather than like the demo device's
  * actual readings (which sit at room temperature, ~24-34 °C, and therefore
@@ -16,6 +15,7 @@
 import { prisma } from './client.js';
 import { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
 import { setModuleOverride } from './module-service.js';
+import { seedDefaultZones } from './default-zones.js';
 
 const EXTERNAL_ID = 'demo-wetaging-0001';
 const LABEL = 'Wet Aging Cooler Sensor (demo)';
@@ -90,22 +90,33 @@ async function main(): Promise<void> {
   });
 
   assertSensorDeviceOrgConsistency({ organizationId: org.id }, facility);
+  await seedDefaultZones(prisma, facility.id);
+  const zone = await prisma.zone.findUniqueOrThrow({
+    where: { facilityId_slug: { facilityId: facility.id, slug: 'wetaging' } },
+  });
+  // Tenants only see readings from assignedAt onward, so back-date it to the start of the history.
+  const assignedAt = new Date(Date.now() - HISTORY_HOURS * 60 * 60_000);
+  // Same placement on create and update, so re-running also revives a demo device that an
+  // upgrade (or an admin) left DEACTIVATED.
+  const placement = {
+    state: 'ACTIVE' as const,
+    assignedAt,
+    zoneId: zone.id,
+    organizationId: org.id,
+    facilityId: facility.id,
+    label: LABEL,
+  };
   const device = await prisma.sensorDevice.upsert({
     where: { externalId: EXTERNAL_ID },
-    update: {},
-    create: {
-      externalId: EXTERNAL_ID,
-      organizationId: org.id,
-      facilityId: facility.id,
-      label: LABEL,
-    },
+    update: placement,
+    create: { externalId: EXTERNAL_ID, ...placement },
   });
 
   const count = (HISTORY_HOURS * 60) / INTERVAL_MINUTES;
   const now = Date.now();
   const readings = Array.from({ length: count }, (_, i) => {
     const timestamp = new Date(now - (count - 1 - i) * INTERVAL_MINUTES * 60_000);
-    return { ...syntheticReading(timestamp, i), deviceId: device.id };
+    return { ...syntheticReading(timestamp, i), deviceId: device.id, organizationId: org.id };
   });
 
   // Same dedup mechanism the real backfill uses, so re-running is a no-op.
@@ -116,7 +127,7 @@ async function main(): Promise<void> {
   console.log(`org:        ${org.slug}`);
   console.log(`facility:   ${facility.name} (${facility.id})`);
   console.log(`device:     ${device.label}`);
-  console.log(`externalId: ${device.externalId}   <- set VITE_ZONE_SENSOR_WETAGING to this`);
+  console.log(`externalId: ${device.externalId}   (shown on the ${zone.slug} zone page)`);
   console.log(
     `readings:   ${result.count} inserted, ${readings.length - result.count} already present`,
   );
