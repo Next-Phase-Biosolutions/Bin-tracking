@@ -15,11 +15,12 @@ const store = vi.hoisted(() => {
     return {
         facilities: [] as FakeFacility[],
         subscription: null as { plan: 'STARTER' | 'PRO' | 'ENTERPRISE' } | null,
+        zones: [] as Array<{ facilityId: string; slug: string; name: string }>,
         nextId: 0,
     };
 });
 
-vi.mock('@bin-tracker/db', () => {
+vi.mock('@bin-tracker/db', async () => {
     const facility = {
         count: ({ where }: { where: { organizationId: string; deletedAt: null } }) =>
             Promise.resolve(
@@ -38,7 +39,21 @@ vi.mock('@bin-tracker/db', () => {
         findUnique: () => Promise.resolve(store.subscription),
     };
 
-    return { prisma: { facility, subscription } };
+    const zone = {
+        createMany: ({ data }: { data: Array<{ facilityId: string; slug: string; name: string }> }) => {
+            store.zones.push(...data);
+            return Promise.resolve({ count: data.length });
+        },
+    };
+    const tx = { facility, zone };
+
+    // The real seeding logic runs against the fake zone table (pure module, no Prisma client).
+    const { seedDefaultZones } = await import('../../../../packages/db/src/default-zones.js');
+
+    return {
+        prisma: { facility, subscription, zone, $transaction: (cb: (client: typeof tx) => unknown) => cb(tx) },
+        seedDefaultZones,
+    };
 });
 
 const { facilityService } = await import('./facility.service.js');
@@ -47,6 +62,7 @@ beforeEach(() => {
     store.facilities = [];
     store.subscription = null;
     store.nextId = 0;
+    store.zones = [];
 });
 
 describe('facilityService.create — plan quantity limit', () => {
@@ -93,3 +109,20 @@ describe('facilityService.create — plan quantity limit', () => {
     });
 });
 
+describe('facilityService.create — default zones', () => {
+    it('seeds the six default zones for the new facility', async () => {
+        store.subscription = { plan: 'ENTERPRISE' };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const created = await facilityService.create('org-a', { name: 'Fresh Plant' } as any);
+
+        expect(store.zones.map((z) => z.slug)).toEqual([
+            'receiving',
+            'killfloor',
+            'processing',
+            'wetaging',
+            'valueadd',
+            'shipping',
+        ]);
+        expect(store.zones.every((z) => z.facilityId === created.id)).toBe(true);
+    });
+});
