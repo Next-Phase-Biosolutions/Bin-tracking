@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sensorDeviceIdProblem, ZONE_ICON_NAMES } from '@bin-tracker/types';
 
 // ─── List Devices ──────────────────────────────────────────────
 
@@ -35,6 +36,12 @@ const NUL = '\u0000';
 const noNul = (value: string): boolean => !value.includes(NUL);
 const NO_NUL_MESSAGE = 'must not contain NUL characters';
 
+/** A device id (see `sensorDeviceIdProblem`); trims, and the failure message is the reason. */
+export const sensorDeviceIdSchema = z.string().trim().superRefine((id, ctx) => {
+    const problem = sensorDeviceIdProblem(id);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+});
+
 // Devices may send an explicit null for "no value"; treat it like omitted.
 const optionalMetric = z.number().finite().nullish();
 
@@ -50,7 +57,7 @@ function utf8Bytes(text: string): number {
 }
 
 export const ingestSensorReadingSchema = z.object({
-    p_device_id: z.string().trim().min(1).max(128).refine(noNul, NO_NUL_MESSAGE),
+    p_device_id: sensorDeviceIdSchema,
     p_raw: z.record(z.string(), z.unknown()).refine(
         (raw) => {
             const json = JSON.stringify(raw);
@@ -80,3 +87,87 @@ export const ingestSensorReadingSchema = z.object({
 });
 
 export type IngestSensorReadingInput = z.infer<typeof ingestSensorReadingSchema>;
+
+// ─── Platform-admin fleet management ───────────────────────────
+
+/** Splits pasted text into ids on whitespace/commas/semicolons, de-duped in order. Does not validate. */
+export function parseDeviceIdList(text: string): string[] {
+    return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
+}
+
+// Per-id validation happens in the service so one bad id doesn't reject the batch.
+export const addSensorDevicesSchema = z.object({
+    externalIds: z.array(z.string().max(200)).min(1).max(500),
+});
+
+export type AddSensorDevicesInput = z.infer<typeof addSensorDevicesSchema>;
+
+export const assignSensorDeviceSchema = z.object({
+    deviceId: z.string(),
+    organizationId: z.string(),
+    facilityId: z.string(),
+    zoneId: z.string(),
+    name: z.string().trim().min(1).max(80),
+    enableModule: z.boolean().default(false),
+});
+
+export type AssignSensorDeviceInput = z.infer<typeof assignSensorDeviceSchema>;
+
+export const reassignSensorDeviceSchema = assignSensorDeviceSchema;
+
+export type ReassignSensorDeviceInput = z.infer<typeof reassignSensorDeviceSchema>;
+
+export const sensorDeviceRefSchema = z.object({ deviceId: z.string() });
+
+export const fleetListSchema = z.object({
+    state: z.enum(['UNASSIGNED', 'ACTIVE', 'DEACTIVATED']).optional(),
+    organizationId: z.string().optional(),
+    facilityId: z.string().optional(),
+    zoneId: z.string().optional(),
+    health: z.enum(['online', 'offline', 'fault', 'waiting']).optional(),
+    search: z.string().max(64).optional(),
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(100).default(25),
+});
+
+export type FleetListInput = z.infer<typeof fleetListSchema>;
+
+export const adminReadingRangeSchema = z.object({
+    deviceId: z.string(),
+    range: z.enum(['24h', '7d', '30d']).default('24h'),
+});
+
+export type AdminReadingRangeInput = z.infer<typeof adminReadingRangeSchema>;
+
+export const viewAsTenantSchema = z.object({ organizationId: z.string() });
+
+export const viewAsTenantReadingsSchema = z.object({
+    organizationId: z.string(),
+    deviceId: z.string(),
+    range: z.enum(['24h', '7d']).default('24h'),
+});
+
+export const setOfflineThresholdSchema = z.object({ minutes: z.number().int().min(1).max(1440) });
+
+// ─── Zones ─────────────────────────────────────────────────────
+
+export const facilityRefSchema = z.object({ facilityId: z.string() });
+
+export const zoneRefSchema = z.object({ zoneId: z.string() });
+
+export const createZoneSchema = z.object({
+    facilityId: z.string(),
+    name: z.string().trim().min(1).max(60),
+    icon: z.enum(ZONE_ICON_NAMES).default('grid'),
+});
+
+export type CreateZoneInput = z.infer<typeof createZoneSchema>;
+
+export const renameZoneSchema = z.object({ zoneId: z.string(), name: z.string().trim().min(1).max(60) });
+
+export const reorderZonesSchema = z.object({
+    facilityId: z.string(),
+    zoneIds: z.array(z.string()).min(1).max(100),
+});
+
+export type ReorderZonesInput = z.infer<typeof reorderZonesSchema>;

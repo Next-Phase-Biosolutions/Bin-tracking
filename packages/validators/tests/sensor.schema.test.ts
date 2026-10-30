@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ingestSensorReadingSchema, RAW_PAYLOAD_MAX_BYTES } from '../src/sensor.schema.js';
+import { sensorDeviceIdProblem } from '@bin-tracker/types';
+import {
+    addSensorDevicesSchema,
+    createZoneSchema,
+    ingestSensorReadingSchema,
+    parseDeviceIdList,
+    RAW_PAYLOAD_MAX_BYTES,
+    sensorDeviceIdSchema,
+} from '../src/sensor.schema.js';
 
 const minimal = { p_device_id: 'master-01', p_raw: { battery_mv: 3712 } };
 
@@ -42,7 +50,11 @@ describe('ingestSensorReadingSchema', () => {
     });
 
     it('rejects an over-long device id', () => {
-        expect(ingestSensorReadingSchema.safeParse({ ...minimal, p_device_id: 'x'.repeat(129) }).success).toBe(false);
+        expect(ingestSensorReadingSchema.safeParse({ ...minimal, p_device_id: 'x'.repeat(65) }).success).toBe(false);
+    });
+
+    it('rejects a p_device_id outside the id allowlist at ingest', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...minimal, p_device_id: 'bad id' }).success).toBe(false);
     });
 
     it('requires p_raw to be an object, not an array or scalar', () => {
@@ -104,5 +116,58 @@ describe('ingestSensorReadingSchema', () => {
         // 4000 three-byte characters = 4000 chars but ~12 KB on the wire.
         const wide = { note: '€'.repeat(4000) };
         expect(ingestSensorReadingSchema.safeParse({ ...minimal, p_raw: wide }).success).toBe(false);
+    });
+});
+
+describe('sensorDeviceIdSchema', () => {
+    it('accepts vendor sequential ids', () => {
+        for (const id of ['master-01', 'MT_0001', 'de057baa-358c-430c-9f00-ccf7ee7834bc']) {
+            expect(sensorDeviceIdSchema.safeParse(id).success).toBe(true);
+        }
+    });
+
+    it('rejects ids outside the allowlist or over 64 chars', () => {
+        for (const id of ['a b', 'a/b', '\u00e91', 'x'.repeat(65), '']) {
+            expect(sensorDeviceIdSchema.safeParse(id).success).toBe(false);
+        }
+    });
+
+    it('trims surrounding whitespace before checking', () => {
+        expect(sensorDeviceIdSchema.parse('  master-01  ')).toBe('master-01');
+    });
+});
+
+describe('sensorDeviceIdProblem', () => {
+    it('returns a reason, not a throw', () => {
+        expect(typeof sensorDeviceIdProblem('a b')).toBe('string');
+        expect(sensorDeviceIdProblem('MT-01')).toBeNull();
+        expect(sensorDeviceIdProblem('   ')).toBe('empty');
+    });
+});
+
+describe('parseDeviceIdList', () => {
+    it('splits on whitespace, commas and semicolons, de-duping in order', () => {
+        expect(parseDeviceIdList('a, b;c\n\n a\t d')).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('returns an empty list for blank input', () => {
+        expect(parseDeviceIdList('')).toEqual([]);
+        expect(parseDeviceIdList(' \n ,; ')).toEqual([]);
+    });
+});
+
+describe('addSensorDevicesSchema', () => {
+    it('caps the batch at 500 ids', () => {
+        const ids = (n: number) => Array.from({ length: n }, (_, i) => `id-${i}`);
+        expect(addSensorDevicesSchema.safeParse({ externalIds: ids(500) }).success).toBe(true);
+        expect(addSensorDevicesSchema.safeParse({ externalIds: ids(501) }).success).toBe(false);
+        expect(addSensorDevicesSchema.safeParse({ externalIds: [] }).success).toBe(false);
+    });
+});
+
+describe('createZoneSchema', () => {
+    it('rejects an icon outside ZONE_ICON_NAMES and defaults a missing one to grid', () => {
+        expect(createZoneSchema.safeParse({ facilityId: 'f', name: 'Cold Room', icon: 'gauge' }).success).toBe(false);
+        expect(createZoneSchema.parse({ facilityId: 'f', name: 'Cold Room' }).icon).toBe('grid');
     });
 });

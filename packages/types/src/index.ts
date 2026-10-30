@@ -86,3 +86,10 @@ export type { ThresholdStatus } from './sensor-thresholds.js';
 export { SENSOR_THRESHOLDS, computeThresholdStatus } from './sensor-thresholds.js';
 export { SENSOR_ZONE_IDS, isSensorZoneId } from './sensor-zones.js';
 export type { SensorZoneId } from './sensor-zones.js';
+export {
+    SENSOR_DEVICE_ID_MAX_LENGTH,
+    SENSOR_DEVICE_ID_PATTERN,
+    sensorDeviceIdProblem,
+    ZONE_ICON_NAMES,
+} from './sensor-device-id.js';
+export type { ZoneIconName } from './sensor-device-id.js';
