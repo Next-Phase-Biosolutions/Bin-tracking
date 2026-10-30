@@ -18,7 +18,7 @@ export const sensorIngestService = {
    */
   async ingest(input: IngestSensorReadingInput, now: Date = new Date()): Promise<void> {
     const device = await prisma.sensorDevice.findUnique({ where: { externalId: input.p_device_id } });
-    if (!device || device.status !== 'ACTIVE') throw new UnknownSensorDeviceError(input.p_device_id);
+    if (!device || device.state !== 'ACTIVE') throw new UnknownSensorDeviceError(input.p_device_id);
 
     const timestamp = input.p_timestamp ? new Date(input.p_timestamp) : now;
 

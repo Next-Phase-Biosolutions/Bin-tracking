@@ -12,6 +12,7 @@ import { PrismaClient, FacilityType, UserRole, BinStatus } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes, createHash } from 'crypto';
 import { provisionOrganization, DEFAULT_BIN_TYPES } from '../src/org-provision.js';
+import { seedDefaultZones } from '../src/default-zones.js';
 
 function generateToken(): string {
     return randomBytes(32).toString('hex');
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
         prisma.facility.create({ data: { name: 'Great Lakes Rendering',type: FacilityType.RENDERING,  address: '654 Process Way',     city: 'Columbus',    province: 'OH', postalCode: '43215', country: 'USA', organizationId: orgId } }),
     ]);
     const [chicago, detroit, milwaukee] = facilities;
+    await Promise.all(facilities.map((facility) => seedDefaultZones(prisma, facility.id)));
 
     // ─── 4. Assign users to facilities ───────────────────────────
     //  ADMIN   → no assignment (role bypasses all facility checks)

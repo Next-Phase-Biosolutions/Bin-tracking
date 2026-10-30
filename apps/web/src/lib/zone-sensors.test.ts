@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { pickZoneDevice } from './zone-sensors';
 
-const d = (id: string, zone: string | null, lastSeenAt: Date | null) => ({ id, zone, lastSeenAt });
+const d = (id: string, zoneSlug: string | null, lastSeenAt: Date | null) => ({
+  id,
+  zone: zoneSlug === null ? null : { slug: zoneSlug },
+  lastSeenAt,
+});
 
 describe('pickZoneDevice', () => {
   it('returns undefined when no device is assigned to the zone', () => {

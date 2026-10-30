@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { isSensorZoneId, SENSOR_ZONE_IDS } from '@bin-tracker/types';
 import { prisma } from './client.js';
 import { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
 
@@ -48,7 +47,7 @@ export interface RegisterSensorDeviceArgs {
 }
 
 /** The slice of the Prisma client this needs; narrow so tests can fake it. */
-export type RegisterSensorDeviceDb = Pick<typeof prisma, 'organization' | 'facility' | 'sensorDevice'>;
+export type RegisterSensorDeviceDb = Pick<typeof prisma, 'organization' | 'facility' | 'zone' | 'sensorDevice'>;
 
 export async function registerSensorDevice(db: RegisterSensorDeviceDb, args: RegisterSensorDeviceArgs) {
     const externalId = args.externalId.trim();
@@ -62,16 +61,18 @@ export async function registerSensorDevice(db: RegisterSensorDeviceDb, args: Reg
         throw new Error('device id may only contain letters, digits, "-" and "_"');
     }
 
-    if (args.zone !== undefined && !isSensorZoneId(args.zone)) {
-        throw new Error(`unknown zone "${args.zone}" — expected one of: ${SENSOR_ZONE_IDS.join(', ')}`);
-    }
-
     const org = await db.organization.findUnique({ where: { slug: args.orgSlug } });
     if (!org) throw new Error(`organization not found: ${args.orgSlug}`);
 
     const facility = await db.facility.findFirst({ where: { id: args.facilityId, deletedAt: null } });
     if (!facility) throw new Error(`facility not found (or deleted): ${args.facilityId}`);
     assertSensorDeviceOrgConsistency({ organizationId: org.id }, facility);
+
+    // A typo'd zone would save a device no page ever shows, so resolve it now.
+    const zone = args.zone
+        ? await db.zone.findUnique({ where: { facilityId_slug: { facilityId: facility.id, slug: args.zone } } })
+        : null;
+    if (args.zone && !zone) throw new Error(`unknown zone "${args.zone}" for facility ${facility.id}`);
 
     // externalId is globally unique. Never silently move a device between
     // tenants — that would redirect its readings into another org.
@@ -81,7 +82,15 @@ export async function registerSensorDevice(db: RegisterSensorDeviceDb, args: Reg
     }
 
     return db.sensorDevice.create({
-        data: { externalId, organizationId: org.id, facilityId: facility.id, label: args.label, zone: args.zone ?? null },
+        data: {
+            externalId,
+            organizationId: org.id,
+            facilityId: facility.id,
+            label: args.label,
+            zoneId: zone?.id ?? null,
+            state: 'ACTIVE',
+            assignedAt: new Date(),
+        },
     });
 }
 
@@ -107,7 +116,7 @@ async function main(): Promise<void> {
         label: values.label ?? externalId,
         zone: values.zone,
     });
-    console.log(`registered device org=${values.org} facility=${device.facilityId} zone=${device.zone ?? '(none)'}`);
+    console.log(`registered device org=${values.org} facility=${device.facilityId} zone=${values.zone ?? '(none)'}`);
     console.log(`  p_device_id (flash this into the unit): ${device.externalId}`);
 }
 

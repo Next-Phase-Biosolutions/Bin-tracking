@@ -47,7 +47,10 @@ export const sensorService = {
     const [devices, settings] = await Promise.all([
       prisma.sensorDevice.findMany({
         where: { organizationId, facilityId: { in: facilityIds } },
-        include: { readings: { orderBy: { timestamp: 'desc' }, take: 1 } },
+        include: {
+          readings: { orderBy: { timestamp: 'desc' }, take: 1 },
+          zone: { select: { slug: true } },
+        },
       }),
       prisma.settings.findUnique({ where: { organizationId }, select: { companyTimezone: true } }),
     ]);
@@ -76,9 +79,12 @@ export const sensorService = {
     // listDevicesForOrg already intersects the caller's facility access, but
     // this by-id lookup has no equivalent unless it's added explicitly.
     if (orgRole !== 'ADMIN') {
-      const hasAccess = await prisma.userFacility.findUnique({
-        where: { userId_facilityId: { userId, facilityId: device.facilityId } },
-      });
+      // An unassigned device has no facility, so no non-admin can have access to it.
+      const hasAccess = device.facilityId
+        ? await prisma.userFacility.findUnique({
+            where: { userId_facilityId: { userId, facilityId: device.facilityId } },
+          })
+        : null;
       if (!hasAccess) throw new TRPCError({ code: 'NOT_FOUND', message: 'Device not found' });
     }
 

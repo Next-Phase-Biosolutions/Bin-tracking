@@ -15,6 +15,7 @@
 import { prisma } from './client.js';
 import { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
 import { setModuleOverride } from './module-service.js';
+import { seedDefaultZones } from './default-zones.js';
 
 const EXTERNAL_ID = 'demo-wetaging-0001';
 const LABEL = 'Wet Aging Cooler Sensor (demo)';
@@ -89,12 +90,20 @@ async function main(): Promise<void> {
   });
 
   assertSensorDeviceOrgConsistency({ organizationId: org.id }, facility);
+  await seedDefaultZones(prisma, facility.id);
+  const zone = await prisma.zone.findUniqueOrThrow({
+    where: { facilityId_slug: { facilityId: facility.id, slug: 'wetaging' } },
+  });
+  // Tenants only see readings from assignedAt onward, so back-date it to the start of the history.
+  const assignedAt = new Date(Date.now() - HISTORY_HOURS * 60 * 60_000);
   const device = await prisma.sensorDevice.upsert({
     where: { externalId: EXTERNAL_ID },
-    update: { zone: 'wetaging' },
+    update: { zoneId: zone.id },
     create: {
       externalId: EXTERNAL_ID,
-      zone: 'wetaging',
+      state: 'ACTIVE',
+      assignedAt,
+      zoneId: zone.id,
       organizationId: org.id,
       facilityId: facility.id,
       label: LABEL,
@@ -105,7 +114,7 @@ async function main(): Promise<void> {
   const now = Date.now();
   const readings = Array.from({ length: count }, (_, i) => {
     const timestamp = new Date(now - (count - 1 - i) * INTERVAL_MINUTES * 60_000);
-    return { ...syntheticReading(timestamp, i), deviceId: device.id };
+    return { ...syntheticReading(timestamp, i), deviceId: device.id, organizationId: org.id };
   });
 
   // Same dedup mechanism the real backfill uses, so re-running is a no-op.
@@ -116,7 +125,7 @@ async function main(): Promise<void> {
   console.log(`org:        ${org.slug}`);
   console.log(`facility:   ${facility.name} (${facility.id})`);
   console.log(`device:     ${device.label}`);
-  console.log(`externalId: ${device.externalId}   (shown on the ${device.zone} zone page)`);
+  console.log(`externalId: ${device.externalId}   (shown on the ${zone.slug} zone page)`);
   console.log(
     `readings:   ${result.count} inserted, ${readings.length - result.count} already present`,
   );

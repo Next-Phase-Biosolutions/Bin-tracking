@@ -4,6 +4,8 @@ export { provisionOrganization, DEFAULT_BIN_TYPES, defaultPlanForNewOrg } from '
 export type { ProvisionOrganizationInput, ProvisionOrganizationResult } from './org-provision.js';
 export { reconcileModulesForPlan, getEnabledModules, setModuleOverride } from './module-service.js';
 export { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
+export { DEFAULT_ZONES, seedDefaultZones } from './default-zones.js';
+export type { ZoneSeedDb } from './default-zones.js';
 export type {
     Prisma,
     Facility,
@@ -30,4 +32,5 @@ export {
     EmployeeStatus,
     AttendanceEventType,
     ShipmentCondition,
+    SensorDeviceState,
 } from '@prisma/client';

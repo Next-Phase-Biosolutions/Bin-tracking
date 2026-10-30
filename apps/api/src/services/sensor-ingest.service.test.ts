@@ -7,7 +7,7 @@ interface FakeDevice {
   id: string;
   organizationId: string;
   externalId: string;
-  status: string;
+  state: string;
   lastSeenAt: Date | null;
 }
 
@@ -63,9 +63,9 @@ const NOW = new Date('2026-10-29T12:00:00.000Z');
 
 beforeEach(() => {
   store.devices = [
-    { id: 'dev-a', organizationId: 'org-a', externalId: 'master-01', status: 'ACTIVE', lastSeenAt: null },
-    { id: 'dev-b', organizationId: 'org-b', externalId: 'master-02', status: 'ACTIVE', lastSeenAt: null },
-    { id: 'dev-off', organizationId: 'org-a', externalId: 'retired-01', status: 'RETIRED', lastSeenAt: null },
+    { id: 'dev-a', organizationId: 'org-a', externalId: 'master-01', state: 'ACTIVE', lastSeenAt: null },
+    { id: 'dev-b', organizationId: 'org-b', externalId: 'master-02', state: 'ACTIVE', lastSeenAt: null },
+    { id: 'dev-off', organizationId: 'org-a', externalId: 'retired-01', state: 'DEACTIVATED', lastSeenAt: null },
   ];
   store.readings = [];
 });

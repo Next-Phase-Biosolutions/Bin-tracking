@@ -6,7 +6,7 @@ import {
     type RegisterSensorDeviceDb,
 } from './register-sensor-device.js';
 
-function fakeDb(overrides: Partial<{ org: unknown; facility: unknown; existing: unknown }> = {}) {
+function fakeDb(overrides: Partial<{ org: unknown; facility: unknown; existing: unknown; zone: unknown }> = {}) {
     const create = vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'new-id', ...data }));
     const db = {
         organization: {
@@ -16,6 +16,9 @@ function fakeDb(overrides: Partial<{ org: unknown; facility: unknown; existing: 
             findFirst: vi
                 .fn()
                 .mockResolvedValue('facility' in overrides ? overrides.facility : { id: 'fac-1', organizationId: 'org-a' }),
+        },
+        zone: {
+            findUnique: vi.fn().mockResolvedValue('zone' in overrides ? overrides.zone : { id: 'zone-wa', facilityId: 'fac-1' }),
         },
         sensorDevice: {
             findUnique: vi.fn().mockResolvedValue('existing' in overrides ? overrides.existing : null),
@@ -33,7 +36,15 @@ describe('registerSensorDevice', () => {
         const { db, create } = fakeDb();
         await registerSensorDevice(db, args);
         expect(create).toHaveBeenCalledWith({
-            data: { externalId: DEVICE_ID, organizationId: 'org-a', facilityId: 'fac-1', label: 'Wet aging cooler', zone: null },
+            data: {
+                externalId: DEVICE_ID,
+                organizationId: 'org-a',
+                facilityId: 'fac-1',
+                label: 'Wet aging cooler',
+                zoneId: null,
+                state: 'ACTIVE',
+                assignedAt: expect.any(Date),
+            },
         });
     });
 
@@ -101,20 +112,23 @@ describe('generateDeviceId', () => {
 });
 
 describe('registerSensorDevice — zone', () => {
-    it('stores the zone when given', async () => {
+    it('resolves the zone slug inside the facility and stores its id', async () => {
         const { db, create } = fakeDb();
         await registerSensorDevice(db, { ...args, zone: 'wetaging' });
-        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ zone: 'wetaging' }) });
+        expect(db.zone.findUnique).toHaveBeenCalledWith({
+            where: { facilityId_slug: { facilityId: 'fac-1', slug: 'wetaging' } },
+        });
+        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ zoneId: 'zone-wa' }) });
     });
 
     it('leaves the zone null when omitted', async () => {
         const { db, create } = fakeDb();
         await registerSensorDevice(db, args);
-        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ zone: null }) });
+        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ zoneId: null }) });
     });
 
-    it('rejects an unknown zone instead of silently creating a device no page will show', async () => {
-        const { db, create } = fakeDb();
+    it('rejects a zone slug the facility does not have instead of creating a device no page shows', async () => {
+        const { db, create } = fakeDb({ zone: null });
         await expect(registerSensorDevice(db, { ...args, zone: 'wet-aging' })).rejects.toThrow(/unknown zone/i);
         expect(create).not.toHaveBeenCalled();
     });

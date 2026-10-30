@@ -2,6 +2,7 @@ import { PrismaClient, FacilityType, UserRole, BinStatus } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes, createHash } from 'crypto';
 import { provisionOrganization, DEFAULT_BIN_TYPES } from '../src/org-provision.js';
+import { seedDefaultZones } from '../src/default-zones.js';
 
 // ─── Supabase Admin API helpers ────────────────────────────────────────────
 
@@ -211,6 +212,7 @@ async function main(): Promise<void> {
         prisma.facility.create({ data: { name: 'Great Lakes Rendering', type: FacilityType.RENDERING, address: '654 Process Way', city: 'Columbus', province: 'OH', postalCode: '43215', country: 'USA', organizationId: orgId } }),
     ]);
     const [chicago, detroit, milwaukee] = facilities;
+    await Promise.all(facilities.map((facility) => seedDefaultZones(prisma, facility.id)));
 
     // ─── 6. Assign users to facilities ──────────────────────────
     //  ADMIN has no assignments (role bypasses all facility checks)

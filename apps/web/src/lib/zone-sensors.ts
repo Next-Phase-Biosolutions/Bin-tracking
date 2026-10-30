@@ -19,13 +19,13 @@ import type { RouterOutputs } from './trpc';
  * back to the zone's mock readings. Several matches: the most recently
  * reporting wins, and a device that has never reported ranks last.
  */
-export function pickZoneDevice<T extends { zone: string | null; lastSeenAt: Date | null }>(
+export function pickZoneDevice<T extends { zone: { slug: string } | null; lastSeenAt: Date | null }>(
   devices: readonly T[] | undefined,
   zoneId: string,
 ): T | undefined {
   let best: T | undefined;
   for (const device of devices ?? []) {
-    if (device.zone !== zoneId) continue;
+    if (device.zone?.slug !== zoneId) continue;
     const seen = device.lastSeenAt?.getTime() ?? -Infinity;
     const bestSeen = best?.lastSeenAt?.getTime() ?? -Infinity;
     if (best === undefined || seen > bestSeen) best = device;
