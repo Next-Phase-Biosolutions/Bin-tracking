@@ -26,6 +26,8 @@ const store = vi.hoisted(() => ({
   zones: [] as Array<{ id: string; facilityId: string }>,
   modules: [] as Array<{ orgId: string; module: string; enabled: boolean }>,
   nextId: 0,
+  // Runs once, right after the next device read: simulates a second admin acting in between.
+  afterRead: null as null | (() => void),
 }));
 
 const forgetMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -37,10 +39,27 @@ vi.mock('@bin-tracker/db', async () => {
 
   const prisma = {
     sensorDevice: {
-      findUnique: ({ where }: { where: { id?: string; externalId?: string } }) =>
-        Promise.resolve(
-          store.devices.find((d) => (where.id ? d.id === where.id : d.externalId === where.externalId)) ?? null,
-        ),
+      findUnique: ({ where }: { where: { id?: string; externalId?: string } }) => {
+        const found = store.devices.find((d) => (where.id ? d.id === where.id : d.externalId === where.externalId));
+        const snapshot = found ? { ...found } : null;
+        const hook = store.afterRead;
+        store.afterRead = null;
+        hook?.();
+        return Promise.resolve(snapshot);
+      },
+      findUniqueOrThrow: ({ where }: { where: { id: string } }) =>
+        Promise.resolve(store.devices.find((d) => d.id === where.id)!),
+      updateMany: ({ where, data }: { where: Record<string, unknown>; data: Partial<FakeDevice> }) => {
+        const matches = store.devices.filter((d) =>
+          Object.entries(where).every(([key, value]) => (d as unknown as Record<string, unknown>)[key] === value),
+        );
+        for (const device of matches) {
+          for (const [key, value] of Object.entries(data)) {
+            if (value !== undefined) (device as unknown as Record<string, unknown>)[key] = value;
+          }
+        }
+        return Promise.resolve({ count: matches.length });
+      },
       findMany: ({ where }: { where: { externalId: { in: string[] } } }) =>
         Promise.resolve(store.devices.filter((d) => where.externalId.in.includes(d.externalId))),
       create: ({ data }: { data: Partial<FakeDevice> & { externalId: string; label: string } }) => {
@@ -158,6 +177,7 @@ beforeEach(() => {
   ];
   store.modules = [];
   store.nextId = 0;
+  store.afterRead = null;
   forgetMock.mockClear();
 });
 
@@ -401,5 +421,54 @@ describe('every mutation writes exactly one audit entry', () => {
     expect(store.audit).toHaveLength(1);
     expect(store.audit[0]).toMatchObject({ actorId: ACTOR, action });
     expect(store.audit[0]!.createdAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('two admins acting at once: the state is checked inside the transaction', () => {
+  const T0 = new Date('2026-10-01T00:00:00Z');
+  const activeFixture = () =>
+    device({ id: 'dev-u', state: 'ACTIVE', organizationId: 'org-a', facilityId: 'fac-a', zoneId: 'zone-a1', label: 'Cooler 1', assignedAt: T0 });
+
+  const cases: Array<{ name: string; setup: () => void; other: () => void; run: () => Promise<unknown> }> = [
+    {
+      name: 'assignDevice (someone assigned it first)',
+      setup: () => {},
+      other: () => Object.assign(store.devices[0]!, { state: 'ACTIVE', organizationId: 'org-b', facilityId: 'fac-b', zoneId: 'zone-b1', assignedAt: T0 }),
+      run: () => sensorFleetService.assignDevice(assignInput(), ACTOR),
+    },
+    {
+      name: 'reassignDevice (someone deactivated it)',
+      setup: () => { store.devices = [activeFixture()]; },
+      other: () => Object.assign(store.devices[0]!, { state: 'DEACTIVATED' }),
+      run: () => sensorFleetService.reassignDevice(assignInput({ zoneId: 'zone-a2' }), ACTOR),
+    },
+    {
+      name: 'reassignDevice (someone moved it to another org)',
+      setup: () => { store.devices = [activeFixture()]; },
+      other: () => Object.assign(store.devices[0]!, { organizationId: 'org-b', facilityId: 'fac-b', zoneId: 'zone-b1' }),
+      run: () => sensorFleetService.reassignDevice(assignInput({ zoneId: 'zone-a2' }), ACTOR),
+    },
+    {
+      name: 'deactivateDevice (someone deactivated it)',
+      setup: () => { store.devices = [activeFixture()]; },
+      other: () => Object.assign(store.devices[0]!, { state: 'DEACTIVATED' }),
+      run: () => sensorFleetService.deactivateDevice('dev-u', ACTOR),
+    },
+    {
+      name: 'reactivateDevice (someone reactivated it)',
+      setup: () => { store.devices = [{ ...activeFixture(), state: 'DEACTIVATED' }]; },
+      other: () => Object.assign(store.devices[0]!, { state: 'ACTIVE' }),
+      run: () => sensorFleetService.reactivateDevice('dev-u', ACTOR),
+    },
+  ];
+
+  it.each(cases)('$name → CONFLICT, nothing overwritten, nothing audited', async ({ setup, other, run }) => {
+    setup();
+    store.afterRead = other;
+    await expect(run()).rejects.toMatchObject({ code: 'CONFLICT' });
+    const afterTheOtherAdmin = { ...store.devices[0]! };
+    expect(store.audit).toHaveLength(0);
+    // The device is exactly as the other admin left it.
+    expect(store.devices[0]).toEqual(afterTheOtherAdmin);
   });
 });

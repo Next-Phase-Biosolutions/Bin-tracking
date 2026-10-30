@@ -51,6 +51,29 @@ interface SensorMetricChartProps {
   formatTime: (ms: number) => string;
 }
 
+interface EdgeAwareTickProps {
+  x?: number;
+  y?: number;
+  index?: number;
+  visibleTicksCount?: number;
+  payload?: { value: number };
+  formatTime: (ms: number) => string;
+}
+
+/**
+ * Time label for the x-axis. The first and last labels hang inward from the plot
+ * edges instead of being centred on them, so a long label ("Oct 30, 14:05" on a
+ * 7-day chart) is never cut off by the card.
+ */
+function EdgeAwareTick({ x = 0, y = 0, index = 0, visibleTicksCount = 1, payload, formatTime }: EdgeAwareTickProps) {
+  const anchor = index === 0 ? 'start' : index === visibleTicksCount - 1 ? 'end' : 'middle';
+  return (
+    <text x={x} y={y} dy="0.71em" textAnchor={anchor} fontSize={9} fontFamily="var(--font-mono)" fill="var(--color-muted)">
+      {payload ? formatTime(payload.value) : ''}
+    </text>
+  );
+}
+
 function TooltipCard({
   active,
   payload,
@@ -117,8 +140,11 @@ export function SensorMetricChart({
     const hasBand = band !== undefined && bandHigh > domainMin && bandLow < domainMax && bandHigh > bandLow;
 
     const tickCount = 4;
-    const tickTimes = Array.from({ length: tickCount }, (_, i) => {
-      const idx = Math.round((i / (tickCount - 1)) * (plotted.length - 1));
+    // Three time labels (start, middle, end): the end labels hang inward, so a fourth
+    // would crowd the last one when the labels are long ("Oct 30, 14:05" on a 7-day chart).
+    const timeTickCount = 3;
+    const tickTimes = Array.from({ length: timeTickCount }, (_, i) => {
+      const idx = Math.round((i / (timeTickCount - 1)) * (plotted.length - 1));
       return plotted[idx]!.t;
     });
     // Computed explicitly rather than left to recharts' auto-tick generation —
@@ -199,7 +225,7 @@ export function SensorMetricChart({
                 domain={['dataMin', 'dataMax']}
                 ticks={ticks}
                 tickFormatter={(v: number) => formatTime(v)}
-                tick={{ fontSize: 9, fontFamily: 'var(--font-mono)', fill: 'var(--color-muted)' }}
+                tick={<EdgeAwareTick formatTime={formatTime} />}
                 axisLine={{ stroke: 'var(--color-edge)', strokeOpacity: 0.5 }}
                 tickLine={false}
                 height={20}

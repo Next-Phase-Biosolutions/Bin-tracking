@@ -67,11 +67,10 @@ function ZoneEditor({ facilityId }: { facilityId: string }) {
   const zones = trpc.zone.adminList.useQuery({ facilityId });
   const refresh = () => utils.zone.invalidate();
   const reorder = trpc.zone.adminReorder.useMutation({ onSuccess: refresh });
-  const remove = trpc.zone.adminRemove.useMutation({ onSuccess: refresh });
 
   const rows = zones.data ?? [];
   const ids = rows.map((z) => z.id);
-  const error = reorder.error ?? remove.error;
+  const error = reorder.error;
 
   return (
     <Card className="p-5">
@@ -84,9 +83,8 @@ function ZoneEditor({ facilityId }: { facilityId: string }) {
             zone={zone}
             canMoveUp={index > 0}
             canMoveDown={index < rows.length - 1}
-            busy={reorder.isPending || remove.isPending}
+            busy={reorder.isPending}
             onMove={(delta) => reorder.mutate({ facilityId, zoneIds: moveZone(ids, index, delta) })}
-            onRemove={() => remove.mutate({ zoneId: zone.id })}
           />
         ))}
       </ul>
@@ -102,14 +100,12 @@ function ZoneRow({
   canMoveDown,
   busy,
   onMove,
-  onRemove,
 }: {
   zone: Zone;
   canMoveUp: boolean;
   canMoveDown: boolean;
   busy: boolean;
   onMove: (delta: -1 | 1) => void;
-  onRemove: () => void;
 }) {
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState<string | null>(null);
@@ -119,6 +115,11 @@ function ZoneRow({
       setDraft(null);
       await utils.zone.invalidate();
     },
+  });
+  // Owned by the row so a refusal ("Zone has assigned devices") shows on THIS row and leaves its Delete state.
+  const remove = trpc.zone.adminRemove.useMutation({
+    onSuccess: () => utils.zone.invalidate(),
+    onError: () => setConfirmRemove(false),
   });
   const name = draft?.trim() ?? '';
 
@@ -159,7 +160,7 @@ function ZoneRow({
         </Button>
         {confirmRemove ? (
           <>
-            <Button variant="rust" disabled={busy} onClick={onRemove}>
+            <Button variant="rust" disabled={busy || remove.isPending} onClick={() => remove.mutate({ zoneId: zone.id })}>
               Remove
             </Button>
             <Button variant="ghost" onClick={() => setConfirmRemove(false)}>
@@ -167,12 +168,19 @@ function ZoneRow({
             </Button>
           </>
         ) : (
-          <Button variant="ghost" onClick={() => setConfirmRemove(true)}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              remove.reset();
+              setConfirmRemove(true);
+            }}
+          >
             Delete
           </Button>
         )}
       </div>
       {rename.isError ? <p className="basis-full text-sm text-rust">{rename.error.message}</p> : null}
+      {remove.isError ? <p className="basis-full text-sm text-rust">{remove.error.message}</p> : null}
     </li>
   );
 }

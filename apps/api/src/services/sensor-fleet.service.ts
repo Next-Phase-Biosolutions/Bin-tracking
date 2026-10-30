@@ -5,6 +5,7 @@ import {
   prisma,
   setModuleOverride,
   type Prisma,
+  type SensorDeviceState,
 } from '@bin-tracker/db';
 import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import type { AssignSensorDeviceInput, ReassignSensorDeviceInput } from '@bin-tracker/validators';
@@ -41,6 +42,33 @@ function placementOf(device: {
     zoneId: device.zoneId,
     name: device.label,
   };
+}
+
+/**
+ * Applies `data` only if the device is still exactly as this request read it
+ * (state and placement). The checks before the transaction only give a friendly
+ * message; THIS is what stops two admins acting on the same device at once from
+ * both passing them. Returns the updated row.
+ */
+async function updateUnlessChanged(
+  tx: Prisma.TransactionClient,
+  device: { id: string; state: SensorDeviceState; organizationId: string | null; facilityId: string | null; zoneId: string | null },
+  data: Prisma.SensorDeviceUncheckedUpdateManyInput,
+) {
+  const { count } = await tx.sensorDevice.updateMany({
+    where: {
+      id: device.id,
+      state: device.state,
+      organizationId: device.organizationId,
+      facilityId: device.facilityId,
+      zoneId: device.zoneId,
+    },
+    data,
+  });
+  if (count === 0) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'This device was just changed by someone else — reload and try again' });
+  }
+  return tx.sensorDevice.findUniqueOrThrow({ where: { id: device.id } });
 }
 
 async function requireDevice(deviceId: string) {
@@ -141,16 +169,13 @@ export const sensorFleetService = {
     const before = placementOf(device);
 
     const moduleEnabled = await prisma.$transaction(async (tx) => {
-      const updated = await tx.sensorDevice.update({
-        where: { id: device.id },
-        data: {
-          state: 'ACTIVE',
-          organizationId: input.organizationId,
-          facilityId: input.facilityId,
-          zoneId: input.zoneId,
-          label: input.name,
-          assignedAt: new Date(),
-        },
+      const updated = await updateUnlessChanged(tx, device, {
+        state: 'ACTIVE',
+        organizationId: input.organizationId,
+        facilityId: input.facilityId,
+        zoneId: input.zoneId,
+        label: input.name,
+        assignedAt: new Date(),
       });
       await writeSensorAudit(tx, {
         deviceId: device.id,
@@ -184,15 +209,12 @@ export const sensorFleetService = {
     const action: SensorAuditAction = device.facilityId === input.facilityId ? 'device.zone_change' : 'device.reassign';
 
     const moduleEnabled = await prisma.$transaction(async (tx) => {
-      const updated = await tx.sensorDevice.update({
-        where: { id: device.id },
-        data: {
-          organizationId: input.organizationId,
-          facilityId: input.facilityId,
-          zoneId: input.zoneId,
-          label: input.name,
-          assignedAt: organizationChanged ? new Date() : undefined,
-        },
+      const updated = await updateUnlessChanged(tx, device, {
+        organizationId: input.organizationId,
+        facilityId: input.facilityId,
+        zoneId: input.zoneId,
+        label: input.name,
+        assignedAt: organizationChanged ? new Date() : undefined,
       });
       await writeSensorAudit(tx, {
         deviceId: device.id,
@@ -215,7 +237,7 @@ export const sensorFleetService = {
     }
     const before = placementOf(device);
     await prisma.$transaction(async (tx) => {
-      const updated = await tx.sensorDevice.update({ where: { id: device.id }, data: { state: 'DEACTIVATED' } });
+      const updated = await updateUnlessChanged(tx, device, { state: 'DEACTIVATED' });
       await writeSensorAudit(tx, {
         deviceId: device.id,
         actorId,
@@ -234,10 +256,7 @@ export const sensorFleetService = {
     }
     const before = placementOf(device);
     await prisma.$transaction(async (tx) => {
-      const updated = await tx.sensorDevice.update({
-        where: { id: device.id },
-        data: { state: device.organizationId ? 'ACTIVE' : 'UNASSIGNED' },
-      });
+      const updated = await updateUnlessChanged(tx, device, { state: device.organizationId ? 'ACTIVE' : 'UNASSIGNED' });
       await writeSensorAudit(tx, {
         deviceId: device.id,
         actorId,
