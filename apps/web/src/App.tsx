@@ -23,6 +23,8 @@ import PayrollAdminPage from './features/admin/PayrollAdminPage';
 import SensorFleetPage from './features/admin/sensors/SensorFleetPage';
 import SensorRegisterPage from './features/admin/sensors/SensorRegisterPage';
 import SensorDevicePage from './features/admin/sensors/SensorDevicePage';
+import SensorViewAsTenantPage from './features/admin/sensors/SensorViewAsTenantPage';
+import ZonesAdminPage from './features/admin/ZonesAdminPage';
 import PayrollPage from './features/payroll/PayrollPage';
 import ApprovePage from './features/payroll/ApprovePage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
@@ -91,7 +93,10 @@ export function App() {
                 <Route path="/app/admin/payroll" element={<PayrollAdminPage />} />
                 <Route path="/app/admin/sensors" element={<SensorFleetPage />} />
                 <Route path="/app/admin/sensors/register" element={<SensorRegisterPage />} />
+                <Route path="/app/admin/sensors/view-as" element={<SensorViewAsTenantPage />} />
+                <Route path="/app/admin/sensors/view-as/:orgId" element={<SensorViewAsTenantPage />} />
                 <Route path="/app/admin/sensors/:deviceId" element={<SensorDevicePage />} />
+                <Route path="/app/admin/zones" element={<ZonesAdminPage />} />
                 <Route path="/app/settings" element={<SettingsPage />} />
                 <Route path="/app/settings/billing" element={<BillingSettingsPage />} />
             </Route>

@@ -115,6 +115,7 @@ export function Sidebar({
               { label: 'Org Modules', href: '/app/admin/orgs', icon: 'grid' },
               { label: 'Payroll Monitor', href: '/app/admin/payroll', icon: 'clock' },
               { label: 'Sensor Fleet', href: '/app/admin/sensors', icon: 'thermo' },
+              { label: 'Zones', href: '/app/admin/zones', icon: 'grid' },
           ]
         : [];
 

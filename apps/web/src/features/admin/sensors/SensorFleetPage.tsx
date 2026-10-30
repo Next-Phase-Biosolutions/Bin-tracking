@@ -70,6 +70,7 @@ function FleetContent() {
         actions={
           <>
             <LinkButton to="/app/admin/sensors/register">Register devices</LinkButton>
+            <LinkButton to="/app/admin/sensors/view-as">View as tenant</LinkButton>
             <LinkButton to="/app/admin/zones">Zones</LinkButton>
           </>
         }
