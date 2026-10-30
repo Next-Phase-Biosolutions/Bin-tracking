@@ -17,6 +17,7 @@ import { adminRouter } from './admin.router.js';
 import { settingsRouter } from './settings.router.js';
 import { sensorRouter } from './sensor.router.js';
 import { zoneRouter } from './zone.router.js';
+import { sensorAdminRouter } from './sensor-admin.router.js';
 
 export const appRouter = router({
     auth: authRouter,
@@ -37,6 +38,7 @@ export const appRouter = router({
     settings: settingsRouter,
     sensor: sensorRouter,
     zone: zoneRouter,
+    sensorAdmin: sensorAdminRouter,
 });
 
 export type AppRouter = typeof appRouter;
