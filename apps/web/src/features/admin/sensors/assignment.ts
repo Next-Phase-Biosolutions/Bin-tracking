@@ -32,12 +32,15 @@ export function describeReassignImpact(input: { currentOrgId: string | null; cur
 /**
  * The facility and zone to show for the current choices, derived during render
  * (so there is no effect to fall out of sync when the organization changes and
- * its options load): a still-valid facility and zone are kept, anything else
- * falls back to the first available.
+ * its options load). The facility is the chosen one if the options contain it,
+ * otherwise the first — including when it was never chosen at all. The zone is
+ * the chosen one if THAT facility has it, otherwise its first, so a zone picked
+ * before touching the facility sticks, and one left over from another
+ * organization's facility never does.
  */
 export function resolvePlacement(options: AssignmentOptions, facilityId: string, zoneId: string): { facilityId: string; zoneId: string } {
-  const placement = defaultPlacement(options, facilityId);
-  if (placement.facilityId !== facilityId) return placement;
-  const zones = options.facilities.find((f) => f.id === facilityId)?.zones ?? [];
-  return zones.some((z) => z.id === zoneId) ? { facilityId, zoneId } : placement;
+  const facility = options.facilities.find((f) => f.id === facilityId) ?? options.facilities[0];
+  if (!facility) return { facilityId: '', zoneId: '' };
+  const zone = facility.zones.find((z) => z.id === zoneId) ?? facility.zones[0];
+  return { facilityId: facility.id, zoneId: zone?.id ?? '' };
 }

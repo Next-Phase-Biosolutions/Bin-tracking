@@ -72,6 +72,16 @@ describe('resolvePlacement', () => {
     expect(resolvePlacement(options, 'other-orgs-facility', 'zzz')).toEqual({ facilityId: 'fac-a', zoneId: 'z1' });
   });
 
+  // Regression (found end-to-end): the admin never touches the Facility dropdown, so the stored
+  // facility is '' while the form SHOWS the first one. Choosing a zone must still stick.
+  it("keeps the admin's zone choice when the facility was never chosen and is derived as the first", () => {
+    expect(resolvePlacement(options, '', 'z2')).toEqual({ facilityId: 'fac-a', zoneId: 'z2' });
+  });
+
+  it("does not carry a zone over from a different facility's list", () => {
+    expect(resolvePlacement(options, '', 'z3')).toEqual({ facilityId: 'fac-a', zoneId: 'z1' });
+  });
+
   it('is empty for an org with no facilities', () => {
     expect(resolvePlacement({ moduleEnabled: false, facilities: [] }, 'x', 'y')).toEqual({ facilityId: '', zoneId: '' });
   });
