@@ -6,26 +6,48 @@ interface ResolvableZone {
 
 /**
  * Which facility's zone a /app/zones/:slug page shows: the requested one if it
- * has the slug, otherwise the first (by facility name) that does. A facility id
- * the caller can't see simply isn't in `zones`, so it can never be selected.
+ * has the slug; otherwise the first (by name) whose zone has a sensor, so a user
+ * with many facilities lands where the data is instead of on a mock layout; and
+ * failing that, the first by name. A facility id the caller can't see simply
+ * isn't in `zones`, so it can never be selected.
  */
 export function resolveZoneFacility<T extends ResolvableZone>(
   zones: readonly T[],
   slug: string,
   requestedFacilityId: string | null,
+  sensorCounts: ReadonlyMap<string, number> = new Map(),
 ): T | undefined {
   const matches = zones.filter((zone) => zone.slug === slug);
+  const byName = [...matches].sort((a, b) => a.facilityName.localeCompare(b.facilityName));
   return (
     matches.find((zone) => zone.facilityId === requestedFacilityId) ??
-    [...matches].sort((a, b) => a.facilityName.localeCompare(b.facilityName))[0]
+    byName.find((zone) => (sensorCounts.get(zone.facilityId) ?? 0) > 0) ??
+    byName[0]
   );
 }
 
+/** Devices per facility for one zone slug (all the caller's active devices, so counts are tenant-scoped). */
+export function sensorCountsByFacility(
+  devices: ReadonlyArray<{ facility: { id: string }; zone: { slug: string } | null }> | undefined,
+  slug: string,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const device of devices ?? []) {
+    if (device.zone?.slug !== slug) continue;
+    counts.set(device.facility.id, (counts.get(device.facility.id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 /** The facilities that have this zone, by name — for the page's facility switcher. */
-export function facilitiesWithZone(zones: readonly ResolvableZone[], slug: string): Array<{ id: string; name: string }> {
+export function facilitiesWithZone(
+  zones: readonly ResolvableZone[],
+  slug: string,
+  sensorCounts: ReadonlyMap<string, number> = new Map(),
+): Array<{ id: string; name: string; sensorCount: number }> {
   return zones
     .filter((zone) => zone.slug === slug)
-    .map((zone) => ({ id: zone.facilityId, name: zone.facilityName }))
+    .map((zone) => ({ id: zone.facilityId, name: zone.facilityName, sensorCount: sensorCounts.get(zone.facilityId) ?? 0 }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

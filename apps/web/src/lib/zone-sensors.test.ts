@@ -1,44 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { SENSOR_THRESHOLDS } from '@bin-tracker/types';
-import { CORE_METRICS, describeLastSeen, metricStatus, metricSeries, pickZoneDevice, toSeriesStats } from './zone-sensors';
+import { CORE_METRICS, describeLastSeen, metricStatus, metricSeries, toSeriesStats, zoneDevices } from './zone-sensors';
 
-const d = (id: string, zoneId: string | null, lastSeenAt: Date | null) => ({
+const d = (id: string, zoneId: string | null, name = id) => ({
   id,
+  name,
   zone: zoneId === null ? null : { id: zoneId },
-  lastSeenAt,
 });
 
-describe('pickZoneDevice', () => {
-  it('returns undefined when no device is assigned to the zone', () => {
-    expect(pickZoneDevice([d('a', 'zone-kf', new Date())], 'zone-wa')).toBeUndefined();
-    expect(pickZoneDevice([], 'zone-wa')).toBeUndefined();
+describe('zoneDevices', () => {
+  it('returns nothing when no device is assigned to the zone', () => {
+    expect(zoneDevices([d('a', 'zone-kf')], 'zone-wa')).toEqual([]);
+    expect(zoneDevices([], 'zone-wa')).toEqual([]);
+    expect(zoneDevices(undefined, 'zone-wa')).toEqual([]);
   });
 
   it('ignores devices with no zone assigned', () => {
-    expect(pickZoneDevice([d('a', null, new Date())], 'zone-wa')).toBeUndefined();
+    expect(zoneDevices([d('a', null)], 'zone-wa')).toEqual([]);
   });
 
-  it('returns the device assigned to the zone', () => {
-    const devices = [d('a', 'zone-kf', new Date()), d('b', 'zone-wa', new Date())];
-    expect(pickZoneDevice(devices, 'zone-wa')?.id).toBe('b');
+  it('returns EVERY device in the zone, so a working one is never hidden behind another', () => {
+    const devices = [d('a', 'zone-kf'), d('cooler', 'zone-wa', 'Cooler A'), d('warm', 'zone-wa', 'Warm room')];
+    expect(zoneDevices(devices, 'zone-wa').map((x) => x.id)).toEqual(['cooler', 'warm']);
   });
 
-  it('prefers the most recently reporting device when several share a zone', () => {
-    const devices = [
-      d('old', 'zone-wa', new Date('2026-10-29T08:00:00Z')),
-      d('new', 'zone-wa', new Date('2026-10-29T11:00:00Z')),
-      d('mid', 'zone-wa', new Date('2026-10-29T09:00:00Z')),
-    ];
-    expect(pickZoneDevice(devices, 'zone-wa')?.id).toBe('new');
-  });
-
-  it('ranks a device that has never reported below one that has', () => {
-    const devices = [d('silent', 'zone-wa', null), d('live', 'zone-wa', new Date('2026-10-29T08:00:00Z'))];
-    expect(pickZoneDevice(devices, 'zone-wa')?.id).toBe('live');
-  });
-
-  it('still returns a never-reported device when it is the only one', () => {
-    expect(pickZoneDevice([d('silent', 'zone-wa', null)], 'zone-wa')?.id).toBe('silent');
+  it('orders by name, ignoring case, then id — the same order on every load', () => {
+    const devices = [d('3', 'zone-wa', 'b room'), d('2', 'zone-wa', 'A room'), d('1', 'zone-wa', 'A room')];
+    expect(zoneDevices(devices, 'zone-wa').map((x) => x.id)).toEqual(['1', '2', '3']);
+    expect(zoneDevices([...devices].reverse(), 'zone-wa').map((x) => x.id)).toEqual(['1', '2', '3']);
   });
 });
 

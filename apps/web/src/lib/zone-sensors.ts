@@ -1,37 +1,27 @@
 /**
  * Facility zone ↔ sensor device linkage.
  *
- * A device is assigned to a zone when it is registered (`SensorDevice.zone`,
- * set by `pnpm --filter @bin-tracker/db register:sensor-device --zone ...`), and
- * the zone page picks it from the org-scoped `sensor.listDevices` result — so
- * each tenant sees its own sensor.
- *
- * ponytail: zones are org-wide UI constants with no facility context, so when
- * several facilities in one org each have a device in the same zone, the most
- * recently reporting one wins. Add a facility selector if that ever matters.
+ * A device is assigned to a zone by a platform admin (`SensorDevice.zoneId`), and
+ * the zone page lists the devices of that zone from the org-scoped
+ * `sensor.listDevices` result — so each tenant sees its own sensors.
  */
 
 import { SENSOR_THRESHOLDS, type ThresholdStatus } from '@bin-tracker/types';
 import type { RouterOutputs } from './trpc';
 
 /**
- * The device assigned to this zone ROW (a zone is per facility, so the page
- * resolves slug + facility to a zone first), or `undefined` when none is.
- * Several matches: the most recently reporting wins, and a device that has
- * never reported ranks last.
+ * Every device assigned to this zone ROW (a zone is per facility, so the page
+ * resolves slug + facility to a zone first). All of them are shown — hiding one
+ * behind another would hide a working sensor — in a fixed order (name, then id)
+ * so the page does not reshuffle between loads.
  */
-export function pickZoneDevice<T extends { zone: { id: string } | null; lastSeenAt: Date | null }>(
+export function zoneDevices<T extends { id: string; name: string; zone: { id: string } | null }>(
   devices: readonly T[] | undefined,
   zoneId: string,
-): T | undefined {
-  let best: T | undefined;
-  for (const device of devices ?? []) {
-    if (device.zone?.id !== zoneId) continue;
-    const seen = device.lastSeenAt?.getTime() ?? -Infinity;
-    const bestSeen = best?.lastSeenAt?.getTime() ?? -Infinity;
-    if (best === undefined || seen > bestSeen) best = device;
-  }
-  return best;
+): T[] {
+  return (devices ?? [])
+    .filter((device) => device.zone?.id === zoneId)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id));
 }
 
 /**

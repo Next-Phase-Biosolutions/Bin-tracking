@@ -194,12 +194,13 @@ function withPage(params: URLSearchParams, page: number): URLSearchParams {
 function SummaryTiles({ data }: { data: RouterOutputs['sensorAdmin']['fleetSummary'] | undefined }) {
   const value = (n: number | undefined) => (n === undefined ? '…' : n);
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
       <Stat label="Unassigned" value={value(data?.byState.UNASSIGNED)} accent={(data?.byState.UNASSIGNED ?? 0) > 0} />
       <Stat label="Active" value={value(data?.byState.ACTIVE)} />
       <Stat label="Deactivated" value={value(data?.byState.DEACTIVATED)} />
       <Stat label="Online" value={value(data?.online)} />
       <Stat label="Offline" value={value(data?.offline)} accent={(data?.offline ?? 0) > 0} />
+      <Stat label="Waiting" value={value(data?.waiting)} />
       <Stat label="In fault" value={value(data?.inFault)} accent={(data?.inFault ?? 0) > 0} />
       <Stat label="Readings (1h)" value={value(data?.readingsLastHour)} />
     </div>

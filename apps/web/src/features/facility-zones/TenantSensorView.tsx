@@ -17,13 +17,15 @@ interface TenantSensorViewProps {
   isLoading: boolean;
   /** Formats a point's timestamp for the x-axis, in the org's own timezone. */
   formatTime: (ms: number) => string;
+  /** Print the device name above the charts. Off when the caller already shows it as a heading. */
+  named?: boolean;
 }
 
 /**
  * What a tenant sees of a sensor: temperature and humidity charts. The same
  * component renders the admin's "view as tenant" page, so the two cannot drift.
  */
-export function TenantSensorView({ deviceName, zoneName, history, isLoading, formatTime }: TenantSensorViewProps) {
+export function TenantSensorView({ deviceName, zoneName, history, isLoading, formatTime, named = true }: TenantSensorViewProps) {
   if (isLoading) {
     return (
       <div className="mt-2 flex min-h-[30vh] items-center justify-center">
@@ -43,6 +45,7 @@ export function TenantSensorView({ deviceName, zoneName, history, isLoading, for
     return (
       <div className="mt-2 flex min-h-[30vh] items-center justify-center">
         <Card className="w-full max-w-md p-8 text-center">
+          {named ? <p className="kicker mb-2">{deviceName}</p> : null}
           <p className="font-mono text-xs uppercase tracking-[0.12em] text-muted">awaiting first reading</p>
         </Card>
       </div>
@@ -51,7 +54,7 @@ export function TenantSensorView({ deviceName, zoneName, history, isLoading, for
 
   return (
     <div className="mt-2">
-      <p className="kicker">{deviceName}</p>
+      {named ? <p className="kicker">{deviceName}</p> : null}
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         {charts.map(({ metric, series }) => (
           <SensorMetricChart

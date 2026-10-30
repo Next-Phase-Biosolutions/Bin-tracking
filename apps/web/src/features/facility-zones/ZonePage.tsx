@@ -4,12 +4,13 @@ import { Badge, Button, Card } from '../../components/ui/primitives';
 import { Icon } from '../../components/ui/Icon';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { getZone } from '../../lib/facility-zones-data';
-import { pickZoneDevice } from '../../lib/zone-sensors';
-import { facilitiesWithZone, resolveZoneFacility, zonePageState, zoneViewMode } from '../../lib/zone-view';
+import { zoneDevices } from '../../lib/zone-sensors';
+import { facilitiesWithZone, resolveZoneFacility, sensorCountsByFacility, zonePageState, zoneViewMode } from '../../lib/zone-view';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { MockZoneView } from './MockZoneView';
-import { LiveSinceReading, TenantSensorView } from './TenantSensorView';
+import { LiveSinceReading } from './TenantSensorView';
+import { ZoneDeviceSection } from './ZoneDeviceSection';
 
 const DEFAULT_TIMEZONE = 'America/Toronto';
 
@@ -21,8 +22,6 @@ export default function ZonePage() {
 
   const zonesQuery = trpc.zone.listMine.useQuery(undefined, { staleTime: 60_000 });
   const zones = zonesQuery.data ?? [];
-  const zoneRow = slug ? resolveZoneFacility(zones, slug, requestedFacility) : undefined;
-  const facilityOptions = slug ? facilitiesWithZone(zones, slug) : [];
 
   const { hasModule, modulesReady } = useSubscription();
   // Skip the query entirely when the org lacks the module — it could only come
@@ -40,13 +39,18 @@ export default function ZonePage() {
     },
   );
 
-  const device = zoneRow ? pickZoneDevice(devicesQuery.data?.devices, zoneRow.id) : undefined;
+  // Without an explicit choice, open on the facility whose zone actually has a sensor.
+  const sensorCounts = slug ? sensorCountsByFacility(devicesQuery.data?.devices, slug) : new Map<string, number>();
+  const zoneRow = slug ? resolveZoneFacility(zones, slug, requestedFacility, sensorCounts) : undefined;
+  const facilityOptions = slug ? facilitiesWithZone(zones, slug, sensorCounts) : [];
+
+  const devices = zoneRow ? zoneDevices(devicesQuery.data?.devices, zoneRow.id) : [];
   const companyTimezone = devicesQuery.data?.companyTimezone ?? DEFAULT_TIMEZONE;
   const offlineAfterMinutes = devicesQuery.data?.offlineAfterMinutes ?? 20;
-
-  const historyQuery = trpc.sensor.getReadings.useQuery(
-    { deviceId: device?.id ?? '', range: '24h' },
-    { enabled: device !== undefined, refetchInterval: 60_000, retry: false },
+  // The header chip follows whichever device reported most recently.
+  const freshest = devices.reduce<Date | null>(
+    (best, device) => (device.lastSeenAt && (!best || device.lastSeenAt > best) ? device.lastSeenAt : best),
+    null,
   );
 
   const formatTime = (ms: number) =>
@@ -80,14 +84,14 @@ export default function ZonePage() {
   if (state === 'missing' || !slug || !zoneRow) return <Navigate to="/app/dashboard" replace />;
 
   const mock = getZone(slug);
-  const mode = zoneViewMode({ slug, hasDevice: device !== undefined });
+  const mode = zoneViewMode({ slug, hasDevice: devices.length > 0 });
   const title = `${zoneRow.name} Zone`;
   const subtitle = mock?.tagline ?? zoneRow.facilityName;
   const icon = <Icon name={zoneRow.icon} width={22} height={22} />;
 
-  const headerAction = device?.lastSeenAt ? (
-    <LiveSinceReading lastSeenAt={device.lastSeenAt} offlineAfterMinutes={offlineAfterMinutes} />
-  ) : device ? (
+  const headerAction = freshest ? (
+    <LiveSinceReading lastSeenAt={freshest} offlineAfterMinutes={offlineAfterMinutes} />
+  ) : devices.length > 0 ? (
     <Badge tone="idle">awaiting first reading</Badge>
   ) : mock && mode === 'mock' ? (
     <Badge tone={mock.status}>
@@ -110,20 +114,26 @@ export default function ZonePage() {
             {facilityOptions.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
+                {f.sensorCount > 0 ? ` · ${f.sensorCount} sensor${f.sensorCount === 1 ? '' : 's'}` : ''}
               </option>
             ))}
           </select>
         </label>
       ) : null}
 
-      {mode === 'sensor' && device ? (
-        <TenantSensorView
-          deviceName={device.name}
-          zoneName={zoneRow.name}
-          history={historyQuery.data}
-          isLoading={historyQuery.isLoading}
-          formatTime={formatTime}
-        />
+      {mode === 'sensor' ? (
+        <div className="grid gap-8">
+          {devices.map((device) => (
+            <ZoneDeviceSection
+              key={device.id}
+              device={device}
+              zoneName={zoneRow.name}
+              showName={devices.length > 1}
+              offlineAfterMinutes={offlineAfterMinutes}
+              formatTime={formatTime}
+            />
+          ))}
+        </div>
       ) : mode === 'mock' && mock ? (
         <MockZoneView zone={mock} />
       ) : (

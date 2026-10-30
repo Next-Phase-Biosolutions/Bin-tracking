@@ -141,7 +141,9 @@ export const sensorFleetReadService = {
     return {
       byState,
       online,
-      offline: active.length - online,
+      // Same definitions as the status filter: a never-reported device is WAITING, not OFFLINE.
+      offline: active.filter((row) => row.status === 'OFFLINE').length,
+      waiting: active.filter((row) => row.status === 'WAITING').length,
       inFault: active.filter((row) => row.status === 'FAULT').length,
       readingsLastHour,
       offlineAfterMinutes,
@@ -209,7 +211,20 @@ export const sensorFleetReadService = {
     const [facilities, modules] = await Promise.all([
       prisma.facility.findMany({
         where: { organizationId: organization.id, deletedAt: null },
-        select: { id: true, name: true, zones: { select: { id: true, name: true, slug: true, sortOrder: true } } },
+        select: {
+          id: true,
+          name: true,
+          zones: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              sortOrder: true,
+              // Only live devices: a deactivated one no longer shows on the zone page.
+              devices: { where: { state: 'ACTIVE' }, select: { id: true, label: true }, orderBy: { label: 'asc' } },
+            },
+          },
+        },
         orderBy: { name: 'asc' },
       }),
       getEnabledModules(prisma, organization.id),
@@ -222,7 +237,12 @@ export const sensorFleetReadService = {
         name: facility.name,
         zones: [...facility.zones]
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map(({ id, name, slug }) => ({ id, name, slug })),
+          .map(({ id, name, slug, devices }) => ({
+            id,
+            name,
+            slug,
+            devices: (devices ?? []).map((device) => ({ id: device.id, name: device.label })),
+          })),
       })),
     };
   },

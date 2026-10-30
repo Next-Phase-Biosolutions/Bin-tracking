@@ -3,7 +3,7 @@ import { nameIsHardwareId } from '@bin-tracker/types';
 /** An org's assignable facilities and zones (sensorAdmin.orgAssignmentOptions). */
 export interface AssignmentOptions {
   moduleEnabled: boolean;
-  facilities: Array<{ id: string; name: string; zones: Array<{ id: string; name: string; slug: string }> }>;
+  facilities: Array<{ id: string; name: string; zones: Array<{ id: string; name: string; slug: string; devices: Array<{ id: string; name: string }> }> }>;
 }
 
 const NAME_MAX = 80;
@@ -52,4 +52,10 @@ export function resolvePlacement(options: AssignmentOptions, facilityId: string,
   if (!facility) return { facilityId: '', zoneId: '' };
   const zone = facility.zones.find((z) => z.id === zoneId) ?? facility.zones[0];
   return { facilityId: facility.id, zoneId: zone?.id ?? '' };
+}
+
+/** Names of the other active devices already in this zone (the one being edited excluded), for the "second device" warning. */
+export function otherDevicesInZone(options: AssignmentOptions, facilityId: string, zoneId: string, selfDeviceId?: string): string[] {
+  const zone = options.facilities.find((f) => f.id === facilityId)?.zones.find((z) => z.id === zoneId);
+  return (zone?.devices ?? []).filter((device) => device.id !== selfDeviceId).map((device) => device.name);
 }

@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { defaultPlacement, describeReassignImpact, isAssignmentComplete, resolvePlacement } from './assignment';
+import { defaultPlacement, describeReassignImpact, isAssignmentComplete, otherDevicesInZone, resolvePlacement } from './assignment';
 
 const options = {
   moduleEnabled: true,
   facilities: [
-    { id: 'fac-a', name: 'Alpha', zones: [{ id: 'z1', name: 'Receiving', slug: 'receiving' }, { id: 'z2', name: 'Wet Aging', slug: 'wetaging' }] },
-    { id: 'fac-b', name: 'Beta', zones: [{ id: 'z3', name: 'Receiving', slug: 'receiving' }] },
+    {
+      id: 'fac-a',
+      name: 'Alpha',
+      zones: [
+        { id: 'z1', name: 'Receiving', slug: 'receiving', devices: [] },
+        { id: 'z2', name: 'Wet Aging', slug: 'wetaging', devices: [{ id: 'd1', name: 'Cooler A' }, { id: 'd2', name: 'Warm room' }] },
+      ],
+    },
+    { id: 'fac-b', name: 'Beta', zones: [{ id: 'z3', name: 'Receiving', slug: 'receiving', devices: [] }] },
     { id: 'fac-empty', name: 'Empty', zones: [] },
   ],
 };
@@ -98,5 +105,21 @@ describe('isAssignmentComplete — the name must not be the hardware id', () => 
   it('allows a real name, and still works without an id to compare against', () => {
     expect(isAssignmentComplete(full, 'MT-0001')).toBe(true);
     expect(isAssignmentComplete(full)).toBe(true);
+  });
+});
+
+describe('otherDevicesInZone', () => {
+  it('names the devices already in the chosen zone, so the admin is warned before adding a second', () => {
+    expect(otherDevicesInZone(options, 'fac-a', 'z2')).toEqual(['Cooler A', 'Warm room']);
+  });
+
+  it('leaves out the device being edited, so keeping it in its own zone is not a warning', () => {
+    expect(otherDevicesInZone(options, 'fac-a', 'z2', 'd1')).toEqual(['Warm room']);
+  });
+
+  it('is empty for an empty zone and for an unknown facility or zone', () => {
+    expect(otherDevicesInZone(options, 'fac-a', 'z1')).toEqual([]);
+    expect(otherDevicesInZone(options, 'nope', 'z1')).toEqual([]);
+    expect(otherDevicesInZone(options, 'fac-a', 'nope')).toEqual([]);
   });
 });

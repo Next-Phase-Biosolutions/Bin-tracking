@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { trpc } from '../../../lib/trpc';
 import { Button, Card, SectionHead } from '../../../components/ui/primitives';
 import { nameIsHardwareId } from '@bin-tracker/types';
-import { describeReassignImpact, isAssignmentComplete, resolvePlacement } from './assignment';
+import { describeReassignImpact, isAssignmentComplete, otherDevicesInZone, resolvePlacement } from './assignment';
 import { inputClass, selectClass, type FleetRow } from './ui';
 
 interface DeviceAssignmentPanelProps {
@@ -33,6 +33,7 @@ export function DeviceAssignmentPanel({ device, mode, onDone, onCancel }: Device
   const options = optionsQuery.data;
   const placement = options ? resolvePlacement(options, facilityId, zoneId) : { facilityId: '', zoneId: '' };
   const zones = options?.facilities.find((f) => f.id === placement.facilityId)?.zones ?? [];
+  const sharing = options ? otherDevicesInZone(options, placement.facilityId, placement.zoneId, device.id) : [];
 
   const onSuccess = async () => {
     await utils.sensorAdmin.invalidate();
@@ -116,6 +117,13 @@ export function DeviceAssignmentPanel({ device, mode, onDone, onCancel }: Device
 
         {options && options.facilities.length === 0 ? (
           <p className="text-sm text-rust sm:col-span-2">This organization has no facilities, so a device cannot be placed.</p>
+        ) : null}
+
+        {sharing.length > 0 ? (
+          <p className="rounded-lg bg-warn/10 p-3 text-sm text-olive-deep sm:col-span-2">
+            This zone already has {sharing.length === 1 ? 'a device' : `${sharing.length} devices`} ({sharing.join(', ')}). Both will be
+            shown on the zone page, each under its own name — give this one a name that tells them apart.
+          </p>
         ) : null}
 
         {moduleOff ? (

@@ -47,7 +47,7 @@ const store = vi.hoisted(() => ({
   readings: [] as FakeReading[],
   audit: [] as Array<{ deviceId: string; actorId: string; action: string; oldValue: unknown; newValue: unknown; createdAt: Date }>,
   orgs: [] as Array<{ id: string; name: string }>,
-  facilities: [] as Array<{ id: string; name: string; organizationId: string; deletedAt: Date | null; zones: Array<{ id: string; name: string; slug: string; sortOrder: number }> }>,
+  facilities: [] as Array<{ id: string; name: string; organizationId: string; deletedAt: Date | null; zones: Array<{ id: string; name: string; slug: string; sortOrder: number; devices?: Array<{ id: string; label: string }> }> }>,
   modules: [] as Array<{ orgId: string; module: string; enabled: boolean }>,
   settings: new Map<string, unknown>(),
 }));
@@ -293,7 +293,8 @@ describe('fleetSummary', () => {
 
     expect(summary.byState).toEqual({ UNASSIGNED: 1, ACTIVE: 4, DEACTIVATED: 1 });
     expect(summary.online).toBe(2); // ok + fault
-    expect(summary.offline).toBe(2); // off + wait (never reported counts as not online)
+    expect(summary.offline).toBe(1); // off only: the Offline tile must match the OFFLINE filter
+    expect(summary.waiting).toBe(1); // wait: registered and assigned but never reported
     expect(summary.inFault).toBe(1);
     expect(summary.readingsLastHour).toBe(2); // r1 and r2; r3 is 90 min old
     expect(summary.offlineAfterMinutes).toBe(20);
@@ -446,14 +447,28 @@ describe('listOrgAssignmentOptions', () => {
         id: 'fac-a',
         name: 'Alpha Plant',
         zones: [
-          { id: 'z1', name: 'Receiving', slug: 'receiving' },
-          { id: 'z2', name: 'Wet Aging', slug: 'wetaging' },
+          { id: 'z1', name: 'Receiving', slug: 'receiving', devices: [] },
+          { id: 'z2', name: 'Wet Aging', slug: 'wetaging', devices: [] },
         ],
       },
     ]);
 
     store.modules = [{ orgId: 'org-a', module: 'ENVIRONMENT_MONITORING', enabled: true }];
     expect((await sensorFleetReadService.listOrgAssignmentOptions('org-a')).moduleEnabled).toBe(true);
+  });
+
+  it('names the ACTIVE devices already in each zone, so the form can warn before a second one is added', async () => {
+    store.facilities = [
+      {
+        id: 'fac-a',
+        name: 'Alpha Plant',
+        organizationId: 'org-a',
+        deletedAt: null,
+        zones: [{ id: 'z2', name: 'Wet Aging', slug: 'wetaging', sortOrder: 1, devices: [{ id: 'd1', label: 'Cooler A' }] }],
+      },
+    ];
+    const { facilities } = await sensorFleetReadService.listOrgAssignmentOptions('org-a');
+    expect(facilities[0]!.zones[0]!.devices).toEqual([{ id: 'd1', name: 'Cooler A' }]);
   });
 
   it('rejects an unknown organization with NOT_FOUND', async () => {
