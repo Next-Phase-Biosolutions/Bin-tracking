@@ -153,7 +153,7 @@ ALTER TABLE "sensor_device_audit_logs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "platform_settings" ENABLE ROW LEVEL SECURITY;
 
 -- An ACTIVE device must be assigned. Prisma cannot model CHECK constraints, so
--- this is migration-only (the drift check ignores it). Added last: after the
--- backfill above every ACTIVE row already has org, facility and assignedAt.
+-- this is migration-only (the drift check ignores it). Added last, after the
+-- backfill above (which leaves no ACTIVE row at all).
 ALTER TABLE "sensor_devices" ADD CONSTRAINT "sensor_devices_active_is_assigned"
     CHECK ("state" <> 'ACTIVE' OR ("organizationId" IS NOT NULL AND "facilityId" IS NOT NULL AND "assignedAt" IS NOT NULL));

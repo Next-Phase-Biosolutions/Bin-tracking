@@ -376,10 +376,18 @@ describe('sensorFleetService deactivate / reactivate', () => {
   });
 
   it('reactivates an assigned device to ACTIVE without touching assignedAt', async () => {
-    store.devices = [device({ id: 'dev-u', state: 'DEACTIVATED', organizationId: 'org-a', facilityId: 'fac-a', assignedAt: T0 })];
+    store.devices = [device({ id: 'dev-u', state: 'DEACTIVATED', organizationId: 'org-a', facilityId: 'fac-a', zoneId: 'zone-a1', assignedAt: T0 })];
     await sensorFleetService.reactivateDevice('dev-u', ACTOR);
     expect(store.devices[0]).toMatchObject({ state: 'ACTIVE' });
     expect(store.devices[0]!.assignedAt).toEqual(T0);
+  });
+
+  it('sends a deactivated device with NO zone (a pre-fleet legacy one) back to UNASSIGNED with its placement cleared, so it must be assigned properly', async () => {
+    store.devices = [device({ id: 'dev-u', state: 'DEACTIVATED', organizationId: 'org-a', facilityId: 'fac-a', zoneId: null, assignedAt: T0 })];
+    await sensorFleetService.reactivateDevice('dev-u', ACTOR);
+    // ACTIVE with no zone would be "active" in the fleet yet shown on no tenant page.
+    expect(store.devices[0]).toMatchObject({ state: 'UNASSIGNED', organizationId: null, facilityId: null, zoneId: null, assignedAt: null });
+    expect(store.audit[0]).toMatchObject({ action: 'device.reactivate', oldValue: expect.objectContaining({ organizationId: 'org-a' }) });
   });
 
   it('reactivates a never-assigned device back to UNASSIGNED', async () => {

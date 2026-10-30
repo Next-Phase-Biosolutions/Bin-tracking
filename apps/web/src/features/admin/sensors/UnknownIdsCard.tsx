@@ -3,6 +3,9 @@ import { trpc } from '../../../lib/trpc';
 import { Button, Card, SectionHead } from '../../../components/ui/primitives';
 import { formatAgo } from './format';
 import { describeSample, nextSelection } from './unknown-ids';
+
+// addDevices takes at most 500 ids per call (the dismiss call takes up to the whole 1000-id log).
+const ADD_BATCH_MAX = 500;
 import { EmptyRow, Th } from './ui';
 
 export function UnknownIdsCard() {
@@ -34,7 +37,7 @@ export function UnknownIdsCard() {
           test devices apart. Add the ones that are real; dismiss typos and strays (they come back only if the device sends again).
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button disabled={chosen.length === 0 || busy} onClick={() => add.mutate({ externalIds: chosen })}>
+          <Button disabled={chosen.length === 0 || chosen.length > ADD_BATCH_MAX || busy} onClick={() => add.mutate({ externalIds: chosen })}>
             {add.isPending ? 'Adding…' : `Add selected${chosen.length ? ` (${chosen.length})` : ''}`}
           </Button>
           <Button variant="secondary" disabled={chosen.length === 0 || busy} onClick={() => dismiss.mutate({ externalIds: chosen })}>
@@ -50,6 +53,9 @@ export function UnknownIdsCard() {
             Clear all
           </Button>
         </div>
+        {chosen.length > ADD_BATCH_MAX ? (
+          <p className="mt-2 text-xs text-rust">Add at most {ADD_BATCH_MAX} at a time — you can still dismiss all {chosen.length}.</p>
+        ) : null}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">

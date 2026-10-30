@@ -99,8 +99,9 @@ export const addSensorDevicesSchema = z.object({
     externalIds: z.array(z.string()).min(1).max(500),
 });
 
+// As large as the unknown-id log itself (UNKNOWN_ID_LOG_MAX_ROWS in the API): "select all" must work on a full log.
 export const dismissUnknownIdsSchema = z.object({
-    externalIds: z.array(z.string()).min(1).max(500),
+    externalIds: z.array(z.string()).min(1).max(1000),
 });
 
 export type AddSensorDevicesInput = z.infer<typeof addSensorDevicesSchema>;

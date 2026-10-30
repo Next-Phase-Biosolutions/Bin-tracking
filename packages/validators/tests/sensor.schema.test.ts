@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import {
     addSensorDevicesSchema,
+    dismissUnknownIdsSchema,
     createZoneSchema,
     ingestSensorReadingSchema,
     parseDeviceIdList,
@@ -192,5 +193,14 @@ describe('addSensorDevicesSchema — one bad token must not reject the batch', (
     it('accepts an over-long token so the service can report it as invalid instead', () => {
         const parsed = addSensorDevicesSchema.safeParse({ externalIds: ['MT-0001', 'x'.repeat(5000)] });
         expect(parsed.success).toBe(true);
+    });
+});
+
+describe('dismissUnknownIdsSchema', () => {
+    it('accepts a selection as large as the whole 1000-id log, so a flood can be dismissed in one go', () => {
+        const ids = (n: number) => Array.from({ length: n }, (_, i) => `id-${i}`);
+        expect(dismissUnknownIdsSchema.safeParse({ externalIds: ids(1000) }).success).toBe(true);
+        expect(dismissUnknownIdsSchema.safeParse({ externalIds: ids(1001) }).success).toBe(false);
+        expect(dismissUnknownIdsSchema.safeParse({ externalIds: [] }).success).toBe(false);
     });
 });

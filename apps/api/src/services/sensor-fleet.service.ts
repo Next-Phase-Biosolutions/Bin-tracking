@@ -248,7 +248,12 @@ export const sensorFleetService = {
     });
   },
 
-  /** Back to ACTIVE if it still belongs to a tenant, otherwise back to UNASSIGNED. assignedAt is untouched. */
+  /**
+   * Back to ACTIVE if it still has a tenant AND a zone (assignedAt untouched). Otherwise back to
+   * UNASSIGNED with its placement cleared, so it has to be assigned properly: a pre-fleet legacy
+   * device has no zone, and "active" in the fleet while shown on no tenant page would only mislead.
+   * The old placement stays in the audit entry.
+   */
   async reactivateDevice(deviceId: string, actorId: string): Promise<void> {
     const device = await requireDevice(deviceId);
     if (device.state !== 'DEACTIVATED') {
@@ -256,7 +261,14 @@ export const sensorFleetService = {
     }
     const before = placementOf(device);
     await prisma.$transaction(async (tx) => {
-      const updated = await updateUnlessChanged(tx, device, { state: device.organizationId ? 'ACTIVE' : 'UNASSIGNED' });
+      const resumable = Boolean(device.organizationId && device.facilityId && device.zoneId);
+      const updated = await updateUnlessChanged(
+        tx,
+        device,
+        resumable
+          ? { state: 'ACTIVE' }
+          : { state: 'UNASSIGNED', organizationId: null, facilityId: null, zoneId: null, assignedAt: null },
+      );
       await writeSensorAudit(tx, {
         deviceId: device.id,
         actorId,
