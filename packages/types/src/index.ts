@@ -88,6 +88,7 @@ export {
     SENSOR_DEVICE_ID_MAX_LENGTH,
     SENSOR_DEVICE_ID_PATTERN,
     sensorDeviceIdProblem,
+    parseDeviceIdList,
     ZONE_ICON_NAMES,
 } from './sensor-device-id.js';
 export type { ZoneIconName } from './sensor-device-id.js';

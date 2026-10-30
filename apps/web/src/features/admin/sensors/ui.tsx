@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { trpc } from '../../../lib/trpc';
+import { trpc, type RouterOutputs } from '../../../lib/trpc';
+
+export type FleetRow = RouterOutputs['sensorAdmin']['listFleetDevices']['rows'][number];
 
 /** Renders children only for platform admins. The server's platformAdminProcedure is the real gate; this only avoids showing a broken page. */
 export function PlatformAdminGate({ children }: { children: ReactNode }) {

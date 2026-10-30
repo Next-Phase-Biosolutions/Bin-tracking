@@ -35,3 +35,8 @@ export const ZONE_ICON_NAMES = [
 ] as const;
 
 export type ZoneIconName = (typeof ZONE_ICON_NAMES)[number];
+
+/** Splits pasted text into ids on whitespace/commas/semicolons, de-duped in order. Does not validate. */
+export function parseDeviceIdList(text: string): string[] {
+    return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
+}

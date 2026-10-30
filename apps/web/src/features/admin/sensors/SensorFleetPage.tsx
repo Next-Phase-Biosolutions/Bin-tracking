@@ -6,9 +6,7 @@ import { Icon } from '../../../components/ui/Icon';
 import { Badge, Button, Card, SectionHead, Stat } from '../../../components/ui/primitives';
 import { formatAgo, formatMetric } from './format';
 import { adminStatusTone, stateTone, type DeviceState } from './status';
-import { EmptyRow, inputClass, LinkButton, PlatformAdminGate, selectClass, Th } from './ui';
-
-type FleetRow = RouterOutputs['sensorAdmin']['listFleetDevices']['rows'][number];
+import { EmptyRow, inputClass, LinkButton, PlatformAdminGate, selectClass, Th, type FleetRow } from './ui';
 
 const STATES: DeviceState[] = ['UNASSIGNED', 'ACTIVE', 'DEACTIVATED'];
 const HEALTHS = ['online', 'offline', 'fault', 'waiting'] as const;

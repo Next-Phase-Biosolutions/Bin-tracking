@@ -90,10 +90,8 @@ export type IngestSensorReadingInput = z.infer<typeof ingestSensorReadingSchema>
 
 // ─── Platform-admin fleet management ───────────────────────────
 
-/** Splits pasted text into ids on whitespace/commas/semicolons, de-duped in order. Does not validate. */
-export function parseDeviceIdList(text: string): string[] {
-    return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
-}
+// Defined in @bin-tracker/types (the web app needs it at runtime and does not depend on this package).
+export { parseDeviceIdList } from '@bin-tracker/types';
 
 // Per-id validation happens in the service so one bad id doesn't reject the batch.
 export const addSensorDevicesSchema = z.object({
