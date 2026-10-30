@@ -21,7 +21,11 @@ const readService = vi.hoisted(() => ({
   viewAsTenant: vi.fn().mockResolvedValue({}),
   viewAsTenantReadings: vi.fn().mockResolvedValue([]),
 }));
-const unknownLog = vi.hoisted(() => ({ list: vi.fn().mockResolvedValue([]) }));
+const unknownLog = vi.hoisted(() => ({
+  list: vi.fn().mockResolvedValue([]),
+  dismiss: vi.fn().mockResolvedValue(undefined),
+  clear: vi.fn().mockResolvedValue(undefined),
+}));
 const settings = vi.hoisted(() => ({
   getOfflineAfterMinutes: vi.fn().mockResolvedValue(20),
   setOfflineAfterMinutes: vi.fn().mockResolvedValue(undefined),
@@ -56,6 +60,8 @@ const INPUTS: Record<string, unknown> = {
   deviceDetail: { deviceId: 'd' },
   deviceReadings: { deviceId: 'd' },
   listUnknownIds: undefined,
+  dismissUnknownIds: { externalIds: ['ghost-1'] },
+  clearUnknownIds: undefined,
   orgAssignmentOptions: { organizationId: 'o' },
   viewAsTenant: { organizationId: 'o' },
   viewAsTenantReadings: { organizationId: 'o', deviceId: 'd' },
@@ -146,6 +152,19 @@ describe('platform admin reaches the services', () => {
     expect(readService.viewAsTenantReadings).toHaveBeenCalledWith('o', 'd', '24h', 'user-1');
     expect(readService.fleetSummary).toHaveBeenCalled();
     expect(unknownLog.list).toHaveBeenCalled();
+  });
+
+  it('lets an admin dismiss chosen unknown ids and clear the whole list', async () => {
+    const caller = sensorAdmin(true);
+    await caller['dismissUnknownIds']!({ externalIds: ['ghost-1', 'ghost-2'] });
+    await caller['clearUnknownIds']!();
+    expect(unknownLog.dismiss).toHaveBeenCalledWith(['ghost-1', 'ghost-2']);
+    expect(unknownLog.clear).toHaveBeenCalled();
+  });
+
+  it('rejects dismissing an empty selection', async () => {
+    await expect(sensorAdmin(true)['dismissUnknownIds']!({ externalIds: [] })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(unknownLog.dismiss).not.toHaveBeenCalled();
   });
 
   it('getOfflineThreshold returns { minutes }', async () => {

@@ -24,7 +24,11 @@ export const sensorIngestService = {
       select: { id: true, state: true, organizationId: true },
     });
     if (!device) {
-      await unknownDeviceLog.record(input.p_device_id, now);
+      await unknownDeviceLog.record(input.p_device_id, now, {
+        tempC: input.p_temp_c,
+        humidityPct: input.p_humidity_pct,
+        raw: input.p_raw,
+      });
       throw new UnknownSensorDeviceError(input.p_device_id);
     }
     // Same response as an unregistered id (the firmware contract has no 403/410).

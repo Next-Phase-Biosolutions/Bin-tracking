@@ -146,8 +146,12 @@ describe('sensorDeviceIdProblem', () => {
 });
 
 describe('parseDeviceIdList', () => {
-    it('splits on whitespace, commas and semicolons, de-duping in order', () => {
-        expect(parseDeviceIdList('a, b;c\n\n a\t d')).toEqual(['a', 'b', 'c', 'd']);
+    it('splits on new lines, tabs, commas and semicolons, de-duping in order', () => {
+        expect(parseDeviceIdList('a, b;c\n\n a\t d\r\ne')).toEqual(['a', 'b', 'c', 'd', 'e']);
+    });
+
+    it('keeps a space inside an entry so a typo is reported, not silently split into two devices', () => {
+        expect(parseDeviceIdList('good-1\nbad id!\n  padded  ')).toEqual(['good-1', 'bad id!', 'padded']);
     });
 
     it('returns an empty list for blank input', () => {

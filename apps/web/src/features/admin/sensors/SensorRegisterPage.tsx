@@ -7,6 +7,7 @@ import { Icon } from '../../../components/ui/Icon';
 import { Badge, Button, Card, SectionHead } from '../../../components/ui/primitives';
 import { DeviceAssignmentPanel } from './DeviceAssignmentPanel';
 import { DeviceLifecycleButtons } from './DeviceLifecycleButtons';
+import { UnknownIdsCard } from './UnknownIdsCard';
 import { formatAgo } from './format';
 import { EmptyRow, LinkButton, PlatformAdminGate, Th, type FleetRow } from './ui';
 
@@ -57,7 +58,7 @@ function AddDevicesCard() {
   return (
     <Card className="p-5">
       <SectionHead title="Add devices" />
-      <p className="mt-2 text-xs text-muted">One id, or paste a list separated by new lines, spaces, commas or semicolons.</p>
+      <p className="mt-2 text-xs text-muted">One id, or paste a list with one id per line (commas, semicolons and tabs also separate). An id with a space in it is reported as invalid.</p>
       <textarea
         aria-label="Device ids"
         className="mt-3 h-32 w-full rounded-lg border border-edge bg-white p-3 font-mono text-sm text-olive-deep"
@@ -169,59 +170,5 @@ function InboxRow({ row, assigning, onAssign }: { row: FleetRow; assigning: bool
         </tr>
       ) : null}
     </>
-  );
-}
-
-function UnknownIdsCard() {
-  const utils = trpc.useUtils();
-  const list = trpc.sensorAdmin.listUnknownIds.useQuery(undefined, { refetchInterval: 30_000 });
-  const add = trpc.sensorAdmin.addDevices.useMutation({ onSuccess: () => utils.sensorAdmin.invalidate() });
-  const rows = list.data ?? [];
-  const now = new Date();
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="p-5 pb-3">
-        <SectionHead title="Unknown ids" />
-        <p className="mt-1 text-xs text-muted">
-          Sent with a valid key but not registered (nothing is stored). Often a typo in the vendor's list — add the id if it is a real device.
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-edge/60">
-              <Th>Device id</Th>
-              <Th>First seen</Th>
-              <Th>Last seen</Th>
-              <Th>Attempts</Th>
-              <Th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-edge/40">
-            {list.isLoading ? (
-              <EmptyRow colSpan={5}>Loading…</EmptyRow>
-            ) : rows.length === 0 ? (
-              <EmptyRow colSpan={5}>No unregistered ids have been seen recently.</EmptyRow>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.externalId}>
-                  <td className="px-5 py-3 font-mono text-sm">{row.externalId}</td>
-                  <td className="px-5 py-3 text-muted">{formatAgo(row.firstSeenAt, now)}</td>
-                  <td className="px-5 py-3 text-muted">{formatAgo(row.lastSeenAt, now)}</td>
-                  <td className="px-5 py-3 tnum">{row.count}</td>
-                  <td className="px-5 py-3 text-right">
-                    <Button variant="secondary" disabled={add.isPending} onClick={() => add.mutate({ externalIds: [row.externalId] })}>
-                      Add
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      {add.isError ? <p className="px-5 pb-4 text-sm text-rust">{add.error.message}</p> : null}
-    </Card>
   );
 }

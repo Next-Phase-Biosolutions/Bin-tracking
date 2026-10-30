@@ -1,5 +1,6 @@
 import {
     addSensorDevicesSchema,
+    dismissUnknownIdsSchema,
     adminReadingRangeSchema,
     assignSensorDeviceSchema,
     fleetListSchema,
@@ -60,6 +61,12 @@ export const sensorAdminRouter = router({
         .query(({ input }) => sensorFleetReadService.deviceReadings(input.deviceId, input.range)),
 
     listUnknownIds: platformAdminProcedure.query(() => unknownDeviceLog.list()),
+
+    dismissUnknownIds: platformAdminProcedure
+        .input(dismissUnknownIdsSchema)
+        .mutation(({ input }) => unknownDeviceLog.dismiss(input.externalIds)),
+
+    clearUnknownIds: platformAdminProcedure.mutation(() => unknownDeviceLog.clear()),
 
     // ─── Assign form & view-as-tenant ────────────────────────────
     orgAssignmentOptions: platformAdminProcedure

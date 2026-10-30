@@ -184,6 +184,7 @@ export {
     createZoneSchema,
     renameZoneSchema,
     reorderZonesSchema,
+    dismissUnknownIdsSchema,
     type ListDevicesInput,
     type SensorReadingRangeInput,
     type IngestSensorReadingInput,

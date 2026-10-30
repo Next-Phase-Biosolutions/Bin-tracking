@@ -23,6 +23,8 @@ interface FakeUnknownRow {
   firstSeenAt: Date;
   lastSeenAt: Date;
   count: number;
+  lastTempC?: number | null;
+  lastRawExcerpt?: string | null;
 }
 
 const store = vi.hoisted(() => ({
@@ -73,13 +75,14 @@ vi.mock('@bin-tracker/db', () => ({
         create,
       }: {
         where: { externalId: string };
-        update: { lastSeenAt: Date; count: { increment: number } };
+        update: Partial<FakeUnknownRow> & { count: { increment: number } };
         create: FakeUnknownRow;
       }) => {
         const existing = store.unknown.find((r) => r.externalId === where.externalId);
         if (existing) {
-          existing.lastSeenAt = update.lastSeenAt;
-          existing.count += update.count.increment;
+          const { count, ...rest } = update;
+          Object.assign(existing, rest);
+          existing.count += count.increment;
           return Promise.resolve(existing);
         }
         store.unknown.push({ ...create });
@@ -183,6 +186,13 @@ describe('sensorIngestService.ingest', () => {
     expect(store.readings).toHaveLength(0);
   });
 
+  it('keeps a small sample of what an unknown id sent, for the admin to tell test devices apart', async () => {
+    await expect(
+      sensorIngestService.ingest({ p_device_id: 'ghost-9', p_temp_c: 21.5, p_raw: { fw: '1.2' } }, NOW),
+    ).rejects.toBeInstanceOf(UnknownSensorDeviceError);
+    expect(store.unknown[0]).toMatchObject({ externalId: 'ghost-9', lastTempC: 21.5, lastRawExcerpt: '{"fw":"1.2"}' });
+  });
+
   it('does not log a deactivated id as unknown', async () => {
     await expect(sensorIngestService.ingest({ p_device_id: 'retired-01', p_raw: {} }, NOW)).rejects.toBeInstanceOf(
       UnknownSensorDeviceError,
@@ -192,11 +202,11 @@ describe('sensorIngestService.ingest', () => {
 
   it('logs an unregistered id, then counts repeats', async () => {
     for (let i = 0; i < 2; i += 1) {
-      await expect(sensorIngestService.ingest({ p_device_id: 'ghost-99', p_raw: { secret: 'x' } }, NOW)).rejects.toBeInstanceOf(
+      await expect(sensorIngestService.ingest({ p_device_id: 'ghost-99', p_raw: {} }, NOW)).rejects.toBeInstanceOf(
         UnknownSensorDeviceError,
       );
     }
-    expect(store.unknown).toEqual([{ externalId: 'ghost-99', firstSeenAt: NOW, lastSeenAt: NOW, count: 2 }]);
+    expect(store.unknown).toMatchObject([{ externalId: 'ghost-99', firstSeenAt: NOW, lastSeenAt: NOW, count: 2 }]);
     expect(store.readings).toHaveLength(0);
   });
 

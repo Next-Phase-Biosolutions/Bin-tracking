@@ -8,6 +8,9 @@ interface FakeRow {
   firstSeenAt: Date;
   lastSeenAt: Date;
   count: number;
+  lastTempC?: number | null;
+  lastHumidityPct?: number | null;
+  lastRawExcerpt?: string | null;
 }
 
 const store = vi.hoisted(() => ({ rows: [] as FakeRow[] }));
@@ -15,8 +18,10 @@ const store = vi.hoisted(() => ({ rows: [] as FakeRow[] }));
 vi.mock('@bin-tracker/db', () => ({
   prisma: {
     unknownSensorDeviceId: {
-      deleteMany: ({ where }: { where: { lastSeenAt?: { lt: Date }; externalId?: { in: string[] } } }) => {
+      deleteMany: ({ where }: { where?: { lastSeenAt?: { lt: Date }; externalId?: { in: string[] } } } = {}) => {
         const before = store.rows.length;
+        if (!where) store.rows = [];
+        else
         store.rows = store.rows.filter((r) => {
           if (where.lastSeenAt && r.lastSeenAt < where.lastSeenAt.lt) return false;
           if (where.externalId && where.externalId.in.includes(r.externalId)) return false;
@@ -33,13 +38,14 @@ vi.mock('@bin-tracker/db', () => ({
         create,
       }: {
         where: { externalId: string };
-        update: { lastSeenAt: Date; count: { increment: number } };
+        update: Partial<FakeRow> & { count: { increment: number } };
         create: FakeRow;
       }) => {
         const existing = store.rows.find((r) => r.externalId === where.externalId);
         if (existing) {
-          existing.lastSeenAt = update.lastSeenAt;
-          existing.count += update.count.increment;
+          const { count, ...rest } = update;
+          Object.assign(existing, rest);
+          existing.count += count.increment;
           return Promise.resolve(existing);
         }
         store.rows.push({ ...create });
@@ -50,7 +56,7 @@ vi.mock('@bin-tracker/db', () => ({
   },
 }));
 
-const { unknownDeviceLog, UNKNOWN_ID_LOG_MAX_ROWS, UNKNOWN_ID_LOG_RETENTION_DAYS } = await import(
+const { unknownDeviceLog, UNKNOWN_ID_LOG_MAX_ROWS, UNKNOWN_ID_LOG_RETENTION_DAYS, UNKNOWN_ID_SAMPLE_EXCERPT_CHARS } = await import(
   './unknown-device-log.service.js'
 );
 
@@ -64,19 +70,29 @@ beforeEach(() => {
 describe('unknownDeviceLog.record', () => {
   it('logs a first sighting with count 1 and equal first/last seen', async () => {
     await unknownDeviceLog.record('ghost-1', NOW);
-    expect(store.rows).toEqual([{ externalId: 'ghost-1', firstSeenAt: NOW, lastSeenAt: NOW, count: 1 }]);
+    expect(store.rows).toMatchObject([{ externalId: 'ghost-1', firstSeenAt: NOW, lastSeenAt: NOW, count: 1 }]);
   });
 
   it('increments count and moves lastSeenAt on a repeat, keeping firstSeenAt', async () => {
     const later = new Date(NOW.getTime() + 60_000);
     await unknownDeviceLog.record('ghost-1', NOW);
     await unknownDeviceLog.record('ghost-1', later);
-    expect(store.rows).toEqual([{ externalId: 'ghost-1', firstSeenAt: NOW, lastSeenAt: later, count: 2 }]);
+    expect(store.rows).toMatchObject([{ externalId: 'ghost-1', firstSeenAt: NOW, lastSeenAt: later, count: 2 }]);
   });
 
-  it('stores no payload: a row has exactly id, first seen, last seen and count', async () => {
+  it('stores no sample for an id sent without one', async () => {
     await unknownDeviceLog.record('ghost-1', NOW);
-    expect(Object.keys(store.rows[0]!).sort()).toEqual(['count', 'externalId', 'firstSeenAt', 'lastSeenAt']);
+    expect(store.rows[0]).toMatchObject({ lastTempC: null, lastHumidityPct: null, lastRawExcerpt: null });
+  });
+
+  it('keeps the latest small sample: temperature, humidity and a capped excerpt of p_raw', async () => {
+    const big = { note: 'x'.repeat(5000) };
+    await unknownDeviceLog.record('ghost-1', NOW, { tempC: 3.2, humidityPct: 71, raw: { fw: '1.0' } });
+    expect(store.rows[0]).toMatchObject({ lastTempC: 3.2, lastHumidityPct: 71, lastRawExcerpt: '{"fw":"1.0"}' });
+
+    await unknownDeviceLog.record('ghost-1', NOW, { tempC: null, humidityPct: undefined, raw: big });
+    expect(store.rows[0]!.lastTempC).toBeNull();
+    expect(store.rows[0]!.lastRawExcerpt!.length).toBe(UNKNOWN_ID_SAMPLE_EXCERPT_CHARS);
   });
 
   it(`prunes rows not seen for ${UNKNOWN_ID_LOG_RETENTION_DAYS} days on write`, async () => {
@@ -116,5 +132,23 @@ describe('unknownDeviceLog.list / forget', () => {
     await unknownDeviceLog.record('b', NOW);
     await unknownDeviceLog.forget(['a']);
     expect(store.rows.map((r) => r.externalId)).toEqual(['b']);
+  });
+});
+
+describe('unknownDeviceLog.dismiss / clear', () => {
+  it('dismiss removes only the given ids', async () => {
+    for (const id of ['a', 'b', 'c']) await unknownDeviceLog.record(id, NOW);
+    await unknownDeviceLog.dismiss(['a', 'c']);
+    expect(store.rows.map((r) => r.externalId)).toEqual(['b']);
+  });
+
+  it('clear empties the log so a flood of junk ids cannot keep real ones out', async () => {
+    store.rows = Array.from({ length: UNKNOWN_ID_LOG_MAX_ROWS }, (_, i) => ({
+      externalId: `junk-${i}`, firstSeenAt: NOW, lastSeenAt: NOW, count: 1,
+    }));
+    await unknownDeviceLog.clear();
+    expect(store.rows).toHaveLength(0);
+    await unknownDeviceLog.record('real-device', NOW);
+    expect(store.rows.map((r) => r.externalId)).toEqual(['real-device']);
   });
 });

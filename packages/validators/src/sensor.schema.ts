@@ -99,6 +99,10 @@ export const addSensorDevicesSchema = z.object({
     externalIds: z.array(z.string()).min(1).max(500),
 });
 
+export const dismissUnknownIdsSchema = z.object({
+    externalIds: z.array(z.string()).min(1).max(500),
+});
+
 export type AddSensorDevicesInput = z.infer<typeof addSensorDevicesSchema>;
 
 export const assignSensorDeviceSchema = z.object({
