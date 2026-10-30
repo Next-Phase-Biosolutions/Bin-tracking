@@ -96,18 +96,20 @@ async function main(): Promise<void> {
   });
   // Tenants only see readings from assignedAt onward, so back-date it to the start of the history.
   const assignedAt = new Date(Date.now() - HISTORY_HOURS * 60 * 60_000);
+  // Same placement on create and update, so re-running also revives a demo device that an
+  // upgrade (or an admin) left DEACTIVATED.
+  const placement = {
+    state: 'ACTIVE' as const,
+    assignedAt,
+    zoneId: zone.id,
+    organizationId: org.id,
+    facilityId: facility.id,
+    label: LABEL,
+  };
   const device = await prisma.sensorDevice.upsert({
     where: { externalId: EXTERNAL_ID },
-    update: { zoneId: zone.id },
-    create: {
-      externalId: EXTERNAL_ID,
-      state: 'ACTIVE',
-      assignedAt,
-      zoneId: zone.id,
-      organizationId: org.id,
-      facilityId: facility.id,
-      label: LABEL,
-    },
+    update: placement,
+    create: { externalId: EXTERNAL_ID, ...placement },
   });
 
   const count = (HISTORY_HOURS * 60) / INTERVAL_MINUTES;

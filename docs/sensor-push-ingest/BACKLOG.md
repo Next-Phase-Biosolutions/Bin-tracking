@@ -18,3 +18,6 @@
 ## Other
 - The unknown-id 404 versus 204 for registered ids lets a key holder probe which ids exist.
 - Retries without `p_timestamp` get a fresh server timestamp each time, so they don't collapse into one row.
+- Drop the deprecated `sensor_devices.status` and `.zone` columns (`legacyStatus` / `legacyZone` in `schema.prisma`) in a migration after the release that ships the fleet work, once no previous API build can be running.
+- The unknown-id log keeps a sample (temperature, humidity, the first 200 characters of `p_raw`) of each unregistered id's latest request, visible to platform admins only. A flood of junk ids can still fill the 1000-id cap until an admin dismisses or clears them; a per-key rate limit or alert on the cap would catch that earlier.
+- The unknown-id log still costs four queries per unknown request (prune, find, count, upsert). It only runs for unregistered ids and the table is capped, so it is left as is.

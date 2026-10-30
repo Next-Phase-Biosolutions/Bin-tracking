@@ -6,9 +6,15 @@
 --   * Every reading is stamped with the organization that owned the device when it
 --     arrived, so reassigning a device never moves history between tenants.
 --   * Adds the unknown-id log, device audit log and platform settings tables.
--- Existing rows are preserved: status 'ACTIVE' -> state ACTIVE (anything else ->
--- DEACTIVATED), assignedAt = createdAt, zone text -> zoneId, readings stamped from
--- their device's organization.
+-- Existing rows are preserved, but every pre-existing device becomes DEACTIVATED:
+-- they are legacy vendor-poller devices, and an ACTIVE one would keep accepting
+-- writes from anyone holding the shared key who knows its (sequential) vendor id.
+-- Readings and the old columns are kept; an admin can reactivate one on purpose.
+-- assignedAt = createdAt, zone text -> zoneId, readings stamped from their
+-- device's organization.
+-- The old status/zone columns stay for ONE release (expand/contract) so the
+-- previous API build keeps working between this migration and the new deploy;
+-- they are unused by the new code and a later migration drops them.
 
 -- CreateEnum
 CREATE TYPE "SensorDeviceState" AS ENUM ('UNASSIGNED', 'ACTIVE', 'DEACTIVATED');
@@ -22,7 +28,7 @@ ALTER TABLE "sensor_devices"
     ALTER COLUMN "facilityId" DROP NOT NULL;
 
 UPDATE "sensor_devices"
-SET "state" = CASE WHEN "status" = 'ACTIVE' THEN 'ACTIVE'::"SensorDeviceState" ELSE 'DEACTIVATED'::"SensorDeviceState" END,
+SET "state" = 'DEACTIVATED'::"SensorDeviceState",
     "assignedAt" = "createdAt";
 
 -- CreateTable
@@ -62,13 +68,11 @@ CROSS JOIN (VALUES
 ) AS z("slug", "name", "icon", "ord")
 WHERE f."deletedAt" IS NULL;
 
--- Point existing devices at their zone row, then drop the old text columns.
+-- Point existing devices at their zone row. The old status/zone columns stay (see above).
 UPDATE "sensor_devices" d
 SET "zoneId" = z."id"
 FROM "zones" z
 WHERE z."facilityId" = d."facilityId" AND z."slug" = d."zone";
-
-ALTER TABLE "sensor_devices" DROP COLUMN "status", DROP COLUMN "zone";
 
 -- CreateIndex
 CREATE INDEX "sensor_devices_state_idx" ON "sensor_devices"("state");
@@ -99,6 +103,9 @@ CREATE TABLE "unknown_sensor_device_ids" (
     "firstSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "count" INTEGER NOT NULL DEFAULT 1,
+    "lastTempC" DOUBLE PRECISION,
+    "lastHumidityPct" DOUBLE PRECISION,
+    "lastRawExcerpt" TEXT,
 
     CONSTRAINT "unknown_sensor_device_ids_pkey" PRIMARY KEY ("externalId")
 );

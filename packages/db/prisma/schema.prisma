@@ -335,6 +335,11 @@ model SensorDevice {
   zoneId         String?
   lastSeenAt     DateTime?
   createdAt      DateTime          @default(now())
+  // DEPRECATED, unused: the pre-fleet status/zone text columns, kept for one
+  // release so the previous API build keeps working between `migrate deploy` and
+  // its replacement. A later migration drops them (docs/sensor-push-ingest/ROLLOUT.md).
+  legacyStatus   String            @default("ACTIVE") @map("status")
+  legacyZone     String?           @map("zone")
 
   organization Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   facility     Facility?              @relation(fields: [facilityId], references: [id], onDelete: Restrict)
@@ -377,6 +382,11 @@ model UnknownSensorDeviceId {
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   count       Int      @default(1)
+  // A small sample of the latest request, so an admin can tell test devices apart.
+  // Admin-only: never selected by a tenant-facing query.
+  lastTempC       Float?
+  lastHumidityPct Float?
+  lastRawExcerpt  String?
 
   @@index([lastSeenAt])
   @@map("unknown_sensor_device_ids")
