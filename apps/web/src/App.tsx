@@ -20,6 +20,7 @@ import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage'
 import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
 import OrgModulesPage from './features/admin/OrgModulesPage';
 import PayrollAdminPage from './features/admin/PayrollAdminPage';
+import SensorFleetPage from './features/admin/sensors/SensorFleetPage';
 import PayrollPage from './features/payroll/PayrollPage';
 import ApprovePage from './features/payroll/ApprovePage';
 import BillingSettingsPage from './features/billing/BillingSettingsPage';
@@ -86,6 +87,7 @@ export function App() {
                 <Route path="/app/forms/:formId" element={<FormListPage />} />
                 <Route path="/app/admin/orgs" element={<OrgModulesPage />} />
                 <Route path="/app/admin/payroll" element={<PayrollAdminPage />} />
+                <Route path="/app/admin/sensors" element={<SensorFleetPage />} />
                 <Route path="/app/settings" element={<SettingsPage />} />
                 <Route path="/app/settings/billing" element={<BillingSettingsPage />} />
             </Route>
