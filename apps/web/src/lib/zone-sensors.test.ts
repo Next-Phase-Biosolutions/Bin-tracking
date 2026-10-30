@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pickZoneDevice } from './zone-sensors';
+import { SENSOR_THRESHOLDS } from '@bin-tracker/types';
+import { CORE_METRICS, metricStatus, pickZoneDevice } from './zone-sensors';
 
 const d = (id: string, zoneSlug: string | null, lastSeenAt: Date | null) => ({
   id,
@@ -38,5 +39,24 @@ describe('pickZoneDevice', () => {
 
   it('still returns a never-reported device when it is the only one', () => {
     expect(pickZoneDevice([d('silent', 'wetaging', null)], 'wetaging')?.id).toBe('silent');
+  });
+});
+
+describe('CORE_METRICS', () => {
+  it('charts temperature and humidity only — tenants are not sent ammonia or any other channel', () => {
+    expect(CORE_METRICS.map((m) => m.key)).toEqual(['tempC', 'humidityPct']);
+  });
+});
+
+describe('metricStatus', () => {
+  it('follows the shared thresholds for temperature', () => {
+    expect(metricStatus(SENSOR_THRESHOLDS.temp.warnHigh, 'tempC')).toBe('OK');
+    expect(metricStatus(SENSOR_THRESHOLDS.temp.warnHigh + 1, 'tempC')).toBe('WARN');
+    expect(metricStatus(SENSOR_THRESHOLDS.temp.alertHigh + 1, 'tempC')).toBe('ALERT');
+  });
+
+  it('follows the shared thresholds for humidity', () => {
+    expect(metricStatus(50, 'humidityPct')).toBe('OK');
+    expect(metricStatus(SENSOR_THRESHOLDS.humidity.alertLow - 1, 'humidityPct')).toBe('ALERT');
   });
 });

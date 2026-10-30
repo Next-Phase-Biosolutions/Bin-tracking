@@ -58,7 +58,7 @@ export function describeLastSeen(lastSeenAt: Date | null): { text: string; isSta
 
 type FullSensorReading = RouterOutputs['sensor']['getReadings'][number];
 
-export type CoreMetricKey = 'tempC' | 'humidityPct' | 'nh3Ppm';
+export type CoreMetricKey = 'tempC' | 'humidityPct';
 
 interface CoreMetricConfig {
   key: CoreMetricKey;
@@ -66,14 +66,14 @@ interface CoreMetricConfig {
   unit: string;
   icon: string;
   decimals: number;
-  /** The OK band to shade behind the trace. `low: null` for a metric with no floor (ammonia). */
+  /** The OK band to shade behind the trace. */
   band: { low: number | null; high: number };
 }
 
 /**
- * The three metrics `computeThresholdStatus` (packages/types/src/sensor-thresholds.ts)
- * actually gates on — same set the backend's `latestStatus` is computed from,
- * which is why this is titled "core" rather than listing all 9 device fields.
+ * The metrics tenants chart: temperature and humidity only. Other device
+ * channels (ammonia, signal strength, faults) are admin-only and are not even
+ * sent to tenant clients.
  */
 export const CORE_METRICS: readonly CoreMetricConfig[] = [
   {
@@ -92,30 +92,17 @@ export const CORE_METRICS: readonly CoreMetricConfig[] = [
     decimals: 2,
     band: { low: SENSOR_THRESHOLDS.humidity.warnLow, high: SENSOR_THRESHOLDS.humidity.warnHigh },
   },
-  {
-    key: 'nh3Ppm',
-    label: 'ammonia',
-    unit: 'ppm',
-    icon: 'gas',
-    decimals: 2,
-    band: { low: null, high: SENSOR_THRESHOLDS.nh3.warnPpm },
-  },
 ];
 
 /**
  * Per-metric status. `computeThresholdStatus` on the backend only returns one
  * flat overall status for a device (packages/types/src/sensor-thresholds.ts —
  * `{overall, byMetric}` was never built), so the individual temperature/
- * humidity/ammonia badges on this chart row are computed here instead —
+ * humidity badges on this chart row are computed here instead —
  * against the same exported `SENSOR_THRESHOLDS` constants, not re-derived
  * numbers, so a threshold change upstream doesn't need a matching edit here.
  */
 export function metricStatus(value: number, key: CoreMetricKey): ThresholdStatus {
-  if (key === 'nh3Ppm') {
-    if (value > SENSOR_THRESHOLDS.nh3.alertPpm) return 'ALERT';
-    if (value > SENSOR_THRESHOLDS.nh3.warnPpm) return 'WARN';
-    return 'OK';
-  }
   const t = key === 'tempC' ? SENSOR_THRESHOLDS.temp : SENSOR_THRESHOLDS.humidity;
   if (value < t.alertLow || value > t.alertHigh) return 'ALERT';
   if (value < t.warnLow || value > t.warnHigh) return 'WARN';

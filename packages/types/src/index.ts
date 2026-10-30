@@ -91,3 +91,4 @@ export {
     ZONE_ICON_NAMES,
 } from './sensor-device-id.js';
 export type { ZoneIconName } from './sensor-device-id.js';
+export { DEFAULT_OFFLINE_AFTER_MINUTES, isDeviceOnline } from './sensor-status.js';

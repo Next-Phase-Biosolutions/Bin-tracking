@@ -114,6 +114,17 @@ describe('zoneService reads', () => {
   });
 });
 
+describe('zoneService tenant response', () => {
+  it('exposes no hardware or debug fields (guard against future drift)', async () => {
+    const result = await zoneService.listForFacilities(['fac-a', 'fac-b']);
+    const keys = new Set(result.flatMap((z) => Object.keys(z)));
+    for (const forbidden of ['rawPayload', 'rssi', 'snr', 'filteredRssi', 'errorCode', 'errorMessage', 'externalId']) {
+      expect(keys.has(forbidden)).toBe(false);
+    }
+    expect([...keys].sort()).toEqual(['facilityId', 'facilityName', 'icon', 'id', 'name', 'slug', 'sortOrder']);
+  });
+});
+
 describe('zoneService.create', () => {
   it('appends after the last zone and returns a unique slug', async () => {
     const created = await zoneService.create({ facilityId: 'fac-a', name: 'Wet-Aging', icon: 'snow' });
