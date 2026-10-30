@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Logo } from './Logo';
 import { Icon } from '../ui/Icon';
-import { facilityZonesNav, operationsNav, type NavItem } from '../../lib/nav';
+import { operationsNav, type NavItem } from '../../lib/nav';
+import { zonesToNavItems } from '../../lib/zones-nav';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { trpc, getSelectedOrgId } from '../../lib/trpc';
@@ -102,6 +103,9 @@ export function Sidebar({
     // Show the active organization's name under the logo (falls back to the
     // brand name while loading / for a not-yet-onboarded user).
     const myOrgs = trpc.auth.myOrgs.useQuery(undefined, { staleTime: 300_000 });
+    // Facility zones come from the database (platform admins can add/rename/reorder them), scoped to the caller's own facilities.
+    const zonesQuery = trpc.zone.listMine.useQuery(undefined, { staleTime: 60_000 });
+    const facilityZonesNav = zonesToNavItems(zonesQuery.data ?? []);
     const orgs = myOrgs.data ?? [];
     const selectedOrg = getSelectedOrgId();
     const currentOrg = (selectedOrg && orgs.find((o) => o.orgId === selectedOrg)) || orgs[0];

@@ -15,17 +15,18 @@ import { SENSOR_THRESHOLDS, type ThresholdStatus } from '@bin-tracker/types';
 import type { RouterOutputs } from './trpc';
 
 /**
- * The device assigned to this zone, or `undefined` when none is — callers fall
- * back to the zone's mock readings. Several matches: the most recently
- * reporting wins, and a device that has never reported ranks last.
+ * The device assigned to this zone ROW (a zone is per facility, so the page
+ * resolves slug + facility to a zone first), or `undefined` when none is.
+ * Several matches: the most recently reporting wins, and a device that has
+ * never reported ranks last.
  */
-export function pickZoneDevice<T extends { zone: { slug: string } | null; lastSeenAt: Date | null }>(
+export function pickZoneDevice<T extends { zone: { id: string } | null; lastSeenAt: Date | null }>(
   devices: readonly T[] | undefined,
   zoneId: string,
 ): T | undefined {
   let best: T | undefined;
   for (const device of devices ?? []) {
-    if (device.zone?.slug !== zoneId) continue;
+    if (device.zone?.id !== zoneId) continue;
     const seen = device.lastSeenAt?.getTime() ?? -Infinity;
     const bestSeen = best?.lastSeenAt?.getTime() ?? -Infinity;
     if (best === undefined || seen > bestSeen) best = device;
@@ -33,22 +34,23 @@ export function pickZoneDevice<T extends { zone: { slug: string } | null; lastSe
   return best;
 }
 
-/** Past this, the card stops claiming the reading is current. Poll cadence is ~10 min. */
-const STALE_AFTER_MS = 20 * 60 * 1000;
-
 /**
- * `lastSeenAt` tracks the newest reading's timestamp, not the last successful
- * poll — a device that is powered off but still being polled reads as stale,
- * which is the honest answer for a card showing environmental conditions.
+ * `lastSeenAt` tracks the newest reading's timestamp, so a device that is
+ * powered off reads as stale — the honest answer for a card showing current
+ * conditions. "Stale" means silent for longer than the platform's offline
+ * threshold (`offlineAfterMinutes`, set by platform admins).
  */
-export function describeLastSeen(lastSeenAt: Date | null): { text: string; isStale: boolean } {
+export function describeLastSeen(
+  lastSeenAt: Date | null,
+  offlineAfterMinutes: number,
+): { text: string; isStale: boolean } {
   if (!lastSeenAt) return { text: 'no readings yet', isStale: true };
 
   const elapsedMs = Date.now() - lastSeenAt.getTime();
   const minutes = Math.floor(elapsedMs / 60_000);
   if (minutes < 1) return { text: 'updated just now', isStale: false };
 
-  const isStale = elapsedMs > STALE_AFTER_MS;
+  const isStale = elapsedMs > offlineAfterMinutes * 60_000;
   if (minutes < 60) return { text: `updated ${minutes}m ago`, isStale };
 
   const hours = Math.floor(minutes / 60);
@@ -123,19 +125,14 @@ export interface SeriesStats {
 }
 
 /**
- * Pulls one metric's time series out of a history response, dropping nulls
- * (every core metric can be null on a given row, even though in practice the
- * live device has never sent one). Returns `null` when there's nothing to
- * chart — callers show an empty state instead of an empty SVG.
+ * Stats over a series, dropping null values (a metric can be missing on any
+ * given row). Returns `null` when nothing is left to chart — callers show an
+ * empty state instead of an empty SVG. Shared by the tenant and admin charts.
  */
-export function metricSeries(
-  readings: readonly FullSensorReading[],
-  key: CoreMetricKey,
-): SeriesStats | null {
+export function toSeriesStats(raw: ReadonlyArray<{ t: number; v: number | null }>): SeriesStats | null {
   const points: MetricPoint[] = [];
-  for (const r of readings) {
-    const v = r[key];
-    if (v !== null) points.push({ t: r.timestamp.getTime(), v });
+  for (const p of raw) {
+    if (p.v !== null) points.push({ t: p.t, v: p.v });
   }
   if (points.length === 0) return null;
 
@@ -148,4 +145,9 @@ export function metricSeries(
     sum += p.v;
   }
   return { min, max, avg: sum / points.length, latest: points[points.length - 1]!.v, points };
+}
+
+/** One tenant metric's time series out of a history response. */
+export function metricSeries(readings: readonly FullSensorReading[], key: CoreMetricKey): SeriesStats | null {
+  return toSeriesStats(readings.map((r) => ({ t: r.timestamp.getTime(), v: r[key] })));
 }
