@@ -195,6 +195,34 @@ describe('sensorFleetService.addDevices', () => {
   });
 });
 
+describe('tenant-facing name is never the hardware id', () => {
+  it('rejects assigning with the id as the name (any case, any padding) and leaves the device unassigned', async () => {
+    store.devices = [device({ id: 'dev-u', externalId: 'MT-0001' })];
+    for (const name of ['MT-0001', ' mt-0001 ']) {
+      await expect(sensorFleetService.assignDevice(assignInput({ name }), ACTOR)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+    expect(store.devices[0]!.state).toBe('UNASSIGNED');
+    expect(store.audit).toHaveLength(0);
+  });
+
+  it('rejects renaming an active device to its hardware id', async () => {
+    store.devices = [
+      device({ id: 'dev-u', externalId: 'MT-0001', state: 'ACTIVE', organizationId: 'org-a', facilityId: 'fac-a', zoneId: 'zone-a1', label: 'Cooler 1', assignedAt: new Date() }),
+    ];
+    await expect(sensorFleetService.reassignDevice(assignInput({ name: 'MT-0001' }), ACTOR)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(store.devices[0]!.label).toBe('Cooler 1');
+  });
+});
+
+describe('addDevices — an over-long token is reported, not fatal', () => {
+  it('adds the valid ids and lists the long one as invalid', async () => {
+    const result = await sensorFleetService.addDevices(['MT-0007', 'x'.repeat(300)], ACTOR);
+    expect(result.added).toEqual(['MT-0007']);
+    expect(result.invalid).toHaveLength(1);
+    expect(result.invalid[0]!.reason).toMatch(/longer than/);
+  });
+});
+
 describe('sensorFleetService.assignDevice', () => {
   it('activates an UNASSIGNED device under the org/facility/zone with the given name and assignedAt', async () => {
     const before = Date.now();

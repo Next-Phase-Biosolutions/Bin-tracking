@@ -10,10 +10,12 @@ Order matters. The database migrations must run **before** the API is deployed: 
 
 ## Deploy
 1. **Back up** the production database (Supabase point-in-time recovery or a dump). The migrations drop the old `sensor_devices.status` and `.zone` columns after copying their data; there is no automatic down-migration, so rollback means restoring the backup.
-2. **Run the migrations** on production: `pnpm db:migrate` (`prisma migrate deploy`). Two new ones apply:
+2. **Run the migrations** on production: `pnpm db:migrate` (`prisma migrate deploy`). Three apply (none of them is on `main` yet):
    - `20261029120000_sensor_push_ingest_columns` — nullable `tempC` / `humidityPct`, and the radio / fault / raw-payload columns. Relaxes a constraint and adds columns only.
+   - `20261029130000_sensor_device_zone` — adds the `zone` text column on `sensor_devices` (the fleet migration below reads it, then drops it).
    - `20261030090000_sensor_fleet_management` — device states and `assignedAt`, per-facility `zones` (the six defaults seeded for every existing facility), `zoneId`, reading `organizationId` (backfilled from each device), the unknown-id log, audit log and platform settings tables, and a CHECK that an ACTIVE device is assigned.
    Then confirm: `select state, count(*) from sensor_devices group by 1;` and `select count(*) from zones;` (six per non-deleted facility).
+   **Expect a short window of sensor errors:** the fleet migration drops `sensor_devices.status` and `.zone`, which the *currently running* API still selects. From the moment it finishes until the new API is live (step 4), the sensor endpoints (`sensor.listDevices` / `getReadings` and the zone pages) return errors. Everything else is unaffected. Run steps 2–4 back to back.
 3. **Set the ingest key** on the VPS: generate with `openssl rand -hex 32`, add `SENSOR_INGEST_API_KEY=<value>` to the VPS `.env` (`infra/vps/bintracker-api/.env`). Never commit it, and keep it out of any repo, document or `.env.example`. Restrict access to that file. If it is unset, every device gets `401` and nothing fails loudly.
 4. **Deploy the API** with `infra/vps/bintracker-api/deploy.sh` (blue-green).
 5. **Deactivate the legacy EcoSafeSense device** from **Sensor Fleet** (id `de057baa-358c-430c-9f00-ccf7ee7834bc`). After the migration it is still ACTIVE and ingest accepts any ACTIVE device by id. Deactivating keeps its readings and the old vendor columns, hides it from its tenant and makes ingest reject it.

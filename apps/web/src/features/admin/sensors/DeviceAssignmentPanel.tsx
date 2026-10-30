@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { trpc } from '../../../lib/trpc';
 import { Button, Card, SectionHead } from '../../../components/ui/primitives';
+import { nameIsHardwareId } from '@bin-tracker/types';
 import { describeReassignImpact, isAssignmentComplete, resolvePlacement } from './assignment';
 import { inputClass, selectClass, type FleetRow } from './ui';
 
@@ -24,7 +25,8 @@ export function DeviceAssignmentPanel({ device, mode, onDone, onCancel }: Device
   const [organizationId, setOrganizationId] = useState(device.organization?.id ?? '');
   const [facilityId, setFacilityId] = useState(device.facility?.id ?? '');
   const [zoneId, setZoneId] = useState(device.zone?.id ?? '');
-  const [name, setName] = useState(device.name);
+  // Assigning starts blank: an unassigned device's name defaults to its hardware id, which tenants must never see.
+  const [name, setName] = useState(mode === 'assign' ? '' : device.name);
   const [enableModule, setEnableModule] = useState(false);
 
   const optionsQuery = trpc.sensorAdmin.orgAssignmentOptions.useQuery({ organizationId }, { enabled: organizationId !== '' });
@@ -41,7 +43,8 @@ export function DeviceAssignmentPanel({ device, mode, onDone, onCancel }: Device
   const mutation = mode === 'assign' ? assign : reassign;
 
   const form = { organizationId, ...placement, name };
-  const complete = isAssignmentComplete(form);
+  const complete = isAssignmentComplete(form, device.externalId);
+  const nameIsId = nameIsHardwareId(name, device.externalId);
   const impact =
     mode === 'reassign'
       ? describeReassignImpact({
@@ -107,7 +110,8 @@ export function DeviceAssignmentPanel({ device, mode, onDone, onCancel }: Device
 
         <label className="grid gap-1 text-xs font-semibold text-muted">
           Device name (shown to the tenant)
-          <input className={inputClass} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+          <input className={inputClass} value={name} maxLength={80} placeholder="e.g. Cooler 1" onChange={(e) => setName(e.target.value)} />
+          {nameIsId ? <span className="text-rust">Tenants see this name — it can't be the device's hardware id.</span> : null}
         </label>
 
         {options && options.facilities.length === 0 ? (

@@ -1,11 +1,11 @@
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/app/PageHeader';
-import { Card, Badge } from '../../components/ui/primitives';
+import { Badge, Button, Card } from '../../components/ui/primitives';
 import { Icon } from '../../components/ui/Icon';
 import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { getZone } from '../../lib/facility-zones-data';
 import { pickZoneDevice } from '../../lib/zone-sensors';
-import { facilitiesWithZone, resolveZoneFacility, zoneViewMode } from '../../lib/zone-view';
+import { facilitiesWithZone, resolveZoneFacility, zonePageState, zoneViewMode } from '../../lib/zone-view';
 import { trpc } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { MockZoneView } from './MockZoneView';
@@ -52,16 +52,32 @@ export default function ZonePage() {
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString('en-US', { timeZone: companyTimezone, hour: '2-digit', minute: '2-digit', hour12: false });
 
-  // Until both lists are in we can't tell whether this zone exists or has a sensor;
-  // a loader beats flashing mock data or redirecting a valid link.
-  if (zonesQuery.isLoading || (sensorsAvailable && devicesQuery.isLoading)) {
+  const state = zonePageState({
+    zonesLoading: zonesQuery.isLoading,
+    zonesError: zonesQuery.isError,
+    devicesLoading: sensorsAvailable && devicesQuery.isLoading,
+    hasZone: Boolean(slug && zoneRow),
+  });
+  if (state === 'loading') {
     return (
       <div className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center">
         <FacilityLoader variant="inline" label={slug} />
       </div>
     );
   }
-  if (!slug || !zoneRow) return <Navigate to="/app/dashboard" replace />;
+  if (state === 'error') {
+    return (
+      <div className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center">
+        <Card className="w-full max-w-md p-8 text-center">
+          <p className="text-sm text-muted">Couldn't load this zone. Check your connection and try again.</p>
+          <Button className="mt-4" variant="secondary" onClick={() => void zonesQuery.refetch()}>
+            Retry
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+  if (state === 'missing' || !slug || !zoneRow) return <Navigate to="/app/dashboard" replace />;
 
   const mock = getZone(slug);
   const mode = zoneViewMode({ slug, hasDevice: device !== undefined });

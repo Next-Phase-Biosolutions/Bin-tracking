@@ -109,6 +109,28 @@ describe('registerSensorDevice — unassigned', () => {
     });
 });
 
+describe('registerSensorDevice — the tenant sees the label as the device name', () => {
+    it('refuses to assign without a label, since the default would be the hardware id', async () => {
+        const { db, create } = fakeDb();
+        await expect(
+            registerSensorDevice(db, { externalId: DEVICE_ID, orgSlug: 'meatech', facilityId: 'fac-1' }),
+        ).rejects.toThrow(/--label/);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a label that is just the hardware id', async () => {
+        const { db, create } = fakeDb();
+        await expect(registerSensorDevice(db, { ...placed, label: 'mt-0001' })).rejects.toThrow(/hardware id/i);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it('still defaults the label to the id for an UNASSIGNED device (admin-only until it is assigned)', async () => {
+        const { db, create } = fakeDb();
+        await registerSensorDevice(db, { externalId: DEVICE_ID });
+        expect(create).toHaveBeenCalledWith({ data: { externalId: DEVICE_ID, label: DEVICE_ID } });
+    });
+});
+
 describe('registerSensorDevice — assigned', () => {
     it("creates an ACTIVE device under the facility's org with assignedAt set", async () => {
         const { db, create } = fakeDb();

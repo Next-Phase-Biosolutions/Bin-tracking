@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sensorDeviceIdProblem } from '@bin-tracker/types';
+import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import {
     addSensorDevicesSchema,
     createZoneSchema,
@@ -169,5 +169,24 @@ describe('createZoneSchema', () => {
     it('rejects an icon outside ZONE_ICON_NAMES and defaults a missing one to grid', () => {
         expect(createZoneSchema.safeParse({ facilityId: 'f', name: 'Cold Room', icon: 'gauge' }).success).toBe(false);
         expect(createZoneSchema.parse({ facilityId: 'f', name: 'Cold Room' }).icon).toBe('grid');
+    });
+});
+
+describe('nameIsHardwareId', () => {
+    it('is true when the tenant-facing name is just the hardware id, ignoring case and spacing', () => {
+        expect(nameIsHardwareId('MT-0001', 'MT-0001')).toBe(true);
+        expect(nameIsHardwareId('  mt-0001 ', 'MT-0001')).toBe(true);
+    });
+
+    it('is false for a real name, including one that merely contains the id', () => {
+        expect(nameIsHardwareId('Cooler 1', 'MT-0001')).toBe(false);
+        expect(nameIsHardwareId('Cooler MT-0001', 'MT-0001')).toBe(false);
+    });
+});
+
+describe('addSensorDevicesSchema — one bad token must not reject the batch', () => {
+    it('accepts an over-long token so the service can report it as invalid instead', () => {
+        const parsed = addSensorDevicesSchema.safeParse({ externalIds: ['MT-0001', 'x'.repeat(5000)] });
+        expect(parsed.success).toBe(true);
     });
 });

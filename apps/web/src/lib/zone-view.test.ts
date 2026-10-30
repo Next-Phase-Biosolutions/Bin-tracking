@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { facilitiesWithZone, resolveZoneFacility, zoneViewMode } from './zone-view';
+import { facilitiesWithZone, resolveZoneFacility, zonePageState, zoneViewMode } from './zone-view';
 
 const z = (id: string, slug: string, facilityId: string, facilityName: string) => ({ id, slug, facilityId, facilityName });
 const zones = [
@@ -57,5 +57,30 @@ describe('zoneViewMode', () => {
 
   it('shows the generic "no sensor assigned" view for an admin-created zone without a device', () => {
     expect(zoneViewMode({ slug: 'coldroom', hasDevice: false })).toBe('generic');
+  });
+});
+
+describe('zonePageState', () => {
+  const base = { zonesLoading: false, zonesError: false, devicesLoading: false, hasZone: true };
+
+  it('waits while zones or devices load, so a valid link is never redirected or flashed with mock data', () => {
+    expect(zonePageState({ ...base, zonesLoading: true, hasZone: false })).toBe('loading');
+    expect(zonePageState({ ...base, devicesLoading: true })).toBe('loading');
+  });
+
+  it('shows an error — not a redirect — when the zones query failed', () => {
+    expect(zonePageState({ ...base, zonesError: true, hasZone: false })).toBe('error');
+  });
+
+  it('redirects only when the zones loaded fine and this slug is not among them', () => {
+    expect(zonePageState({ ...base, hasZone: false })).toBe('missing');
+  });
+
+  it('is ready once the zone is known', () => {
+    expect(zonePageState(base)).toBe('ready');
+  });
+
+  it('a failed devices query does not block the page (the zone just has no sensor)', () => {
+    expect(zonePageState({ ...base, devicesLoading: false })).toBe('ready');
   });
 });

@@ -86,3 +86,17 @@ describe('resolvePlacement', () => {
     expect(resolvePlacement({ moduleEnabled: false, facilities: [] }, 'x', 'y')).toEqual({ facilityId: '', zoneId: '' });
   });
 });
+
+describe('isAssignmentComplete — the name must not be the hardware id', () => {
+  const full = { organizationId: 'o', facilityId: 'f', zoneId: 'z', name: 'Cooler 1' };
+
+  it('blocks submission when the name is the device id', () => {
+    expect(isAssignmentComplete({ ...full, name: 'MT-0001' }, 'MT-0001')).toBe(false);
+    expect(isAssignmentComplete({ ...full, name: ' mt-0001' }, 'MT-0001')).toBe(false);
+  });
+
+  it('allows a real name, and still works without an id to compare against', () => {
+    expect(isAssignmentComplete(full, 'MT-0001')).toBe(true);
+    expect(isAssignmentComplete(full)).toBe(true);
+  });
+});

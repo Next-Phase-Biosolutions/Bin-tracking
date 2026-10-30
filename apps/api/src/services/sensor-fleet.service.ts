@@ -6,7 +6,7 @@ import {
   setModuleOverride,
   type Prisma,
 } from '@bin-tracker/db';
-import { sensorDeviceIdProblem } from '@bin-tracker/types';
+import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import type { AssignSensorDeviceInput, ReassignSensorDeviceInput } from '@bin-tracker/validators';
 import { handlePrismaError } from '../lib/errors.js';
 import { writeSensorAudit, type SensorAuditAction } from './sensor-audit.js';
@@ -47,6 +47,13 @@ async function requireDevice(deviceId: string) {
   const device = await prisma.sensorDevice.findUnique({ where: { id: deviceId } });
   if (!device) throw new TRPCError({ code: 'NOT_FOUND', message: 'Device not found' });
   return device;
+}
+
+/** The name is what tenants see; it must not be the hardware id (which an unnamed device's label defaults to). */
+function assertTenantFacingName(name: string, externalId: string): void {
+  if (nameIsHardwareId(name, externalId)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: "Give the device a name that is not its hardware id — tenants see this name" });
+  }
 }
 
 /** The org must exist, the facility must be live and the org's own, and the zone must belong to that facility. */
@@ -129,6 +136,7 @@ export const sensorFleetService = {
     if (device.state !== 'UNASSIGNED') {
       throw new TRPCError({ code: 'CONFLICT', message: 'Only an unassigned device can be assigned — use reassign' });
     }
+    assertTenantFacingName(input.name, device.externalId);
     await validateTarget(input);
     const before = placementOf(device);
 
@@ -168,6 +176,7 @@ export const sensorFleetService = {
     if (device.state !== 'ACTIVE') {
       throw new TRPCError({ code: 'CONFLICT', message: 'Only an active device can be reassigned' });
     }
+    assertTenantFacingName(input.name, device.externalId);
     await validateTarget(input);
 
     const before = placementOf(device);

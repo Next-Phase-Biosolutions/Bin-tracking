@@ -40,3 +40,13 @@ export type ZoneIconName = (typeof ZONE_ICON_NAMES)[number];
 export function parseDeviceIdList(text: string): string[] {
     return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
 }
+
+/**
+ * True when a tenant-facing device name is just the hardware id (ignoring case
+ * and surrounding spaces). Tenants must never see the hardware id, and an
+ * unnamed device's label defaults to it, so naming a device after its id would
+ * show the id on every tenant screen.
+ */
+export function nameIsHardwareId(name: string, externalId: string): boolean {
+    return name.trim().toLowerCase() === externalId.trim().toLowerCase();
+}

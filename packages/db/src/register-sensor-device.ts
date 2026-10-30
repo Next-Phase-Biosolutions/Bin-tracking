@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { sensorDeviceIdProblem } from '@bin-tracker/types';
+import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import { prisma } from './client.js';
 import { assertSensorDeviceOrgConsistency } from './assert-sensor-device-org.js';
 
@@ -54,6 +54,13 @@ export async function registerSensorDevice(db: RegisterSensorDeviceDb, args: Reg
     const existing = await db.sensorDevice.findUnique({ where: { externalId } });
     if (existing) throw new Error(`device ${externalId} is already registered`);
 
+    // The label is the tenant-facing device name. For an UNASSIGNED device it can default to the id
+    // (admins only see it until assignment), but an assigned device with that name would show the
+    // hardware id to its tenant.
+    if (placed && !args.label) throw new Error('--label is required when assigning: tenants see it as the device name');
+    if (placed && nameIsHardwareId(args.label!, externalId)) {
+        throw new Error('--label must not be the hardware id: tenants see it as the device name');
+    }
     const label = args.label ?? externalId;
     const actorId = args.actorId ?? 'cli';
 

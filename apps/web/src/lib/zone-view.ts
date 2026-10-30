@@ -47,3 +47,24 @@ export function zoneViewMode(input: { slug: string; hasDevice: boolean }): ZoneV
   if (PLACEHOLDER_ZONE_SLUGS.has(input.slug)) return 'placeholder';
   return 'generic';
 }
+
+export type ZonePageState = 'loading' | 'error' | 'missing' | 'ready';
+
+/**
+ * What the zone page should do before it can show a zone. It waits for the zone
+ * and device lists (so a valid link is never redirected and mock data never
+ * flashes); a FAILED zones query is an error to show, never a "not found" — a
+ * network blip must not bounce a valid zone link to the dashboard. Only a zones
+ * list that loaded fine without this slug is "missing". A failed devices query
+ * does not block: the zone simply has no sensor.
+ */
+export function zonePageState(input: {
+  zonesLoading: boolean;
+  zonesError: boolean;
+  devicesLoading: boolean;
+  hasZone: boolean;
+}): ZonePageState {
+  if (input.zonesLoading || input.devicesLoading) return 'loading';
+  if (input.zonesError) return 'error';
+  return input.hasZone ? 'ready' : 'missing';
+}

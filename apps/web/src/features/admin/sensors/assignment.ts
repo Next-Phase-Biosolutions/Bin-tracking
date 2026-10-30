@@ -1,3 +1,5 @@
+import { nameIsHardwareId } from '@bin-tracker/types';
+
 /** An org's assignable facilities and zones (sensorAdmin.orgAssignmentOptions). */
 export interface AssignmentOptions {
   moduleEnabled: boolean;
@@ -6,10 +8,17 @@ export interface AssignmentOptions {
 
 const NAME_MAX = 80;
 
-/** The assign form can submit only with every choice made and a usable name (the API trims and caps it at 80). */
-export function isAssignmentComplete(form: { organizationId: string; facilityId: string; zoneId: string; name: string }): boolean {
+/**
+ * The assign form can submit only with every choice made and a usable name (the API trims and caps it at 80).
+ * Pass the device's hardware id to also refuse a name that is just that id: tenants see the name.
+ */
+export function isAssignmentComplete(
+  form: { organizationId: string; facilityId: string; zoneId: string; name: string },
+  externalId?: string,
+): boolean {
   const name = form.name.trim();
-  return Boolean(form.organizationId && form.facilityId && form.zoneId) && name.length > 0 && name.length <= NAME_MAX;
+  const usableName = name.length > 0 && name.length <= NAME_MAX && !(externalId && nameIsHardwareId(name, externalId));
+  return Boolean(form.organizationId && form.facilityId && form.zoneId) && usableName;
 }
 
 /**

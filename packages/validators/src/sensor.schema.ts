@@ -93,9 +93,10 @@ export type IngestSensorReadingInput = z.infer<typeof ingestSensorReadingSchema>
 // Defined in @bin-tracker/types (the web app needs it at runtime and does not depend on this package).
 export { parseDeviceIdList } from '@bin-tracker/types';
 
-// Per-id validation happens in the service so one bad id doesn't reject the batch.
+// Per-id validation (including length) happens in the service, so one bad or over-long token
+// is reported as invalid instead of rejecting the whole pasted batch.
 export const addSensorDevicesSchema = z.object({
-    externalIds: z.array(z.string().max(200)).min(1).max(500),
+    externalIds: z.array(z.string()).min(1).max(500),
 });
 
 export type AddSensorDevicesInput = z.infer<typeof addSensorDevicesSchema>;
