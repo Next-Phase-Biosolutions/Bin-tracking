@@ -1,7 +1,8 @@
 import { prisma, type Prisma } from '@bin-tracker/db';
 import type { IngestSensorReadingInput } from '@bin-tracker/validators';
+import { unknownDeviceLog } from './unknown-device-log.service.js';
 
-/** The device_id isn't registered to any org, or its device is no longer ACTIVE. */
+/** The device_id isn't registered, or its device has been deactivated. */
 export class UnknownSensorDeviceError extends Error {
   constructor(externalId: string) {
     super(`unknown device: ${externalId}`);
@@ -11,14 +12,23 @@ export class UnknownSensorDeviceError extends Error {
 
 export const sensorIngestService = {
   /**
-   * Stores one pushed reading. Tenant is derived from the pre-registered
-   * SensorDevice (looked up by its externalId), never from anything in the
-   * payload — the shared ingest key identifies no tenant, so an unregistered
-   * device_id must write nothing.
+   * Stores one pushed reading. The tenant is derived from the pre-registered
+   * SensorDevice (looked up by its externalId), never from the payload — the
+   * shared ingest key identifies no tenant. UNASSIGNED devices are stored too
+   * (organizationId null) so an admin can confirm data is arriving before
+   * assigning; DEACTIVATED and unregistered ids write nothing.
    */
   async ingest(input: IngestSensorReadingInput, now: Date = new Date()): Promise<void> {
-    const device = await prisma.sensorDevice.findUnique({ where: { externalId: input.p_device_id } });
-    if (!device || device.state !== 'ACTIVE') throw new UnknownSensorDeviceError(input.p_device_id);
+    const device = await prisma.sensorDevice.findUnique({
+      where: { externalId: input.p_device_id },
+      select: { id: true, state: true, organizationId: true },
+    });
+    if (!device) {
+      await unknownDeviceLog.record(input.p_device_id, now);
+      throw new UnknownSensorDeviceError(input.p_device_id);
+    }
+    // Same response as an unregistered id (the firmware contract has no 403/410).
+    if (device.state === 'DEACTIVATED') throw new UnknownSensorDeviceError(input.p_device_id);
 
     const timestamp = input.p_timestamp ? new Date(input.p_timestamp) : now;
 
@@ -28,6 +38,8 @@ export const sensorIngestService = {
         data: [
           {
             deviceId: device.id,
+            // Stamped now so reassigning the device later never moves this reading to another tenant.
+            organizationId: device.organizationId,
             timestamp,
             tempC: input.p_temp_c ?? null,
             humidityPct: input.p_humidity_pct ?? null,

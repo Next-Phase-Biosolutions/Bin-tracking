@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── In-memory Prisma fake ────────────────────────────────────
-// Mirrors only the sensorDevice/sensorReading calls sensor-ingest.service.ts makes.
+// Mirrors only the sensorDevice/sensorReading/unknownSensorDeviceId calls the ingest path makes
+// (the real unknown-device-log service runs on top of this fake).
 
 interface FakeDevice {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   externalId: string;
   state: string;
   lastSeenAt: Date | null;
@@ -17,9 +18,17 @@ interface FakeReading {
   [key: string]: unknown;
 }
 
+interface FakeUnknownRow {
+  externalId: string;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  count: number;
+}
+
 const store = vi.hoisted(() => ({
   devices: [] as FakeDevice[],
   readings: [] as FakeReading[],
+  unknown: [] as FakeUnknownRow[],
 }));
 
 vi.mock('@bin-tracker/db', () => ({
@@ -53,6 +62,30 @@ vi.mock('@bin-tracker/db', () => ({
         return Promise.resolve({ count });
       },
     },
+    unknownSensorDeviceId: {
+      deleteMany: () => Promise.resolve({ count: 0 }),
+      findUnique: ({ where }: { where: { externalId: string } }) =>
+        Promise.resolve(store.unknown.find((r) => r.externalId === where.externalId) ?? null),
+      count: () => Promise.resolve(store.unknown.length),
+      upsert: ({
+        where,
+        update,
+        create,
+      }: {
+        where: { externalId: string };
+        update: { lastSeenAt: Date; count: { increment: number } };
+        create: FakeUnknownRow;
+      }) => {
+        const existing = store.unknown.find((r) => r.externalId === where.externalId);
+        if (existing) {
+          existing.lastSeenAt = update.lastSeenAt;
+          existing.count += update.count.increment;
+          return Promise.resolve(existing);
+        }
+        store.unknown.push({ ...create });
+        return Promise.resolve(create);
+      },
+    },
     $transaction: (ops: Array<Promise<unknown>>) => Promise.all(ops),
   },
 }));
@@ -66,8 +99,10 @@ beforeEach(() => {
     { id: 'dev-a', organizationId: 'org-a', externalId: 'master-01', state: 'ACTIVE', lastSeenAt: null },
     { id: 'dev-b', organizationId: 'org-b', externalId: 'master-02', state: 'ACTIVE', lastSeenAt: null },
     { id: 'dev-off', organizationId: 'org-a', externalId: 'retired-01', state: 'DEACTIVATED', lastSeenAt: null },
+    { id: 'dev-new', organizationId: null, externalId: 'new-01', state: 'UNASSIGNED', lastSeenAt: null },
   ];
   store.readings = [];
+  store.unknown = [];
 });
 
 describe('sensorIngestService.ingest', () => {
@@ -130,10 +165,38 @@ describe('sensorIngestService.ingest', () => {
     expect(store.readings).toHaveLength(0);
   });
 
-  it('rejects a registered but non-ACTIVE device', async () => {
+  it('stores readings from an UNASSIGNED device with organizationId null', async () => {
+    await sensorIngestService.ingest({ p_device_id: 'new-01', p_raw: {}, p_temp_c: 4 }, NOW);
+    expect(store.readings).toHaveLength(1);
+    expect(store.readings[0]).toMatchObject({ deviceId: 'dev-new', organizationId: null, tempC: 4 });
+  });
+
+  it("stamps readings from an ACTIVE device with the device's organizationId", async () => {
+    await sensorIngestService.ingest({ p_device_id: 'master-02', p_raw: {} }, NOW);
+    expect(store.readings[0]).toMatchObject({ deviceId: 'dev-b', organizationId: 'org-b' });
+  });
+
+  it('rejects a DEACTIVATED device immediately and stores nothing', async () => {
     await expect(sensorIngestService.ingest({ p_device_id: 'retired-01', p_raw: {} }, NOW)).rejects.toBeInstanceOf(
       UnknownSensorDeviceError,
     );
+    expect(store.readings).toHaveLength(0);
+  });
+
+  it('does not log a deactivated id as unknown', async () => {
+    await expect(sensorIngestService.ingest({ p_device_id: 'retired-01', p_raw: {} }, NOW)).rejects.toBeInstanceOf(
+      UnknownSensorDeviceError,
+    );
+    expect(store.unknown).toHaveLength(0);
+  });
+
+  it('logs an unregistered id, then counts repeats', async () => {
+    for (let i = 0; i < 2; i += 1) {
+      await expect(sensorIngestService.ingest({ p_device_id: 'ghost-99', p_raw: { secret: 'x' } }, NOW)).rejects.toBeInstanceOf(
+        UnknownSensorDeviceError,
+      );
+    }
+    expect(store.unknown).toEqual([{ externalId: 'ghost-99', firstSeenAt: NOW, lastSeenAt: NOW, count: 2 }]);
     expect(store.readings).toHaveLength(0);
   });
 
