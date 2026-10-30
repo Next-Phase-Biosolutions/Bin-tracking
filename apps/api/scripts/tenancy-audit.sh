@@ -112,6 +112,25 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            orgId, status: 'ACTIVE' } }` is on the lines below the call; orgId
 #            is the function's own parameter (ctx.orgId), never client input.
 #
+# Sensor fleet / zones (platform-admin API) entries. Reviewed in the sensor
+# fleet management work; every caller below is a platformAdminProcedure
+# (swept by sensor-admin.router.test.ts), never a tenant:
+#   [FILTER] const facilities = await prisma.facility.findMany({ in
+#            sensor-fleet-read.service.ts viewAsTenant(), and
+#            prisma.facility.findMany({ in listOrgAssignmentOptions() — the
+#            `where` on the next line is `{ organizationId: organization.id,
+#            deletedAt: null }`, where `organization` is the org the admin
+#            chose, resolved by requireOrganization() (NOT_FOUND if unknown).
+#   [POSTCHECK] const facility = await prisma.facility.findFirst({ in
+#            sensor-fleet.service.ts validateTarget() — the very next lines
+#            run assertSensorDeviceOrgConsistency(), which rejects (BAD_REQUEST)
+#            a facility whose organizationId differs from the chosen org's.
+#   [PLATFORM-ADMIN] const facility = await prisma.facility.findFirst({ in
+#            zone.service.ts create() — a platform admin deliberately creates
+#            a zone in ANY organization's facility (cross-tenant by design,
+#            reachable only through zone.adminCreate, a platformAdminProcedure).
+#            It only checks the facility exists and is not soft-deleted.
+#
 # Employee bank-details self-serve link (employee.service.ts) entries:
 #   [VERIFIED-ID] await prisma.employee.update({ in requestBankDetails —
 #            updates the SAME row returned by getEmployeeInOrg(orgId, ...)
@@ -208,11 +227,15 @@ apps/api/src/services/payroll.service.ts	const existing = await prisma.payrollRu
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({ where: { id: runId } });
 apps/api/src/services/payroll.service.ts	const runs = await prisma.payrollRun.findMany({
+apps/api/src/services/sensor-fleet-read.service.ts	const facilities = await prisma.facility.findMany({
+apps/api/src/services/sensor-fleet-read.service.ts	prisma.facility.findMany({
+apps/api/src/services/sensor-fleet.service.ts	const facility = await prisma.facility.findFirst({ where: { id: target.facilityId, deletedAt: null } });
 apps/api/src/services/settings.service.ts	prisma.settings.upsert({
 apps/api/src/services/shipment.service.ts	const row = await prisma.shipment.create({
 apps/api/src/services/shipment.service.ts	const row = await prisma.shipment.findUnique({
 apps/api/src/services/shipment.service.ts	const rows = await prisma.shipment.findMany({
 apps/api/src/services/shipment.service.ts	return prisma.facility.findMany({
+apps/api/src/services/zone.service.ts	const facility = await prisma.facility.findFirst({ where: { id: input.facilityId, deletedAt: null } });
 EOF
 
 # Occurrence-count comparison (not set membership): for each (file, content)
