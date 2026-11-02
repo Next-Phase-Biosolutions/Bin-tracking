@@ -196,6 +196,16 @@ beforeEach(() => {
   store.readings = [];
   store.userFacilities = [];
   store.platformSettings = new Map();
+  // The service windows history by Date.now() (24h / 7d) while fixtures are
+  // stamped relative to the fixed T0. Pin the clock just after T0 so those
+  // fixtures never age out of the window — without this the suite goes red
+  // once real time passes T0 + 24h. Only Date is faked; promises/IO are real.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(T0.getTime() + 60 * MIN));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('computeThresholdStatus — boundaries', () => {
