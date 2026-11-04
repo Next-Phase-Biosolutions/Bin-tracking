@@ -8,6 +8,7 @@ import { FacilityLoader } from '../../components/app/FacilityLoader';
 import { Icon } from '../../components/ui/Icon';
 import { Card, Badge, Button, Stat } from '../../components/ui/primitives';
 import { EmployeeBadge } from './EmployeeBadge';
+import { EmployeePhoneCell } from './EmployeePhoneCell';
 
 type Employee = RouterOutputs['employee']['list'][number];
 
@@ -38,6 +39,13 @@ export default function EmployeesPage() {
     const me = trpc.auth.me.useQuery();
     const canManageRates =
         (me.data?.orgRole === 'ADMIN' || me.data?.orgRole === 'OPS_MANAGER') && hasModule('PAYROLL');
+
+    // Registered NFC phones, grouped by employee for the Phone column.
+    const devicesQuery = trpc.deviceRegistration.listDevices.useQuery(undefined, { staleTime: 10_000, retry: false });
+    const devicesByEmployee = new Map<string, NonNullable<typeof devicesQuery.data>>();
+    for (const device of devicesQuery.data ?? []) {
+        devicesByEmployee.set(device.employeeId, [...(devicesByEmployee.get(device.employeeId) ?? []), device]);
+    }
 
     const setRate = trpc.employee.setHourlyRate.useMutation({
         onSuccess: () => void utils.employee.list.invalidate(),
@@ -71,7 +79,7 @@ export default function EmployeesPage() {
     }
 
     const rows = listQuery.data ?? [];
-    const colCount = canManageRates ? 7 : 6;
+    const colCount = canManageRates ? 8 : 7;
     // ponytail: counts derived from the (capped) list rather than a dedicated
     // employee.stats endpoint — PLAN_LIMITS caps PRO at 200 employees, which
     // the limit above covers. Add the endpoint if an ENTERPRISE org exceeds it.
@@ -165,6 +173,7 @@ export default function EmployeesPage() {
                                 ) : null}
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Status</th>
                                 <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Direct deposit</th>
+                                <th className="px-5 py-2.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Phone</th>
                                 <th className="px-5 py-2.5 text-right font-mono text-[0.58rem] uppercase tracking-[0.1em] text-muted">Badge</th>
                             </tr>
                         </thead>
@@ -216,6 +225,9 @@ export default function EmployeesPage() {
                                                 }
                                                 onRequest={() => requestBankDetails.mutate({ employeeId: row.id })}
                                             />
+                                        </td>
+                                        <td className="px-5 py-3">
+                                            <EmployeePhoneCell employee={row} devices={devicesByEmployee.get(row.id) ?? []} />
                                         </td>
                                         <td className="px-5 py-3 text-right">
                                             <button

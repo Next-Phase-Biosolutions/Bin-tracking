@@ -286,9 +286,19 @@ Copy `.env.example` to `.env` and adjust for your local Postgres credentials.
 | `PORT` | ✅ | API server port (default: `3001`) |
 | `HOST` | ✅ | API server host (default: `0.0.0.0`) |
 | `CORS_ORIGIN` | ✅ | Allowed frontend origin (e.g., `http://localhost:3000`) |
+| `APP_URL` | ✅ (prod) | Web app origin; builds emailed links and NFC registration links (`${APP_URL}/app/register?token=…`) |
+| `COOKIE_SECURE` | ❌ | `false` allows the NFC phone cookies over plain http for local testing; ignored in production |
+| `DB_POOL_MAX` | ❌ | Cap on the Postgres connection pool (default 10) |
+| `RATE_LIMIT_MAX` | ❌ | Global per-IP API requests per minute (default 100); raise it behind the Netlify `/trpc` rewrite |
 | `DISABLE_AUTH` | ⚠️ | Set `true` to bypass auth — **dev/test only, never in production** |
 | `BLOCKFROST_API_KEY` | ❌ | Cardano Blockfrost key (required for blockchain anchoring) |
 | `CARDANO_NETWORK` | ❌ | `preprod` or `mainnet` |
+
+---
+
+## NFC attendance
+
+Employees clock in and out by tapping their own phone on a wall-mounted NFC tag. No app, no login. See **[docs/nfc-attendance](./docs/nfc-attendance/README.md)** for the tag URL format, the registration flow, environment variables, security notes, and the physical test checklist.
 
 ---
 

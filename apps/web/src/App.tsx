@@ -14,6 +14,10 @@ import EmployeeRegisterPage from './features/employees/EmployeeRegisterPage';
 import EmployeesPage from './features/employees/EmployeesPage';
 import BankDetailsPage from './features/employees/BankDetailsPage';
 import GuardScannerPage from './features/guard/GuardScannerPage';
+import NfcCardsPage from './features/nfc/NfcCardsPage';
+import LiveStatusPage from './features/nfc/LiveStatusPage';
+import TapPage from './features/nfc/TapPage';
+import RegisterPage from './features/nfc/RegisterPage';
 import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage';
 import ShipmentRegisterPage from './features/shipments/ShipmentRegisterPage';
 import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage';
@@ -65,6 +69,10 @@ export function App() {
             <Route path="/app/invite/:token" element={<AcceptInvitePage />} />
             {/* Public: the employee has no login — the link token is the sole credential. */}
             <Route path="/app/bank-details/:token" element={<BankDetailsPage />} />
+            {/* Public phone pages: the employee has no login. /tap is reached by tapping an NFC tag; both
+                identify the phone by its httpOnly device cookie, sent same-origin through the /trpc proxy. */}
+            <Route path="/app/register" element={<RegisterPage />} />
+            <Route path="/app/tap" element={<TapPage />} />
             {/* Public: the manager has no login here either — the run id + one-time code are the sole credential. */}
             <Route path="/app/payroll/approve" element={<ApprovePage />} />
 
@@ -81,6 +89,8 @@ export function App() {
                 <Route path="/app/employees" element={<EmployeesPage />} />
                 <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
                 <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
+                <Route path="/app/live-status" element={<LiveStatusPage />} />
+                <Route path="/app/nfc-cards" element={<NfcCardsPage />} />
                 <Route path="/app/payroll" element={<PayrollPage />} />
                 <Route path="/app/shipments" element={<ShipmentsDashboardPage />} />
                 <Route path="/app/shipments/:id" element={<ShipmentDetailPage />} />
