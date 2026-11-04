@@ -757,6 +757,12 @@ model RegistrationToken {
   usedAt         DateTime?
   // Set when a newer link is issued for the same employee before this was used.
   supersededAt   DateTime?
+  // The 10-minute "mid-registration" cookie. When the employee opens the link the
+  // server mints a fresh RANDOM secret for that browser and stores only its hash
+  // here, so the cookie is never a value derived from (or equal to) anything in
+  // this table. A database read therefore yields no usable credential.
+  pendingHash      String?   @unique
+  pendingExpiresAt DateTime?
   createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

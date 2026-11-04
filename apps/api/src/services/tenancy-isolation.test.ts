@@ -230,7 +230,8 @@ vi.mock('@bin-tracker/db', () => {
     const nfcCard = {
         findMany: ({ where }: { where: { organizationId: string } }) =>
             Promise.resolve(store.nfcCards.filter((c) => c.organizationId === where.organizationId)),
-        findUnique: ({ where }: { where: { id: string } }) => Promise.resolve(store.nfcCards.find((c) => c.id === where.id) ?? null),
+        findFirst: ({ where }: { where: { id: string; organizationId: string } }) =>
+            Promise.resolve(store.nfcCards.find((c) => c.id === where.id && c.organizationId === where.organizationId) ?? null),
         findFirstOrThrow: ({ where }: { where: { id: string; organizationId: string } }) => {
             const card = store.nfcCards.find((c) => c.id === where.id && c.organizationId === where.organizationId);
             return card ? Promise.resolve(card) : Promise.reject(new Error('No NfcCard found'));
@@ -1084,7 +1085,19 @@ describe('cross-organization tenancy isolation', () => {
             });
             store.nfcCards.push({ id: 'card-b', organizationId: ORG_B, label: 'B door', direction: 'BOTH', chipUid: 'uid-b', active: true });
 
-            await expect(tap({ cardId: 'card-b', deviceToken: 'odd-secret' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+            await expect(tap({ cardId: 'card-b', deviceToken: 'odd-secret' })).rejects.toMatchObject({ appCode: 'SESSION_NOT_FOUND' });
+        });
+
+        it("an inactive card of another org is indistinguishable from a missing one (no state leaks across orgs)", async () => {
+            const employee = seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+            store.deviceSessions.push({
+                id: 'dev-a', organizationId: ORG_A, employeeId: employee.id, sessionTokenHash: hashToken('phone-secret'),
+                deviceLabel: null, createdAt: new Date(), lastUsedAt: new Date(), revokedAt: null,
+            });
+            store.nfcCards.push({ id: 'card-b-off', organizationId: ORG_B, label: 'B off', direction: 'BOTH', chipUid: 'uid-b2', active: false });
+
+            await expect(tap({ cardId: 'card-b-off', deviceToken: 'phone-secret' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+            await expect(tap({ cardId: 'no-such-card', deviceToken: 'phone-secret' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
         });
     });
 });

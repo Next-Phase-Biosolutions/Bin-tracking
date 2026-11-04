@@ -21,6 +21,7 @@ export default function NfcCardsPage() {
 function NfcCards() {
     const utils = trpc.useUtils();
     const list = trpc.nfcCard.list.useQuery(undefined, { staleTime: 10_000 });
+    const tagBase = trpc.nfcCard.tagBaseUrl.useQuery(undefined, { staleTime: Infinity });
     const [label, setLabel] = useState('');
     const [direction, setDirection] = useState<Direction>('BOTH');
     const [chipUid, setChipUid] = useState('');
@@ -83,7 +84,7 @@ function NfcCards() {
                 ) : (
                     <ul className="divide-y divide-edge/40">
                         {cards.map((card) => (
-                            <NfcCardRow key={card.id} card={card} />
+                            <NfcCardRow key={card.id} card={card} tagBase={tagBase.data?.url} />
                         ))}
                     </ul>
                 )}

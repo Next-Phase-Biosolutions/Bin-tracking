@@ -175,13 +175,12 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            attendanceService.facilityStatus — a second occurrence of the line
 #            already listed for summary(); `where: { organizationId: orgId }` is
 #            on the line below, orgId is ctx.orgId, never client input.
-#   [TOKEN]  const card = await prisma.nfcCard.findUnique({ where: { id: cardId } });
-#            and const session = await prisma.deviceSession.findUnique({ in
-#            nfc-tap.service.ts — the PUBLIC phone tap. The card id from the tag
-#            URL and the hashed device cookie are the credentials; the org is READ
-#            FROM the resolved card row, and the device's and the employee's org
-#            must then equal it (else a generic CARD_NOT_FOUND). Nothing the
-#            client sends can choose the org. See the [TOKEN] category above.
+#   [TOKEN]  const session = await prisma.deviceSession.findUnique({ in
+#            nfc-tap.service.ts — the PUBLIC phone tap. The hashed device cookie is
+#            the credential; the org is READ FROM the resolved session row (and must
+#            equal its employee's org), and the card is then looked up SCOPED to that
+#            org, so a missing card and another org's card are the same answer.
+#            Nothing the client sends can choose the org. See [TOKEN] above.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
@@ -237,7 +236,6 @@ apps/api/src/services/form.service.ts	const maxSort = await prisma.formTemplate.
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.create({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.findUnique({ where: { id } });
 apps/api/src/services/form.service.ts	const rows = await prisma.formTemplate.findMany({
-apps/api/src/services/nfc-tap.service.ts	const card = await prisma.nfcCard.findUnique({ where: { id: cardId } });
 apps/api/src/services/nfc-tap.service.ts	const session = await prisma.deviceSession.findUnique({
 apps/api/src/services/payroll.service.ts	const existing = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({

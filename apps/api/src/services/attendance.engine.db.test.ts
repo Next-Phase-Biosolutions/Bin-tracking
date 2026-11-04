@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bin-tracker/db';
 import { cleanupOrg, dbTestsEnabled, seedCard, seedCrowd, seedDevice, seedEmployee, seedOrg } from '../test-support/db.js';
+import { withLock } from '../lib/with-lock.js';
+import { periodOf } from '../lib/period.js';
 import { attendanceService } from './attendance.service.js';
 import { tap } from './nfc-tap.service.js';
 
@@ -30,6 +32,11 @@ suite('attendance engine (real Postgres)', () => {
         const employee = await seedEmployee(org);
         const { token } = await seedDevice(org, employee.id);
         return { employee, token };
+    }
+    async function personWithSession(org = orgId) {
+        const employee = await seedEmployee(org);
+        const { token, session } = await seedDevice(org, employee.id);
+        return { employee, token, session };
     }
     const punch = (cardId: string, token: string, now: Date) => tap({ cardId, deviceToken: token }, now);
     const events = (employeeId: string) => prisma.attendanceEvent.findMany({ where: { employeeId }, orderBy: { scannedAt: 'asc' } });
@@ -136,14 +143,35 @@ suite('attendance engine (real Postgres)', () => {
             expect(echo.result).toMatchObject({ status: 'CHECK_OUT', durationMin: 60, debounced: true });
         });
 
-        it('echoes a rejection while the state is unchanged', async () => {
-            const { token } = await person();
-            const outCard = await seedCard(orgId, 'OUT');
-            await punch(outCard.id, token, at(0));
+        it('does NOT debounce a rejection, so the corrective tap right after a wrong card still works', async () => {
+            const { employee, token } = await person();
+            const [inCard, outCard] = [await seedCard(orgId, 'IN'), await seedCard(orgId, 'OUT')];
+            await punch(inCard.id, token, at(0)); // checks in
 
-            const echo = await punch(outCard.id, token, at(2));
+            const wrong = await punch(inCard.id, token, at(10)); // IN card while already in: refused
+            const right = await punch(outCard.id, token, at(12)); // 2 s later, the OUT card
 
-            expect(echo.result).toMatchObject({ status: 'NOT_CHECKED_IN', debounced: true });
+            expect(wrong.result).toMatchObject({ status: 'ALREADY_CHECKED_IN', debounced: false });
+            expect(right.result).toMatchObject({ status: 'CHECK_OUT', debounced: false }); // not swallowed by an echo
+            expect((await sessions(employee.id))[0]).toMatchObject({ checkOutAt: expect.any(Date) });
+        });
+
+        it('a tap already past its checks when a manager revokes the phone is refused, not recorded', async () => {
+            // Pre-lock checks passed; the revoke lands while the tap waits for the employee lock.
+            const { employee, token, session } = await personWithSession();
+            const both = await seedCard(orgId, 'BOTH');
+            let release!: () => void;
+            const held = withLock(`employee:${employee.id}`, () => new Promise<void>((resolve) => (release = resolve)));
+            await new Promise((r) => setTimeout(r, 20)); // lock is now held
+
+            const inFlight = punch(both.id, token, T0).then((r) => r, (e: unknown) => e);
+            await new Promise((r) => setTimeout(r, 50)); // it has passed the pre-lock checks and is queued
+            await prisma.deviceSession.updateMany({ where: { id: session.id, organizationId: orgId }, data: { revokedAt: new Date() } });
+            release();
+            await held;
+
+            expect(await inFlight).toMatchObject({ appCode: 'SESSION_REVOKED' });
+            expect(await sessions(employee.id)).toHaveLength(0);
         });
     });
 
@@ -385,6 +413,58 @@ suite('attendance engine (real Postgres)', () => {
 
             const ok = await attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: nextStart.toISOString() }, T0);
             expect(ok.durationMin).toBe(18 * 60);
+        });
+
+        it('also checks overlap when approving as-is (the closed time itself may run into the next shift)', async () => {
+            const { employee, session, checkInAt } = await autoClosed(); // closed at checkIn + 16 h
+            await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: new Date(checkInAt.getTime() + hours(10)) } });
+
+            await expect(attendanceService.approveWorkSession(orgId, null, { id: session.id }, T0)).rejects.toMatchObject({ appCode: 'OVERLAPS_NEXT_SESSION' });
+            expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
+        });
+
+        it('refuses to approve a shift longer than 24 hours, and accepts exactly 24', async () => {
+            const { session, checkInAt } = await autoClosed(); // checked in 20 h before T0
+            const later = new Date(T0.getTime() + hours(30)); // "now": late enough that both times below are in the past
+            const tooLong = new Date(checkInAt.getTime() + hours(25));
+            const exactly24 = new Date(checkInAt.getTime() + hours(24));
+
+            await expect(
+                attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: tooLong.toISOString() }, later),
+            ).rejects.toMatchObject({ appCode: 'SHIFT_TOO_LONG' });
+            expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
+            await expect(
+                attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: exactly24.toISOString() }, later),
+            ).resolves.toMatchObject({ durationMin: 24 * 60 });
+        });
+
+        describe('payroll runs that are no longer drafts', () => {
+            const tzPeriod = (d: Date) => periodOf(d, 'America/Toronto');
+
+            it.each(['APPROVED', 'PAID', 'CANCELLED'] as const)('refuses to approve into a %s run, because it could never be paid', async (status) => {
+                const { session, checkInAt } = await autoClosed();
+                await prisma.payrollRun.create({ data: { organizationId: orgId, period: tzPeriod(checkInAt), rateCents: 2000, status } });
+
+                try {
+                    await expect(attendanceService.approveWorkSession(orgId, null, { id: session.id }, T0)).rejects.toMatchObject({ appCode: 'PAYROLL_RUN_FROZEN' });
+                    expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
+                } finally {
+                    await prisma.payrollRun.deleteMany({ where: { organizationId: orgId, period: tzPeriod(checkInAt) } });
+                }
+            });
+
+            it('approves into a DRAFT run, and when no run exists yet', async () => {
+                const a = await autoClosed(new Date('2031-09-10T12:00:00Z'));
+                await prisma.payrollRun.create({ data: { organizationId: orgId, period: tzPeriod(a.checkInAt), rateCents: 2000, status: 'DRAFT' } });
+                const b = await autoClosed(new Date('2031-11-10T12:00:00Z'));
+
+                try {
+                    await expect(attendanceService.approveWorkSession(orgId, null, { id: a.session.id }, T0)).resolves.toMatchObject({ durationMin: 960 });
+                    await expect(attendanceService.approveWorkSession(orgId, null, { id: b.session.id }, T0)).resolves.toMatchObject({ durationMin: 960 });
+                } finally {
+                    await prisma.payrollRun.deleteMany({ where: { organizationId: orgId } });
+                }
+            });
         });
 
         it("another organization's session is indistinguishable from a missing one", async () => {

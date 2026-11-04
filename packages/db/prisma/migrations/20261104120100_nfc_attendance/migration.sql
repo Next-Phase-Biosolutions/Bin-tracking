@@ -39,6 +39,8 @@ CREATE TABLE "registration_tokens" (
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "usedAt" TIMESTAMP(3),
     "supersededAt" TIMESTAMP(3),
+    "pendingHash" TEXT,
+    "pendingExpiresAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "registration_tokens_pkey" PRIMARY KEY ("id")
@@ -66,6 +68,9 @@ CREATE UNIQUE INDEX "nfc_cards_organizationId_chipUid_key" ON "nfc_cards"("organ
 
 -- CreateIndex
 CREATE UNIQUE INDEX "registration_tokens_tokenHash_key" ON "registration_tokens"("tokenHash");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "registration_tokens_pendingHash_key" ON "registration_tokens"("pendingHash");
 
 -- CreateIndex
 CREATE INDEX "registration_tokens_employeeId_idx" ON "registration_tokens"("employeeId");

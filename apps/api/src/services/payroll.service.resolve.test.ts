@@ -214,3 +214,20 @@ describe('payrollService.resolveException — FIX_CHECKOUT overlap guard', () =>
         ).resolves.toMatchObject({ resolved: true });
     });
 });
+
+describe('payrollService.resolveException — FIX_CHECKOUT time bounds', () => {
+    it('rejects a check-out in the future and changes nothing', async () => {
+        seed();
+
+        await expect(
+            payrollService.resolveException(ORG_A, {
+                exceptionId: 'ex-1',
+                action: 'FIX_CHECKOUT',
+                checkOutAt: new Date(Date.now() + 3_600_000).toISOString(),
+            }),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('future') });
+
+        expect(store.sessions[0]?.checkOutAt).toBeNull();
+        expect(store.exceptions[0]?.resolved).toBe(false);
+    });
+});

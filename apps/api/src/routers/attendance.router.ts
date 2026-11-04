@@ -9,7 +9,6 @@ import {
 import { attendanceService } from '../services/attendance.service.js';
 import { tap } from '../services/nfc-tap.service.js';
 import { TERMINAL_TOKEN_ERRORS } from '../services/device-registration.service.js';
-import { tapRateLimit } from '../trpc/rate-limit.js';
 import { AppError } from '../lib/app-error.js';
 import {
     DEVICE_COOKIE,
@@ -51,22 +50,23 @@ export const attendanceRouter = router({
 
     /**
      * Employee: a phone tapped a wall-mounted NFC card. NOT behind a user JWT —
-     * the phone authenticates with its device cookie (a hashed DeviceSession),
-     * and the organization is read from the card, never from client input. With
-     * a pending-registration cookie present the same tap completes registration.
+     * the phone authenticates with its device cookie (a hashed DeviceSession).
+     * The caller is identified first and the card must belong to that caller's
+     * organization; nothing in the request chooses it. With a pending-registration
+     * cookie present the same tap completes registration. Rate-limited per
+     * registered phone inside the service, after the cookie is validated.
      */
     tap: publicProcedure
-        .use(tapRateLimit())
         .input(nfcTapSchema)
         .mutation(async ({ input, ctx }) => {
             assertTrustedOrigin(ctx.req);
             const deviceToken = readCookie(ctx.req, DEVICE_COOKIE);
-            const pendingHash = readCookie(ctx.req, PENDING_COOKIE);
+            const pendingSecret = readCookie(ctx.req, PENDING_COOKIE);
             try {
                 const { result, newDeviceToken } = await tap({
                     cardId: input.cardId,
                     deviceToken,
-                    pendingHash,
+                    pendingSecret,
                     userAgent: ctx.req.headers['user-agent'],
                 });
                 if (newDeviceToken) {
@@ -76,7 +76,7 @@ export const attendanceRouter = router({
                 return result;
             } catch (e) {
                 // A dead registration link must not keep a stale pending cookie around.
-                if (pendingHash && e instanceof AppError && TERMINAL_TOKEN_ERRORS.has(e.appCode)) {
+                if (pendingSecret && e instanceof AppError && TERMINAL_TOKEN_ERRORS.has(e.appCode)) {
                     clearCookie(ctx.res, PENDING_COOKIE);
                 }
                 throw e;

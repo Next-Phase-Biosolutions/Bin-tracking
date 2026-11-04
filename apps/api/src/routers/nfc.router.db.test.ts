@@ -120,21 +120,69 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
     });
 
     describe('opening the link (deviceRegistration.start)', () => {
-        it('sets only the short-lived pending cookie, with strict attributes', async () => {
+        it('sets only the short-lived pending cookie: a fresh random secret, never a value taken from the database', async () => {
             const employee = await seedEmployee(orgId);
-            const { token } = await issueLink(employee.id);
+            const { token, row } = await issueLink(employee.id);
             const browser = phone();
 
             await browser.api().deviceRegistration.start({ token });
 
             expect(browser.set).toHaveLength(1);
-            expect(browser.set[0]).toMatchObject({
-                name: 'bt_pending_reg',
-                value: hashToken(token),
-                options: { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 600 },
-            });
+            const [cookie] = browser.set;
+            expect(cookie).toMatchObject({ name: 'bt_pending_reg', options: { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 600 } });
+            expect(cookie!.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+            // Not the raw token, and not anything stored in the table: a database read yields no usable cookie.
+            expect(cookie!.value).not.toBe(token);
+            expect(cookie!.value).not.toBe(row.tokenHash);
+            const stored = await prisma.registrationToken.findUniqueOrThrow({ where: { id: row.id } });
+            expect(stored.pendingHash).toBe(hashToken(cookie!.value));
+            expect(stored.pendingHash).not.toBe(cookie!.value);
+            expect(stored.pendingExpiresAt!.getTime() - Date.now()).toBeGreaterThan(9 * 60_000);
             expect(browser.jar.has('bt_device')).toBe(false);
             expect(await prisma.deviceSession.count({ where: { employeeId: employee.id } })).toBe(0);
+        });
+
+        it('values read from the database cannot be used as the pending cookie (no impersonation from a DB dump)', async () => {
+            const employee = await seedEmployee(orgId);
+            const card = await seedCard(orgId, 'BOTH');
+            const { token, row } = await issueLink(employee.id);
+            await phone().api().deviceRegistration.start({ token });
+            const stored = await prisma.registrationToken.findUniqueOrThrow({ where: { id: row.id } });
+
+            for (const fromDb of [row.tokenHash, stored.pendingHash!]) {
+                const attacker = phone();
+                attacker.jar.set('bt_pending_reg', fromDb);
+                await expect(attacker.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'TOKEN_NOT_FOUND' });
+            }
+            expect(await prisma.deviceSession.count({ where: { employeeId: employee.id } })).toBe(0);
+        });
+
+        it('opening the link in a second browser replaces the first browser\'s pending secret', async () => {
+            const employee = await seedEmployee(orgId);
+            const card = await seedCard(orgId, 'BOTH');
+            const { token } = await issueLink(employee.id);
+            const first = phone();
+            const second = phone();
+            await first.api().deviceRegistration.start({ token });
+            await second.api().deviceRegistration.start({ token });
+
+            await expect(first.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'TOKEN_NOT_FOUND' });
+            await expect(second.api().attendance.tap({ cardId: card.id })).resolves.toMatchObject({ status: 'REGISTRATION_COMPLETE' });
+        });
+
+        it('a pending secret expires after 10 minutes even though the link itself is still valid', async () => {
+            const employee = await seedEmployee(orgId);
+            const card = await seedCard(orgId, 'BOTH');
+            const { token, row } = await issueLink(employee.id);
+            const browser = phone();
+            await browser.api().deviceRegistration.start({ token });
+            await prisma.registrationToken.update({ where: { id: row.id }, data: { pendingExpiresAt: new Date(Date.now() - 1000) } });
+
+            await expect(browser.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'TOKEN_EXPIRED' });
+            expect(browser.cleared).toContain('bt_pending_reg');
+            // opening the (still valid) link again starts a new 10 minutes
+            await browser.api().deviceRegistration.start({ token });
+            await expect(browser.api().attendance.tap({ cardId: card.id })).resolves.toMatchObject({ status: 'REGISTRATION_COMPLETE' });
         });
 
         it('reports errors in order: used beats expired, superseded beats expired, then expired, then unknown', async () => {
@@ -162,12 +210,12 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             await expect(phone().api().deviceRegistration.start({ token: 'ab\u0000cd' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
         });
 
-        it('throttles guessing: the 21st attempt from one IP in an hour is TOO_MANY_REQUESTS', async () => {
+        it('bounds repeated attempts from one address: the 201st in an hour is TOO_MANY_REQUESTS', async () => {
             const browser = phone();
-            const attempts = [];
-            for (let i = 0; i < 22; i++) attempts.push(await browser.api().deviceRegistration.start({ token: `guess-${i}` }).catch((e: { code: string }) => e.code));
-            expect(attempts.slice(0, 20).every((c) => c === 'NOT_FOUND')).toBe(true);
-            expect(attempts.slice(20)).toEqual(['TOO_MANY_REQUESTS', 'TOO_MANY_REQUESTS']);
+            const codes: string[] = [];
+            for (let i = 0; i < 202; i++) codes.push(await browser.api().deviceRegistration.start({ token: `guess-${i}` }).then(() => 'ok', (e: { code: string }) => e.code));
+            expect(codes.slice(0, 200).every((c) => c === 'NOT_FOUND')).toBe(true);
+            expect(codes.slice(200)).toEqual(['TOO_MANY_REQUESTS', 'TOO_MANY_REQUESTS']);
         });
     });
 
@@ -216,11 +264,12 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             const { token } = await issueLink(employee.id);
             const browser = phone();
             await browser.api().deviceRegistration.start({ token });
+            const pendingSecret = browser.jar.get('bt_pending_reg');
 
             await expect(browser.api().attendance.tap({ cardId: dead.id })).rejects.toMatchObject({ appCode: 'CARD_INACTIVE' });
             await expect(browser.api().attendance.tap({ cardId: 'no-such-card' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
 
-            expect(browser.jar.get('bt_pending_reg')).toBe(hashToken(token));
+            expect(browser.jar.get('bt_pending_reg')).toBe(pendingSecret);
             expect(await prisma.deviceSession.count({ where: { employeeId: employee.id } })).toBe(0);
             await expect(browser.api().attendance.tap({ cardId: good.id })).resolves.toMatchObject({ status: 'REGISTRATION_COMPLETE' });
         });
@@ -244,10 +293,11 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             const { token } = await issueLink(employee.id);
             const first = phone();
             await first.api().deviceRegistration.start({ token });
+            const stolenSecret = first.jar.get('bt_pending_reg')!; // what a shoulder-surfer / old backup might hold
             await first.api().attendance.tap({ cardId: card.id });
 
             const thief = phone();
-            thief.jar.set('bt_pending_reg', hashToken(token));
+            thief.jar.set('bt_pending_reg', stolenSecret);
             await expect(thief.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'TOKEN_ALREADY_USED' });
 
             expect(thief.cleared).toContain('bt_pending_reg');
@@ -270,7 +320,7 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
 
         it('forged pending cookies are "not found", never a 500', async () => {
             const card = await seedCard(orgId, 'IN');
-            for (const forged of ['\u0000', 'x'.repeat(64), 'A'.repeat(64), '%00', "' OR 1=1 --", 'a'.repeat(5000)]) {
+            for (const forged of ['\u0000', 'x'.repeat(64), 'A'.repeat(64), '%00', "' OR 1=1 --", 'a'.repeat(5000), 'Z'.repeat(43)]) {
                 const browser = phone();
                 browser.jar.set('bt_pending_reg', forged);
                 await expect(browser.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'TOKEN_NOT_FOUND' });
@@ -316,6 +366,43 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
 
             expect(await prisma.workSession.count({ where: { employeeId: employee.id } })).toBe(0);
             expect(await prisma.attendanceEvent.count({ where: { employeeId: employee.id } })).toBe(0);
+        });
+
+        it('does not reveal whether a card exists to a caller who is not a registered phone', async () => {
+            const realCard = await seedCard(orgId, 'BOTH');
+            const answers = new Set<string>();
+            for (const cardId of [realCard.id, 'no-such-card', 'c'.repeat(36)]) {
+                const junk = phone();
+                junk.jar.set('bt_device', 'any-old-cookie');
+                answers.add(await junk.api().attendance.tap({ cardId }).then(() => 'ok', (e: { appCode?: string }) => e.appCode ?? 'other'));
+            }
+            expect([...answers]).toEqual(['SESSION_NOT_FOUND']); // identical whether or not the card is real
+        });
+
+        it("another organization's card looks exactly like a missing one, even when it is inactive or its module is off", async () => {
+            const employee = await seedEmployee(orgId);
+            const { token } = await seedDevice(orgId, employee.id);
+            const offOrg = (await seedOrg('oracle-off', { workforce: false })).id;
+            created.push(offOrg);
+            const inactiveCard = await seedCard(otherOrgId, 'BOTH', { active: false });
+            const moduleOffCard = await seedCard(offOrg, 'BOTH');
+
+            for (const cardId of [inactiveCard.id, moduleOffCard.id, 'no-such-card']) {
+                const browser = phone();
+                browser.jar.set('bt_device', token);
+                await expect(browser.api().attendance.tap({ cardId })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND', code: 'NOT_FOUND' });
+            }
+        });
+
+        it("a pending registration cannot be completed on another organization's inactive card (and learns nothing about it)", async () => {
+            const employee = await seedEmployee(orgId);
+            const foreignInactive = await seedCard(otherOrgId, 'BOTH', { active: false });
+            const { token } = await issueLink(employee.id);
+            const browser = phone();
+            await browser.api().deviceRegistration.start({ token });
+
+            await expect(browser.api().attendance.tap({ cardId: foreignInactive.id })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+            expect(browser.jar.has('bt_pending_reg')).toBe(true); // a card problem leaves the registration alone
         });
 
         it('an organization without the WORKFORCE module cannot take taps', async () => {
@@ -436,6 +523,21 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
     });
 
     describe('NFC card management', () => {
+        it('gives each card a random UUID id (it ends up in the tag URL), not a time-ordered cuid', async () => {
+            const org = (await seedOrg('card-ids')).id;
+            created.push(org);
+            const a = await manager(org).nfcCard.create({ label: 'A', direction: 'IN', chipUid: 'id-a' });
+            const b = await manager(org).nfcCard.create({ label: 'B', direction: 'IN', chipUid: 'id-b' });
+
+            expect(a.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+            expect(a.id).not.toBe(b.id);
+        });
+
+        it('tells the admin which origin to write into tag URLs: the server APP_URL, with no trailing slash', async () => {
+            const { url } = await manager(orgId).nfcCard.tagBaseUrl();
+            expect(url).toBe((process.env['APP_URL'] ?? 'http://localhost:3000').replace(/\/$/, ''));
+        });
+
         it('creates, lists (by label), edits partially, toggles and deletes', async () => {
             const org = (await seedOrg('cards')).id;
             created.push(org);

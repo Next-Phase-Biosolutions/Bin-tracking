@@ -21,6 +21,7 @@ function caller(orgRole: UserRole | null, orgId: string | null = 'org-1'): Api {
 
 const adminProcedures: Record<string, (api: Api) => Promise<unknown>> = {
     'nfcCard.list': (api) => api.nfcCard.list(),
+    'nfcCard.tagBaseUrl': (api) => api.nfcCard.tagBaseUrl(),
     'nfcCard.create': (api) => api.nfcCard.create({ label: 'Door', direction: 'IN', chipUid: '04AA' }),
     'nfcCard.update': (api) => api.nfcCard.update({ id: 'c1', label: 'x' }),
     'nfcCard.setActive': (api) => api.nfcCard.setActive({ id: 'c1', active: false }),

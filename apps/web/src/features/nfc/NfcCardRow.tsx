@@ -13,7 +13,7 @@ const smallButton =
     'rounded-lg border border-edge bg-white px-2.5 py-1 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-olive-deep transition-colors hover:border-rust hover:bg-rust/5 hover:text-rust disabled:opacity-40';
 
 /** One card: its tag URL (with copy), active toggle, edit and delete. */
-export function NfcCardRow({ card }: { card: NfcCard }) {
+export function NfcCardRow({ card, tagBase }: { card: NfcCard; tagBase: string | undefined }) {
     const utils = trpc.useUtils();
     const [editing, setEditing] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
@@ -54,7 +54,8 @@ export function NfcCardRow({ card }: { card: NfcCard }) {
             </div>
 
             <div className="mt-3">
-                <CopyField value={tagUrl(card.id)} label={`Tag URL for ${card.label}`} />
+                {/* Never show a URL built from a guessed origin: wait for the server's. */}
+                {tagBase ? <CopyField value={tagUrl(card.id, tagBase)} label={`Tag URL for ${card.label}`} /> : <p className="text-xs text-muted">Loading tag URL…</p>}
             </div>
             {!card.active && <p className="mt-2 text-xs text-muted">Inactive: a tap on this tag is refused. Tags already written still carry the same URL.</p>}
             {error && <p role="alert" className="mt-2 text-sm text-rust">{describeAdminError(error)}</p>}

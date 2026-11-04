@@ -14,6 +14,7 @@ import { registerStripeWebhook } from './routes/stripe-webhook.js';
 import { registerSensorIngest } from './routes/sensor-ingest.js';
 import { initSentry, captureError } from './lib/sentry.js';
 import { validateEnv } from './lib/env.js';
+import { clientIp } from './lib/client-ip.js';
 
 // Fail fast on a misconfigured production environment — before Sentry init,
 // before the server binds. No-op outside production (lib/env.ts).
@@ -58,6 +59,8 @@ async function buildServer() {
         // RATE_LIMIT_MAX raises the per-IP ceiling when the API sits behind a
         // proxy that collapses many clients onto few IPs (see docs/nfc-attendance).
         max: Number(process.env['RATE_LIMIT_MAX'] ?? 100),
+        // req.ip is the proxy for everyone unless CLIENT_IP_HEADER is set (lib/client-ip.ts).
+        keyGenerator: (request) => clientIp(request),
         timeWindow: '1 minute',
     });
 

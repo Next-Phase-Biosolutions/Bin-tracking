@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { prisma } from '@bin-tracker/db';
 import type { CreateNfcCardInput, UpdateNfcCardInput, SetNfcCardActiveInput } from '@bin-tracker/validators';
 import { AppError, isPrismaError } from '../lib/app-error.js';
@@ -14,7 +15,8 @@ export const nfcCardService = {
 
     async create(orgId: string, input: CreateNfcCardInput) {
         try {
-            return await prisma.nfcCard.create({ data: { organizationId: orgId, ...input } });
+            // The id goes into the tag URL, so it is a random UUID rather than a time-ordered cuid.
+            return await prisma.nfcCard.create({ data: { id: randomUUID(), organizationId: orgId, ...input } });
         } catch (e) {
             if (isPrismaError(e, 'P2002')) throw new AppError('DUPLICATE_CHIP_UID', 'CONFLICT', 'A card with this chip UID already exists');
             throw e;

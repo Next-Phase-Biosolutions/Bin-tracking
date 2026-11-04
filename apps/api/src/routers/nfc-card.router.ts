@@ -11,6 +11,14 @@ import { nfcCardService } from '../services/nfc-card.service.js';
 const cardAdmin = orgOpsProcedure.use(requireModule('WORKFORCE'));
 
 export const nfcCardRouter = router({
+    /**
+     * The origin to write into tag URLs: the server's APP_URL, the same origin registration
+     * links use and the one cookie-authenticated calls are required to come from. The admin's
+     * own browser origin (www, a Netlify preview) may differ, and a tag written with it would
+     * never work.
+     */
+    tagBaseUrl: cardAdmin.query(() => ({ url: (process.env['APP_URL'] ?? 'http://localhost:3000').replace(/\/$/, '') })),
+
     list: cardAdmin.query(({ ctx }) => nfcCardService.list(ctx.orgId)),
     create: cardAdmin.input(createNfcCardSchema).mutation(({ input, ctx }) => nfcCardService.create(ctx.orgId, input)),
     update: cardAdmin.input(updateNfcCardSchema).mutation(({ input, ctx }) => nfcCardService.update(ctx.orgId, input)),

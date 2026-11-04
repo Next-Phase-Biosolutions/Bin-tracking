@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { apiError, gatewayError, renderAt } from '../../test/render';
 
@@ -116,13 +116,62 @@ describe('TapPage', () => {
         expect(tapMutate).toHaveBeenCalledTimes(3);
     });
 
-    it('gives up after 3 retries (4 attempts) with a generic message', async () => {
+    it('gives up after 3 retries (4 attempts) and says it could not CONFIRM the tap, rather than claiming a failure', async () => {
         tapMutate.mockRejectedValue(gatewayError());
 
         tapPage();
 
-        expect((await screen.findByRole('alert')).textContent).toContain('Something went wrong');
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('Couldn’t confirm your tap');
+        expect(alert.textContent).toContain('tap the card again');
         expect(tapMutate).toHaveBeenCalledTimes(4);
+    });
+
+    describe('a retry can never record a second punch', () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        /** Makes Date.now() jump by `stepMs` per call, so the page sees time pass without real waiting. */
+        function advanceClock(stepMs: number) {
+            let now = 1_000_000;
+            vi.spyOn(Date, 'now').mockImplementation(() => (now += stepMs));
+        }
+
+        it('does NOT repeat an ambiguous failure once it is past the debounce-safe window (the tap may have been recorded)', async () => {
+            advanceClock(5_000); // by the time attempt 1 fails, 5 s have passed: a repeat could be a real second tap
+            tapMutate.mockRejectedValue(gatewayError());
+
+            tapPage();
+
+            expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t confirm your tap');
+            expect(tapMutate).toHaveBeenCalledTimes(1);
+        });
+
+        it('still repeats an HTTP 429 however late it is, because nothing was recorded', async () => {
+            advanceClock(5_000);
+            tapMutate.mockRejectedValue(apiError('SERVER_BUSY', 429));
+
+            tapPage();
+
+            expect((await screen.findByRole('alert')).textContent).toContain('The system is busy');
+            expect(tapMutate).toHaveBeenCalledTimes(4);
+        });
+
+        it('says so plainly when one phone taps too often', async () => {
+            tapMutate.mockRejectedValue(apiError('TOO_MANY_TAPS', 429));
+
+            tapPage();
+
+            expect((await screen.findByRole('alert')).textContent).toContain('Too many taps');
+        });
+    });
+
+    it('keeps <main> as the page landmark, with the status inside it', async () => {
+        tapMutate.mockResolvedValue({ status: 'CHECK_IN', at, employeeName: 'Jane', debounced: false });
+
+        tapPage();
+
+        const status = await screen.findByRole('status');
+        expect(screen.getByRole('main').contains(status)).toBe(true);
     });
 
     it('tells the employee the system is busy when the server stays overloaded', async () => {

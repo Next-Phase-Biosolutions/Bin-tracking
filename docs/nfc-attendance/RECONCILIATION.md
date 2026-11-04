@@ -108,3 +108,25 @@ Two, in order: (1) the isolated `ALTER TYPE "AttendanceEventType" ADD VALUE` sta
 - Whether **production** has employees with more than one open session (the migration handles it, but run `SELECT "employeeId", count(*) FROM work_sessions WHERE "checkOutAt" IS NULL GROUP BY 1 HAVING count(*) > 1` read-only first).
 - Netlify's actual environment variables (`VITE_API_URL` etc.) are not in the repo.
 - Physical tag writing and phone testing are out of scope; the checklist ships in the docs section.
+
+## 12. Changes after independent review
+
+Two independent reviews (security, correctness) of the finished branch led to these changes to the design above. Where this section and an earlier one disagree, this section wins.
+
+| Area | Was | Now |
+|---|---|---|
+| Pending-registration cookie | the stored token hash (so a database dump yielded a working credential) | a fresh random secret per browser; only its hash is stored (`registration_tokens.pendingHash`, `pendingExpiresAt`). Deviation from the prompt's "validate the pending cookie as a SHA-256 hex digest": it is validated by its 43-character base64url shape instead. |
+| Tap lookup order | card first, then caller | caller first (device session / pending registration), then the card **scoped to the caller's organization**. Removes a card-existence oracle and a cross-org state leak. |
+| Tap rate limit | per cookie string, before validation | per `DeviceSession` id, after validation. |
+| Retry on the tap page | 3 retries on any transient error | HTTP 429 always safe to repeat; any other transient failure only within 3 s of the first attempt (otherwise "couldn't confirm your tap"). The earlier claim that every retry stays inside the 5 s debounce window was wrong. |
+| Debounce | also echoed a refused tap | refused taps are not debounced, so the correct card tapped just after a wrong one works. |
+| In-flight revoke | checked before the lock only | re-checked inside the employee lock. |
+| Approval | no overlap check as-is, no cap, no payroll-run check | overlap checked always; shift capped at 24 h; refused if the month's run is not a DRAFT. |
+| `FIX_CHECKOUT` | no future-time check | rejects a check-out in the future. |
+| Registration rate limit | 20/hour per address | 200/hour per address, and every limiter uses `CLIENT_IP_HEADER` when configured. |
+| Tag URL origin | admin's browser origin | server `APP_URL` (`nfcCard.tagBaseUrl`). |
+| Card ids | cuid | random UUID. |
+| Limiter memory | unbounded | expired keys swept above 10,000. |
+
+Not changed on purpose, with reasons in [README.md](./README.md): `__Host-` cookie prefixes, the lost-response-on-registration case, reload re-tapping, timesheet counting capped shifts, and `trustProxy` (needs the real proxy chain).
+

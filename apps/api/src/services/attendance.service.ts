@@ -12,8 +12,12 @@ import type {
 } from '@bin-tracker/types';
 import { TRPCError } from '@trpc/server';
 import { AppError } from '../lib/app-error.js';
+import { periodOf } from '../lib/period.js';
 import { withLock } from '../lib/with-lock.js';
 import { MAX_SHIFT_MS, closeIfStale, punchInTx, type PunchResult } from './attendance-punch.js';
+
+/** An approved shift longer than this is almost certainly a typo, not a real shift. */
+const MAX_APPROVED_SHIFT_MS = 24 * 60 * 60 * 1000;
 
 function diffMinutes(start: Date, end: Date): number {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60_000));
@@ -282,15 +286,35 @@ export const attendanceService = {
             if (!session.autoClosed) throw new AppError('NOT_AUTO_CLOSED', 'BAD_REQUEST');
             if (session.approvedAt) throw new AppError('ALREADY_APPROVED', 'CONFLICT');
 
+            // Approving adds hours to a payroll period. If that period's run has already
+            // left DRAFT it can never be recomputed (computeRun refuses), so the hours
+            // would silently never be paid. Refuse, so the manager knows to handle it.
+            const settings = await tx.settings.findUnique({ where: { organizationId: orgId }, select: { companyTimezone: true } });
+            const period = periodOf(session.checkInAt, settings?.companyTimezone ?? 'UTC');
+            const run = await tx.payrollRun.findUnique({ where: { organizationId_period: { organizationId: orgId, period } }, select: { status: true } });
+            if (run && run.status !== 'DRAFT') {
+                throw new AppError('PAYROLL_RUN_FROZEN', 'CONFLICT', `Payroll for ${period} is already ${run.status}, so these hours cannot be added to it.`);
+            }
+
             const data: Prisma.WorkSessionUpdateInput = { approvedAt: now };
+            let checkOutAt = session.checkOutAt;
             if (input.checkOutAt) {
-                const checkOutAt = new Date(input.checkOutAt);
+                checkOutAt = new Date(input.checkOutAt);
                 if (checkOutAt.getTime() <= session.checkInAt.getTime() || checkOutAt.getTime() > now.getTime()) {
                     throw new AppError('INVALID_CHECK_OUT', 'BAD_REQUEST', 'Check-out must be after check-in and not in the future');
                 }
-                // Real overtime must not run into the employee's NEXT shift (open or
-                // closed) or those minutes would be paid twice. Ending exactly when
-                // the next shift begins is fine.
+                if (checkOutAt.getTime() - session.checkInAt.getTime() > MAX_APPROVED_SHIFT_MS) {
+                    throw new AppError('SHIFT_TOO_LONG', 'BAD_REQUEST', 'A shift longer than 24 hours cannot be approved');
+                }
+                data.checkOutAt = checkOutAt;
+                data.durationMin = diffMinutes(session.checkInAt, checkOutAt);
+            }
+
+            // The (possibly unchanged) check-out must not run into the employee's NEXT shift,
+            // open or closed, or those minutes would be paid twice. Ending exactly when the next
+            // shift begins is fine. Checked on the as-is path too: it is not only the manager's
+            // typed time that can overlap (e.g. older duplicates closed by the migration).
+            if (checkOutAt) {
                 const next = await tx.workSession.findFirst({
                     where: { employeeId: session.employeeId, checkInAt: { gt: session.checkInAt } },
                     orderBy: { checkInAt: 'asc' },
@@ -299,8 +323,6 @@ export const attendanceService = {
                 if (next && checkOutAt.getTime() > next.checkInAt.getTime()) {
                     throw new AppError('OVERLAPS_NEXT_SESSION', 'BAD_REQUEST', "Check-out overlaps the employee's next shift");
                 }
-                data.checkOutAt = checkOutAt;
-                data.durationMin = diffMinutes(session.checkInAt, checkOutAt);
             }
 
             const updated = await tx.workSession.update({ where: { id: session.id }, data });

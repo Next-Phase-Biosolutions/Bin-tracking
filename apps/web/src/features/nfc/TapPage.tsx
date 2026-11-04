@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { phoneClient } from '../../lib/phone-client';
 import { InAppBrowserBanner } from './InAppBrowserBanner';
-import { TAP_ERRORS, appCodeOf, isTransientError } from './errors';
+import { TAP_ERRORS, appCodeOf, isOverloadError, isTransientError } from './errors';
 import { toTapView, type TapView } from './tap-view';
 
 type View =
@@ -12,13 +12,19 @@ type View =
     | { kind: 'error'; title: string; detail: string };
 
 /**
- * Up to 3 retries on a transient failure (network drop, gateway error, HTTP 429
- * "busy"). Every attempt falls inside the server's 5 s debounce window, so if a
- * response was lost AFTER the tap was recorded, the retry is answered with an
- * echo of that tap and can never toggle a BOTH card a second time.
+ * Retry rules, chosen so a retry can never record a second punch:
+ *  - HTTP 429 (rate limit, SERVER_BUSY) is raised before anything is recorded, so it is
+ *    always safe to repeat, up to MAX_RETRIES times.
+ *  - Any other transient failure (dropped network, gateway error) is AMBIGUOUS: the tap
+ *    may have been recorded and only the response lost. Repeating it is safe only if the
+ *    server will read it as a double-tap, i.e. it lands inside its 5 s debounce window of
+ *    the first attempt (which was recorded no earlier than it was sent). So ambiguous
+ *    failures are retried only within AMBIGUOUS_RETRY_WINDOW_MS of the first attempt;
+ *    after that the employee is told to check and tap again themselves.
  */
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1200;
+const AMBIGUOUS_RETRY_WINDOW_MS = 3000;
 
 const TONE: Record<TapView['tone'] | 'loading' | 'error', string> = {
     loading: 'bg-canvas text-olive-deep',
@@ -46,18 +52,22 @@ export default function TapPage({ retryDelayMs = RETRY_DELAY_MS }: { retryDelayM
             return;
         }
         void (async () => {
+            const startedAt = Date.now();
             for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
                 try {
                     const result = await phoneClient.attendance.tap.mutate({ cardId });
                     setView({ kind: 'result', view: toTapView(result) });
                     return;
                 } catch (e) {
-                    if (isTransientError(e) && attempt < MAX_RETRIES) {
+                    const overloaded = isOverloadError(e);
+                    const safeToRepeat = overloaded || (isTransientError(e) && Date.now() - startedAt < AMBIGUOUS_RETRY_WINDOW_MS);
+                    if (safeToRepeat && attempt < MAX_RETRIES) {
                         setView({ kind: 'waking' });
                         await sleep(retryDelayMs);
                         continue;
                     }
-                    const known = TAP_ERRORS[appCodeOf(e) ?? ''];
+                    const code = appCodeOf(e) ?? (isTransientError(e) && !overloaded ? 'UNCONFIRMED' : '');
+                    const known = TAP_ERRORS[code];
                     setView({
                         kind: 'error',
                         title: known?.title ?? 'Something went wrong',
@@ -107,9 +117,12 @@ function Screen({
     busy?: boolean;
     children: React.ReactNode;
 }) {
+    // <main> stays the page landmark; the live region (status/alert) is the element inside it.
     return (
-        <main role={role} aria-busy={busy} className={`flex min-h-screen flex-col items-center justify-center gap-3 px-6 py-10 text-center ${TONE[tone]}`}>
-            {children}
+        <main className={`flex min-h-screen flex-col items-center justify-center px-6 py-10 text-center ${TONE[tone]}`}>
+            <div role={role} aria-busy={busy} className="flex flex-col items-center gap-3">
+                {children}
+            </div>
         </main>
     );
 }

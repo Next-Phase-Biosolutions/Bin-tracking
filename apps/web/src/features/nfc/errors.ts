@@ -24,6 +24,16 @@ export function isTransientError(e: unknown): boolean {
     return [408, 429, 502, 503, 504].includes(status);
 }
 
+/**
+ * True when the API answered HTTP 429 (rate limit, or SERVER_BUSY). Those are raised
+ * BEFORE anything is recorded, so repeating the request is always safe. Every other
+ * transient failure (dropped network, gateway error) is ambiguous: the tap may have
+ * been recorded and only the response lost.
+ */
+export function isOverloadError(e: unknown): boolean {
+    return dataOf(e)?.httpStatus === 429;
+}
+
 /** What a phone shows when a tap fails for a final reason. */
 export const TAP_ERRORS: Record<string, { title: string; detail: string }> = {
     NO_SESSION: {
@@ -38,6 +48,11 @@ export const TAP_ERRORS: Record<string, { title: string; detail: string }> = {
     MODULE_DISABLED: { title: 'Attendance is off', detail: 'Attendance isn’t switched on for your organisation. Tell your manager.' },
     BAD_ORIGIN: { title: 'Open the link again', detail: 'Please tap the card again and open it in Chrome or Safari.' },
     SERVER_BUSY: { title: 'The system is busy', detail: 'Lots of people are tapping at once. Wait a moment and tap again.' },
+    TOO_MANY_TAPS: { title: 'Too many taps', detail: 'You’ve tapped a lot in the last minute. Wait a moment and tap again.' },
+    UNCONFIRMED: {
+        title: 'Couldn’t confirm your tap',
+        detail: 'Your connection dropped, so we can’t tell if it was recorded. Check your connection, and if you don’t see a confirmation, tap the card again.',
+    },
     TOKEN_EXPIRED: { title: 'Link expired', detail: 'Your registration link has expired. Ask your manager for a new one.' },
     TOKEN_ALREADY_USED: { title: 'Link already used', detail: 'This registration link was already used. If setup didn’t finish, ask your manager for a new link.' },
     TOKEN_SUPERSEDED: { title: 'Link replaced', detail: 'A newer registration link was sent to you. Please use that one.' },
@@ -64,6 +79,8 @@ const ADMIN_ERRORS: Record<string, string> = {
     ALREADY_APPROVED: 'This shift was already approved.',
     INVALID_CHECK_OUT: 'The check-out time must be after check-in and not in the future.',
     OVERLAPS_NEXT_SESSION: 'That check-out overlaps the employee’s next shift. Choose an earlier time.',
+    SHIFT_TOO_LONG: 'A shift longer than 24 hours cannot be approved. Check the check-out time.',
+    PAYROLL_RUN_FROZEN: 'Payroll for that month is already approved or paid, so these hours cannot be added to it.',
 };
 
 /** A readable message for a failed manager action. */

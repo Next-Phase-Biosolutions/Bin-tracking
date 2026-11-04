@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bin-tracker/db';
 import { cleanupOrg, dbTestsEnabled, seedCard, seedDevice, seedEmployee, seedOrg } from '../test-support/db.js';
+import { periodOf } from '../lib/period.js';
 import { attendanceService } from './attendance.service.js';
 import { payrollService } from './payroll.service.js';
 import { tap } from './nfc-tap.service.js';
@@ -13,11 +14,7 @@ const suite = dbTestsEnabled() ? describe : describe.skip;
 const hours = (h: number) => h * 3_600_000;
 const RATE = 2000; // $20.00/h, the org flat rate from seedOrg
 
-/** The payroll period ('YYYY-MM') a check-in falls in, in the org's company timezone. */
-function periodOf(date: Date, timeZone = 'America/Toronto'): string {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit' }).formatToParts(date);
-    return `${parts.find((p) => p.type === 'year')!.value}-${parts.find((p) => p.type === 'month')!.value}`;
-}
+const periodOf_ = (date: Date) => periodOf(date, 'America/Toronto');
 
 suite('NFC attendance feeding payroll (real Postgres)', () => {
     let orgId: string;
@@ -52,9 +49,9 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const checkIn = new Date(Date.now() - hours(30)); // recent but long closed
         await worked(token, card.id, checkIn, 8 * 60 + 30);
 
-        await payrollService.computeRun(orgId, { period: periodOf(checkIn) });
+        await payrollService.computeRun(orgId, { period: periodOf_(checkIn) });
 
-        const { line, exceptions } = await lineFor(periodOf(checkIn), employee.id);
+        const { line, exceptions } = await lineFor(periodOf_(checkIn), employee.id);
         expect(line).toMatchObject({ minutes: 510, rateCents: RATE, grossCents: Math.round((510 / 60) * RATE) });
         expect(exceptions).toHaveLength(0);
     });
@@ -65,9 +62,9 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const checkIn = new Date(Date.now() - hours(40));
         await worked(token, card.id, checkIn, 120);
 
-        await payrollService.computeRun(orgId, { period: periodOf(checkIn) });
+        await payrollService.computeRun(orgId, { period: periodOf_(checkIn) });
 
-        expect((await lineFor(periodOf(checkIn), employee.id)).line).toMatchObject({ minutes: 120, rateCents: 3000, grossCents: 6000 });
+        expect((await lineFor(periodOf_(checkIn), employee.id)).line).toMatchObject({ minutes: 120, rateCents: 3000, grossCents: 6000 });
     });
 
     it('a forgotten check-out is NOT paid: it is auto-closed lazily and held as an AUTO_CLOSED exception', async () => {
@@ -76,9 +73,9 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const checkIn = new Date(Date.now() - hours(20));
         await tap({ cardId: card.id, deviceToken: token }, checkIn); // checks in; nobody ever taps out
 
-        await payrollService.computeRun(orgId, { period: periodOf(checkIn) });
+        await payrollService.computeRun(orgId, { period: periodOf_(checkIn) });
 
-        const { line, exceptions } = await lineFor(periodOf(checkIn), employee.id);
+        const { line, exceptions } = await lineFor(periodOf_(checkIn), employee.id);
         expect(line).toBeUndefined(); // nothing paid
         expect(exceptions).toMatchObject([{ type: 'AUTO_CLOSED', resolved: false }]); // not NO_CHECKOUT: it was closed at the cap
         expect(await prisma.workSession.findFirstOrThrow({ where: { employeeId: employee.id } })).toMatchObject({ autoClosed: true, durationMin: 960, approvedAt: null });
@@ -90,9 +87,9 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const checkIn = new Date(Date.now() - hours(2));
         await tap({ cardId: card.id, deviceToken: token }, checkIn);
 
-        await payrollService.computeRun(orgId, { period: periodOf(checkIn) });
+        await payrollService.computeRun(orgId, { period: periodOf_(checkIn) });
 
-        const { line, exceptions } = await lineFor(periodOf(checkIn), employee.id);
+        const { line, exceptions } = await lineFor(periodOf_(checkIn), employee.id);
         expect(line).toBeUndefined();
         expect(exceptions).toMatchObject([{ type: 'NO_CHECKOUT' }]);
         expect((await prisma.workSession.findFirstOrThrow({ where: { employeeId: employee.id } })).checkOutAt).toBeNull();
@@ -103,7 +100,7 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const card = await seedCard(orgId, 'BOTH');
         const checkIn = new Date(Date.now() - hours(22));
         await tap({ cardId: card.id, deviceToken: token }, checkIn);
-        const period = periodOf(checkIn);
+        const period = periodOf_(checkIn);
         await payrollService.computeRun(orgId, { period });
         expect((await lineFor(period, employee.id)).exceptions).toHaveLength(1);
 
@@ -121,7 +118,7 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const card = await seedCard(orgId, 'BOTH');
         const checkIn = new Date(Date.now() - hours(28));
         await tap({ cardId: card.id, deviceToken: token }, checkIn);
-        const period = periodOf(checkIn);
+        const period = periodOf_(checkIn);
         await payrollService.computeRun(orgId, { period }); // lazily auto-closes it
 
         const [pending] = (await attendanceService.listPendingApprovals(orgId)).filter((p) => p.employee.id === employee.id);
@@ -141,7 +138,7 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
             const checkIn = new Date(Date.now() - hours(50));
             await worked(mine.token, card.id, checkIn, 60);
 
-            await payrollService.computeRun(orgId, { period: periodOf(checkIn) });
+            await payrollService.computeRun(orgId, { period: periodOf_(checkIn) });
 
             expect(await prisma.workSession.findFirstOrThrow({ where: { employeeId: foreign.id } })).toMatchObject({ checkOutAt: null, autoClosed: false });
         } finally {
@@ -155,7 +152,7 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         const nextIn = new Date(firstIn.getTime() + hours(6));
         const first = await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: firstIn } }); // NO_CHECKOUT
         await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: nextIn, checkOutAt: new Date(nextIn.getTime() + hours(2)), durationMin: 120 } });
-        const period = periodOf(firstIn);
+        const period = periodOf_(firstIn);
         await payrollService.computeRun(orgId, { period });
         const { exceptions } = await lineFor(period, employee.id);
         const exception = exceptions.find((e) => e.sessionId === first.id)!;
@@ -166,5 +163,18 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         await expect(
             payrollService.resolveException(orgId, { exceptionId: exception.id, action: 'FIX_CHECKOUT', checkOutAt: nextIn.toISOString() }),
         ).resolves.toMatchObject({ resolved: true, requiresRecompute: true });
+    });
+
+    it('FIX_CHECKOUT refuses a check-out in the future, which could close a shift that is still running', async () => {
+        const { employee } = await person();
+        const checkIn = new Date(Date.now() - hours(30));
+        const open = await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: checkIn } });
+        const period = periodOf_(checkIn);
+        await payrollService.computeRun(orgId, { period });
+        const exception = (await lineFor(period, employee.id)).exceptions.find((e) => e.sessionId === open.id)!;
+
+        await expect(
+            payrollService.resolveException(orgId, { exceptionId: exception.id, action: 'FIX_CHECKOUT', checkOutAt: new Date(Date.now() + hours(1)).toISOString() }),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('future') });
     });
 });

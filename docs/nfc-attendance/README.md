@@ -46,7 +46,7 @@ A manager can **Revoke** a lost phone from the same dialog; it stops working imm
 
 ## Daily rules
 
-- **Double tap:** a second tap within 5 seconds repeats the previous result and changes nothing.
+- **Double tap:** a second tap within 5 seconds repeats the previous result and changes nothing. A *refused* tap (the wrong card for the current state) is **not** debounced, so tapping the right card a moment later works.
 - **Forgotten check-out:** a shift open 16 hours or more is closed at the 16 h cap on the next tap or payroll run (there is no background job). It is **not paid** until a manager approves it. **Live status** → *Forgotten check-outs* lets them approve it as-is or enter the real check-out time. Re-run payroll afterwards.
 - **Payroll:** an auto-closed, unapproved shift is a payroll exception (`AUTO_CLOSED`); a shift still open is `NO_CHECKOUT`. Approving moves it into pay on the next run.
 - **Live status** refreshes every 5 seconds and lists who is in, who is out, who has been in 16 h or more, and how many active employees have no registered phone. It shows no pay rates.
@@ -71,6 +71,7 @@ Everything is behind the **WORKFORCE** module.
 | `COOKIE_SECURE` | on | `false` allows the phone cookies over plain http for local LAN testing. Ignored in production. |
 | `DB_POOL_MAX` | `10` | Postgres pool size. Raise to match the pooler. |
 | `RATE_LIMIT_MAX` | `100` | Global per-IP requests/minute. See "Rate limits". |
+| `CLIENT_IP_HEADER` | unset | Header holding the real client IP (Netlify: `x-nf-client-connection-ip`). Makes every limiter key on it. **Read "Rate limits" before setting.** |
 
 ## Security notes
 
@@ -80,6 +81,9 @@ What is protected:
 
 - **Identity is the phone, not the request.** The employee and organization come from a hashed `DeviceSession` and the card row; nothing in the request body can choose them. A phone registered in one organization tapping another's card gets "card not recognised" and writes nothing.
 - **Secrets are never stored raw.** The registration token and the device cookie are stored only as SHA-256 hashes. The raw values exist only in the link and in the cookie.
+- **The "mid-registration" cookie is a fresh random secret** minted when the link is opened (its hash is stored on the token, valid 10 minutes). It is never a value taken from the database, so a database dump or backup cannot be turned into a working cookie. Opening the link in a second browser replaces the first browser's secret.
+- **Probing:** a caller is identified first (device session or pending registration) and the card is then looked up *inside that caller's organization*. A missing card and another organization's card give the same answer, and a phone that is not registered learns nothing about whether a card exists. Card ids are random UUIDs.
+- **Revocation is immediate even mid-flight:** the tap re-checks the phone and the employee inside the employee lock, so a tap that was already past its checks when you revoke is still refused.
 - **Cookies:** `httpOnly`, `Secure`, `SameSite=Lax`. Calls that carry them also reject a foreign `Origin` header.
 - **Manager actions** (cards, links, revoke, approvals, live status) require an ADMIN or OPS_MANAGER role and are scoped to that organization. Rates and QR codes never appear in live status.
 - **Input:** NUL bytes are rejected everywhere (a 400, not a database 500); a malformed pending cookie is "not found".
@@ -88,7 +92,20 @@ What is protected:
 
 ### Rate limits
 
-Per phone: 30 taps/minute. Registration links: 20 attempts/hour per IP. The **global** API limit is per IP, and the phone pages reach the API through a Netlify rewrite, so many phones can share Netlify's IP. If a shift start returns HTTP 429, raise `RATE_LIMIT_MAX`. This is unverified in production: measure it on staging.
+- **Per registered phone:** 30 taps/minute, counted after the cookie is validated (a garbage cookie cannot create counters).
+- **Registration links:** 200 opens/hour per address. The link token itself is 256-bit and unguessable, so this only bounds cheap lookups.
+- **Global:** 100 requests/minute per address across the whole API (`RATE_LIMIT_MAX`).
+
+**Known limitation (also true of the rest of the API before NFC): behind Netlify and Caddy the API sees the proxy's address for everyone**, so "per address" becomes one bucket shared by the whole company, and any anonymous caller who sends more than the global limit locks everyone out for a minute. The phone pages make this more visible because every tap goes through the Netlify rewrite.
+
+To fix it properly, once and on the real deployment:
+
+1. On staging, send a request through `https://<site>/trpc/…` and look at which headers reach the API (log them, or use a tiny echo route) to confirm Netlify's `x-nf-client-connection-ip` arrives intact.
+2. Confirm the API cannot be reached by a spoofer who sets that header, or accept that it can (a caller who spoofs the header only chooses their own bucket; they can already reach the API directly).
+3. Set `CLIENT_IP_HEADER=x-nf-client-connection-ip` on the API. Every limiter then keys on the real client address.
+4. Until then, raise `RATE_LIMIT_MAX` (e.g. 600) so a shift start does not hit the shared bucket, and treat it as a stopgap.
+
+I could not verify any of this from outside the deployment, which is why `CLIENT_IP_HEADER` is off by default.
 
 ## Deployment notes
 
@@ -97,6 +114,7 @@ Per phone: 30 taps/minute. Registration links: 20 attempts/hour per IP. The **gl
   ```sql
   SELECT "employeeId", count(*) FROM work_sessions WHERE "checkOutAt" IS NULL GROUP BY 1 HAVING count(*) > 1;
   ```
+- **Approving into a frozen month is refused.** Approving a forgotten check-out adds hours to the payroll period it falls in; if that month's run is already APPROVED, PAID or CANCELLED it can never be recomputed, so the approval is refused with a clear message rather than silently never paying. An approved shift is also capped at 24 hours.
 - `prisma migrate dev` will propose **dropping** the `work_sessions_one_open_per_employee` index (Prisma cannot model partial indexes). Delete that line from any generated migration.
 
 ## Physical test checklist
@@ -128,7 +146,20 @@ Failure cases
 - [ ] Check in, leave it open overnight (or backdate in a test org), tap: the old shift appears under *Forgotten check-outs*; approve it; re-run payroll and confirm it is paid.
 - [ ] Shift start: have 10+ people tap within seconds; watch for HTTP 429 in the browser network tab.
 
+Rate limits (see "Rate limits" above)
+- [ ] With the Netlify rewrite live, check which client-IP header reaches the API, then decide on `CLIENT_IP_HEADER` / `RATE_LIMIT_MAX`.
+
 Things to record, because they could not be verified from here: whether the cookie survives a week on iPhone Safari through the Netlify rewrite, and what client IP the API sees.
+
+## Known limitations
+
+- **A tap is not proof of presence** (see above).
+- **A lost response on the very first (registration) tap strands the phone:** the link is used but the phone never received its cookie. The page says "Link already used"; issue a new link. The tap page never repeats an ambiguous failure after 3 seconds, to avoid recording a second punch, so this is rare.
+- **Reloading `/app/tap`, or the browser restoring a discarded tab, taps again.** The 5-second debounce absorbs a quick reload; a later one is a real second tap.
+- **The Timesheet counts an unapproved auto-closed shift at its capped 16 hours** (existing behaviour of `attendance.summary`), while payroll holds it out until approved.
+- **"Different check-out time" is entered in the manager's browser timezone**, while payroll buckets by the company timezone. Month-end shifts entered from another timezone can land in the neighbouring month.
+- **Cookie names have no `__Host-` prefix** (a compromised sibling subdomain could set a cookie for the victim, which would make their tap clock in the wrong employee). Left out deliberately: dev over http cannot use the prefix, and the impact is limited to a wrong name on screen.
+- **Netlify deploy previews** have a different origin, so cookie-authenticated calls from them fail with `BAD_ORIGIN`. Production is unaffected.
 
 ## Running the tests
 

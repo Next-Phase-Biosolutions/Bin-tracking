@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { middleware } from './trpc.js';
-import { DEVICE_COOKIE, PENDING_COOKIE, readCookie } from '../lib/nfc-cookies.js';
-import { hashToken } from '../lib/token.js';
+import { AppError } from '../lib/app-error.js';
+import { clientIp } from '../lib/client-ip.js';
 
 /**
  * In-memory sliding-window limiter. Single-process only — the existing
@@ -11,6 +11,9 @@ import { hashToken } from '../lib/token.js';
  * for guarding bursts on a single API instance; revisit with a Redis store
  * if the API ever runs multiple instances behind a load balancer.
  */
+/** Above this many tracked keys, expired ones are swept on the next hit. */
+const MAX_TRACKED_KEYS = 10_000;
+
 export class SlidingWindowLimiter {
     // ponytail: unbounded Map growth across distinct keys over process
     // lifetime — acceptable given the small, slow-growing set of orgIds;
@@ -26,6 +29,7 @@ export class SlidingWindowLimiter {
     tryConsume(key: string): boolean {
         const now = Date.now();
         const cutoff = now - this.windowMs;
+        if (this.hits.size > MAX_TRACKED_KEYS) this.evictExpired(cutoff);
         const recent = (this.hits.get(key) ?? []).filter((t) => t > cutoff);
         if (recent.length >= this.limit) {
             this.hits.set(key, recent);
@@ -34,6 +38,13 @@ export class SlidingWindowLimiter {
         recent.push(now);
         this.hits.set(key, recent);
         return true;
+    }
+
+    /** Drops keys whose newest hit has left the window, so a flood of distinct keys cannot grow the map forever. */
+    private evictExpired(cutoff: number): void {
+        for (const [key, times] of this.hits) {
+            if ((times[times.length - 1] ?? 0) <= cutoff) this.hits.delete(key);
+        }
     }
 }
 
@@ -136,10 +147,9 @@ const bankTokenLimiter = new SlidingWindowLimiter(BANK_TOKEN_ATTEMPTS_PER_HOUR, 
 
 export function bankTokenRateLimit(limiter: SlidingWindowLimiter = bankTokenLimiter) {
     return middleware(async ({ ctx, next }) => {
-        // ponytail: ctx.req.ip trusts Fastify's own resolution; behind Caddy
-        // that means the proxy's view. Tighten with trustProxy config if these
-        // endpoints ever get abused from a single upstream.
-        const key = ctx.req.ip;
+        // clientIp() is ctx.req.ip unless CLIENT_IP_HEADER is configured: behind
+        // Netlify/Caddy req.ip is the proxy's address (see lib/client-ip.ts).
+        const key = clientIp(ctx.req);
         if (!limiter.tryConsume(key)) {
             throw new TRPCError({
                 code: 'TOO_MANY_REQUESTS',
@@ -151,30 +161,28 @@ export function bankTokenRateLimit(limiter: SlidingWindowLimiter = bankTokenLimi
 }
 
 /**
- * Registration links: the token is the sole credential, so the same per-IP rule
- * as the bank-link endpoints, in its own bucket.
+ * Registration links: the 256-bit single-use token is the real protection, so
+ * this only bounds cheap lookups. It must also be roomy: employees open their
+ * links in a burst on the first day, often behind one proxy address (see
+ * lib/client-ip.ts), and a tight shared cap would lock a whole company out.
  */
-const registrationStartLimiter = new SlidingWindowLimiter(BANK_TOKEN_ATTEMPTS_PER_HOUR, BANK_TOKEN_WINDOW_MS);
+const REGISTRATION_STARTS_PER_HOUR = 200;
+const registrationStartLimiter = new SlidingWindowLimiter(REGISTRATION_STARTS_PER_HOUR, BANK_TOKEN_WINDOW_MS);
 export const registrationStartRateLimit = () => bankTokenRateLimit(registrationStartLimiter);
 
 /**
- * NFC taps: keyed on the phone's own cookie (hashed, so no raw secret is held
- * as a map key), falling back to IP for a cookie-less caller. Deliberately NOT
- * IP-first: behind Netlify and Caddy many phones can share one IP, and per-IP
- * limiting would throttle a whole shift change. A rotating cookie value would
- * dodge this limiter, but such a caller carries no valid session and is stopped
- * by the global per-IP limit and the NO_SESSION check.
+ * NFC taps are limited per registered phone, keyed on its DeviceSession id and
+ * consumed only AFTER the cookie has been validated. Keying on the raw cookie
+ * (or on IP) would let an anonymous caller mint endless keys or share one bucket
+ * across a whole shift change. Garbage cookies never get here: they are refused
+ * by the lookup and bounded by the global limiter.
  */
 const TAPS_PER_MINUTE = 30;
 const tapLimiter = new SlidingWindowLimiter(TAPS_PER_MINUTE, 60 * 1000);
 
-export function tapRateLimit(limiter: SlidingWindowLimiter = tapLimiter) {
-    return middleware(async ({ ctx, next }) => {
-        const cookie = readCookie(ctx.req, DEVICE_COOKIE) ?? readCookie(ctx.req, PENDING_COOKIE);
-        const key = cookie ? `cookie:${hashToken(cookie)}` : `ip:${ctx.req.ip}`;
-        if (!limiter.tryConsume(key)) {
-            throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Too many taps. Wait a moment and try again.' });
-        }
-        return next();
-    });
+/** Throws a retryable 429 when one phone taps too often. Nothing has been recorded at that point. */
+export function consumeTapBudget(deviceSessionId: string, limiter: SlidingWindowLimiter = tapLimiter): void {
+    if (!limiter.tryConsume(deviceSessionId)) {
+        throw new AppError('TOO_MANY_TAPS', 'TOO_MANY_REQUESTS', 'Too many taps. Wait a moment and tap again.');
+    }
 }

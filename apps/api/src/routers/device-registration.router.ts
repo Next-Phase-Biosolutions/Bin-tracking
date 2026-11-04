@@ -27,8 +27,8 @@ export const deviceRegistrationRouter = router({
         .input(registerStartSchema)
         .mutation(async ({ input, ctx }) => {
             assertTrustedOrigin(ctx.req);
-            const { pendingValue, employeeName } = await deviceRegistrationService.start(input.token);
-            setCookie(ctx.res, PENDING_COOKIE, pendingValue, pendingCookieOptions());
+            const { pendingSecret, employeeName } = await deviceRegistrationService.start(input.token);
+            setCookie(ctx.res, PENDING_COOKIE, pendingSecret, pendingCookieOptions());
             return { employeeName };
         }),
 });

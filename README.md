@@ -290,6 +290,7 @@ Copy `.env.example` to `.env` and adjust for your local Postgres credentials.
 | `COOKIE_SECURE` | ❌ | `false` allows the NFC phone cookies over plain http for local testing; ignored in production |
 | `DB_POOL_MAX` | ❌ | Cap on the Postgres connection pool (default 10) |
 | `RATE_LIMIT_MAX` | ❌ | Global per-IP API requests per minute (default 100); raise it behind the Netlify `/trpc` rewrite |
+| `CLIENT_IP_HEADER` | ❌ | Header carrying the real client IP (Netlify: `x-nf-client-connection-ip`); makes rate limits per person. Leave unset until verified |
 | `DISABLE_AUTH` | ⚠️ | Set `true` to bypass auth — **dev/test only, never in production** |
 | `BLOCKFROST_API_KEY` | ❌ | Cardano Blockfrost key (required for blockchain anchoring) |
 | `CARDANO_NETWORK` | ❌ | `preprod` or `mainnet` |

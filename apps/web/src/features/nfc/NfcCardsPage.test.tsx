@@ -17,36 +17,54 @@ const card = (over: Partial<{ id: string; label: string; direction: 'IN' | 'OUT'
 });
 
 const admin = { orgRole: 'ADMIN' };
+// The origin to write into tags comes from the SERVER's APP_URL, not from the admin's own browser.
+const TAG_BASE = 'https://app.example.test';
 beforeEach(() => {
     subscription.hasWorkforce = true;
 });
 
 describe('NfcCardsPage', () => {
     it('lists each card with its direction, state and a tag URL built from the CARD id', async () => {
-        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.list': () => [card(), card({ id: 'card-2', label: 'Dock', direction: 'OUT', active: false, chipUid: '04B2' })] });
+        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card(), card({ id: 'card-2', label: 'Dock', direction: 'OUT', active: false, chipUid: '04B2' })] });
 
         expect(await screen.findByText('Main entrance')).toBeTruthy();
         expect(screen.getByText('Dock')).toBeTruthy();
-        expect((screen.getByLabelText('Tag URL for Main entrance') as HTMLInputElement).value).toBe(`${window.location.origin}/app/tap?card=card-1`);
+        expect((screen.getByLabelText('Tag URL for Main entrance') as HTMLInputElement).value).toBe(`${TAG_BASE}/app/tap?card=card-1`);
         expect((screen.getByLabelText('Tag URL for Dock') as HTMLInputElement).value).toContain('card=card-2');
         expect(screen.getByText('IN + OUT')).toBeTruthy();
         expect(screen.getByText('Inactive')).toBeTruthy();
     });
 
+    it('never shows a tag URL until the server has said which origin to use (no guessing from the browser)', async () => {
+        let release!: (v: { url: string }) => void;
+        renderWithTrpc(<NfcCardsPage />, {
+            'auth.me': () => admin,
+            'nfcCard.list': () => [card()],
+            'nfcCard.tagBaseUrl': () => new Promise((resolve) => (release = resolve)),
+        });
+
+        await screen.findByText('Main entrance');
+        expect(screen.getByText('Loading tag URL…')).toBeTruthy();
+        expect(screen.queryByLabelText('Tag URL for Main entrance')).toBeNull();
+
+        release({ url: TAG_BASE });
+        expect(await screen.findByLabelText('Tag URL for Main entrance')).toBeTruthy();
+    });
+
     it('copies the tag URL with the Copy button', async () => {
         const user = userEvent.setup(); // installs its own clipboard stub, so spy on it afterwards
         const clipboard = vi.spyOn(navigator.clipboard, 'writeText');
-        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.list': () => [card()] });
+        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card()] });
         await screen.findByText('Main entrance');
 
         await user.click(screen.getByRole('button', { name: 'Copy' }));
 
-        expect(clipboard).toHaveBeenCalledWith(`${window.location.origin}/app/tap?card=card-1`);
+        expect(clipboard).toHaveBeenCalledWith(`${TAG_BASE}/app/tap?card=card-1`);
         expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
     });
 
     it('shows an empty state', async () => {
-        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.list': () => [] });
+        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [] });
         expect(await screen.findByText(/No cards yet/)).toBeTruthy();
     });
 
@@ -54,7 +72,7 @@ describe('NfcCardsPage', () => {
         const user = userEvent.setup();
         const server = [card()];
         const { callsTo } = renderWithTrpc(<NfcCardsPage />, {
-            'auth.me': () => admin,
+            'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }),
             'nfcCard.list': () => [...server],
             'nfcCard.create': (input) => {
                 const created = card({ id: 'card-9', ...(input as object) });
@@ -80,7 +98,7 @@ describe('NfcCardsPage', () => {
         let releaseFirst!: (rows: unknown[]) => void;
         const server: ReturnType<typeof card>[] = [];
         renderWithTrpc(<NfcCardsPage />, {
-            'auth.me': () => admin,
+            'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }),
             'nfcCard.list': (_input, n) => (n === 1 ? new Promise((resolve) => (releaseFirst = resolve)) : [...server]),
             'nfcCard.create': (input) => {
                 const created = card({ id: 'card-new', ...(input as object) });
@@ -101,7 +119,7 @@ describe('NfcCardsPage', () => {
     it('explains a duplicate chip UID', async () => {
         const user = userEvent.setup();
         renderWithTrpc(<NfcCardsPage />, {
-            'auth.me': () => admin,
+            'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }),
             'nfcCard.list': () => [],
             'nfcCard.create': () => { throw apiError('DUPLICATE_CHIP_UID', 409); },
         });
@@ -117,7 +135,7 @@ describe('NfcCardsPage', () => {
     it('deactivates a card', async () => {
         const user = userEvent.setup();
         const { callsTo } = renderWithTrpc(<NfcCardsPage />, {
-            'auth.me': () => admin, 'nfcCard.list': () => [card()], 'nfcCard.setActive': () => card({ active: false }),
+            'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card()], 'nfcCard.setActive': () => card({ active: false }),
         });
         await screen.findByText('Main entrance');
 
@@ -129,7 +147,7 @@ describe('NfcCardsPage', () => {
     it('deleting takes two clicks, and the first only arms the button', async () => {
         const user = userEvent.setup();
         const { callsTo } = renderWithTrpc(<NfcCardsPage />, {
-            'auth.me': () => admin, 'nfcCard.list': () => [card()], 'nfcCard.remove': () => ({ deleted: true }),
+            'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card()], 'nfcCard.remove': () => ({ deleted: true }),
         });
         await screen.findByText('Main entrance');
 
@@ -144,7 +162,7 @@ describe('NfcCardsPage', () => {
         async function openEdit() {
             const user = userEvent.setup();
             const view = renderWithTrpc(<NfcCardsPage />, {
-                'auth.me': () => admin, 'nfcCard.list': () => [card()], 'nfcCard.update': (input) => card(input as object),
+                'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card()], 'nfcCard.update': (input) => card(input as object),
             });
             await screen.findByText('Main entrance');
             await user.click(screen.getByRole('button', { name: 'Edit Main entrance' }));
@@ -205,7 +223,7 @@ describe('NfcCardsPage', () => {
 
     it('shows the upgrade prompt when the organisation has no workforce module', async () => {
         subscription.hasWorkforce = false;
-        const { callsTo } = renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.list': () => [], 'billing.status': () => ({}) });
+        const { callsTo } = renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [], 'billing.status': () => ({}) });
 
         await waitFor(() => expect(callsTo('nfcCard.list')).toHaveLength(0));
         expect(within(document.body).queryByText('Add a card')).toBeNull();

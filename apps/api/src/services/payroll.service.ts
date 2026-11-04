@@ -339,6 +339,11 @@ export const payrollService = {
         if (checkOutAt.getTime() <= checkInAt.getTime()) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout must be after the check-in time.' });
         }
+        // A future check-out would close a shift that may still be running, and the employee's
+        // next tap would then open a second, overlapping one.
+        if (checkOutAt.getTime() > Date.now()) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout cannot be in the future.' });
+        }
         if (checkOutAt.getTime() - checkInAt.getTime() > MAX_SHIFT_MS) {
             throw new TRPCError({
                 code: 'BAD_REQUEST',
