@@ -11,14 +11,22 @@ import { clientIp } from '../lib/client-ip.js';
  * for guarding bursts on a single API instance; revisit with a Redis store
  * if the API ever runs multiple instances behind a load balancer.
  */
-/** Above this many tracked keys, expired ones are swept on the next hit. */
+/** Above this many tracked keys, expired ones are swept (at most once per SWEEP_INTERVAL_MS). */
 const MAX_TRACKED_KEYS = 10_000;
+const SWEEP_INTERVAL_MS = 5_000;
+/**
+ * Hard ceiling. A flood of distinct, un-expired keys (possible when the key comes from a header
+ * the caller controls, see lib/client-ip.ts) cannot grow the map past this: the OLDEST key is
+ * dropped, which only ever makes the limiter more lenient to whoever was evicted, never unbounded.
+ */
+const HARD_CAP_KEYS = 50_000;
 
 export class SlidingWindowLimiter {
     // ponytail: unbounded Map growth across distinct keys over process
     // lifetime — acceptable given the small, slow-growing set of orgIds;
     // add eviction if this ever shows up in memory profiling.
     private readonly hits = new Map<string, number[]>();
+    private lastSweepAt = 0;
 
     constructor(
         private readonly limit: number,
@@ -29,13 +37,20 @@ export class SlidingWindowLimiter {
     tryConsume(key: string): boolean {
         const now = Date.now();
         const cutoff = now - this.windowMs;
-        if (this.hits.size > MAX_TRACKED_KEYS) this.evictExpired(cutoff);
+        if (this.hits.size > MAX_TRACKED_KEYS && now - this.lastSweepAt >= SWEEP_INTERVAL_MS) {
+            this.lastSweepAt = now;
+            this.evictExpired(cutoff);
+        }
         const recent = (this.hits.get(key) ?? []).filter((t) => t > cutoff);
         if (recent.length >= this.limit) {
             this.hits.set(key, recent);
             return false;
         }
         recent.push(now);
+        if (!this.hits.has(key) && this.hits.size >= HARD_CAP_KEYS) {
+            const oldest = this.hits.keys().next().value;
+            if (oldest !== undefined) this.hits.delete(oldest);
+        }
         this.hits.set(key, recent);
         return true;
     }

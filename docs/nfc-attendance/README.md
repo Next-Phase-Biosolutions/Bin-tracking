@@ -102,7 +102,7 @@ To fix it properly, once and on the real deployment:
 
 1. On staging, send a request through `https://<site>/trpc/…` and look at which headers reach the API (log them, or use a tiny echo route) to confirm Netlify's `x-nf-client-connection-ip` arrives intact.
 2. Confirm the API cannot be reached by a spoofer who sets that header, or accept that it can (a caller who spoofs the header only chooses their own bucket; they can already reach the API directly).
-3. Set `CLIENT_IP_HEADER=x-nf-client-connection-ip` on the API. Every limiter then keys on the real client address.
+3. Set `CLIENT_IP_HEADER=x-nf-client-connection-ip` on the API. Every limiter then keys on the real client address. **Only do this once the API origin cannot be reached around the edge, or Caddy overwrites that header**: while the API is directly reachable, a caller can send any value and choose their own bucket. The limiter's memory is bounded either way (expired keys are swept, and a hard ceiling of 50,000 keys drops the oldest), so the worst a spoofer gets is a weaker limit for themselves.
 4. Until then, raise `RATE_LIMIT_MAX` (e.g. 600) so a shift start does not hit the shared bucket, and treat it as a stopgap.
 
 I could not verify any of this from outside the deployment, which is why `CLIENT_IP_HEADER` is off by default.
@@ -159,6 +159,10 @@ Things to record, because they could not be verified from here: whether the cook
 - **The Timesheet counts an unapproved auto-closed shift at its capped 16 hours** (existing behaviour of `attendance.summary`), while payroll holds it out until approved.
 - **"Different check-out time" is entered in the manager's browser timezone**, while payroll buckets by the company timezone. Month-end shifts entered from another timezone can land in the neighbouring month.
 - **Cookie names have no `__Host-` prefix** (a compromised sibling subdomain could set a cookie for the victim, which would make their tap clock in the wrong employee). Left out deliberately: dev over http cannot use the prefix, and the impact is limited to a wrong name on screen.
+- **Retries are a heuristic, not a guarantee.** The tap page repeats a failed request only when that is very unlikely to record a second punch (a 429 before any ambiguous failure, or anything within 3 s of the first attempt) and otherwise says "couldn't confirm your tap". A server-side idempotency key (one id per page load, stored on the event) would make retries unconditionally safe and is the proposed follow-up.
+- **Approving races with payroll finalization.** The approval reads the month's run status under the employee lock, but moving a run out of DRAFT (done by the payment agent) takes no such lock, so a finalize landing in the same few milliseconds could leave an approved shift unpaid. An approval made after `computeRun` while the run is still DRAFT leaves the run stale until it is recomputed (the UI says so).
+- **Opening the registration link twice** (two tabs, two phones) lets the last one win; the earlier browser then sees "link not valid" and the employee just opens the link again.
+- **Pay caps differ on purpose:** approving a forgotten check-out may enter real overtime up to 24 h; the older payroll "Fix checkout" action keeps its 16 h cap.
 - **Netlify deploy previews** have a different origin, so cookie-authenticated calls from them fail with `BAD_ORIGIN`. Production is unaffected.
 
 ## Running the tests

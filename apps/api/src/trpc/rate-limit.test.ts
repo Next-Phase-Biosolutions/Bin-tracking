@@ -57,6 +57,17 @@ describe('SlidingWindowLimiter', () => {
         expect(tracked()).toBe(1);
     });
 
+    it('has a hard ceiling on tracked keys, so a flood of distinct live keys cannot grow it without bound', () => {
+        const limiter = new SlidingWindowLimiter(5, 60_000);
+        const hits = () => (limiter as unknown as { hits: Map<string, number[]> }).hits;
+
+        for (let i = 0; i < 50_005; i++) limiter.tryConsume(`flood-${i}`); // all still inside the window
+
+        expect(hits().size).toBeLessThanOrEqual(50_000);
+        expect(hits().has('flood-0')).toBe(false); // the oldest were dropped
+        expect(hits().has('flood-50004')).toBe(true); // the newest are kept
+    });
+
     it('sweeping never forgets a key that is still inside its window', () => {
         const limiter = new SlidingWindowLimiter(1, 60_000);
         for (let i = 0; i < 10_001; i++) limiter.tryConsume(`old-${i}`);

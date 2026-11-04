@@ -25,10 +25,13 @@ export function isTransientError(e: unknown): boolean {
 }
 
 /**
- * True when the API answered HTTP 429 (rate limit, or SERVER_BUSY). Those are raised
- * BEFORE anything is recorded, so repeating the request is always safe. Every other
- * transient failure (dropped network, gateway error) is ambiguous: the tap may have
- * been recorded and only the response lost.
+ * True when the API answered HTTP 429 (a per-phone limit, or SERVER_BUSY). These are raised
+ * before the punch is recorded (the limit check runs before the lock; SERVER_BUSY is a pool or
+ * transaction-start timeout, and an expired transaction is rolled back), so repeating the
+ * request is safe in practice. A timeout that races the commit cannot be excluded from the
+ * client side, which is why TapPage still treats a 429 that follows an ambiguous failure
+ * with caution. Every other transient failure (dropped network, gateway error) is ambiguous:
+ * the tap may have been recorded and only the response lost.
  */
 export function isOverloadError(e: unknown): boolean {
     return dataOf(e)?.httpStatus === 429;

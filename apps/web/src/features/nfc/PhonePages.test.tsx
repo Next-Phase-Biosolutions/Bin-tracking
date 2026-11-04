@@ -156,6 +156,42 @@ describe('TapPage', () => {
             expect(tapMutate).toHaveBeenCalledTimes(4);
         });
 
+        it('once a failure was ambiguous, even a later 429 is not retried past the window, and the message is "couldn\u2019t confirm", not "busy"', async () => {
+            // gateway error (the tap may have been recorded), then 429s. Telling the employee "busy, tap again"
+            // here could invite a deliberate second tap on top of a punch that may already exist.
+            advanceClock(1_000);
+            tapMutate
+                .mockRejectedValueOnce(gatewayError())
+                .mockRejectedValueOnce(apiError('SERVER_BUSY', 429))
+                .mockRejectedValue(apiError('SERVER_BUSY', 429));
+
+            tapPage();
+
+            const alert = await screen.findByRole('alert');
+            expect(alert.textContent).toContain('Couldn’t confirm your tap');
+            expect(alert.textContent).not.toContain('The system is busy');
+            expect(tapMutate).toHaveBeenCalledTimes(3); // the 4th would have been sent past the 3 s bound
+        });
+
+        it('counts the delay before a retry, not just the time already elapsed', async () => {
+            // The failure is detected at 2 s; a retry sent after the 1.2 s delay would go out at 3.2 s: too late.
+            advanceClock(2_000);
+            tapMutate.mockRejectedValue(gatewayError());
+
+            renderAt(<TapPage retryDelayMs={1200} />, '/app/tap?card=card-1');
+
+            expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t confirm your tap');
+            expect(tapMutate).toHaveBeenCalledTimes(1);
+        });
+
+        it('shows a definitive answer as such even after an ambiguous failure', async () => {
+            tapMutate.mockRejectedValueOnce(gatewayError()).mockRejectedValue(apiError('SESSION_REVOKED', 403));
+
+            tapPage();
+
+            expect((await screen.findByRole('alert')).textContent).toContain('Phone not allowed');
+        });
+
         it('says so plainly when one phone taps too often', async () => {
             tapMutate.mockRejectedValue(apiError('TOO_MANY_TAPS', 429));
 

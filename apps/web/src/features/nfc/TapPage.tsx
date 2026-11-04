@@ -12,15 +12,20 @@ type View =
     | { kind: 'error'; title: string; detail: string };
 
 /**
- * Retry rules, chosen so a retry can never record a second punch:
- *  - HTTP 429 (rate limit, SERVER_BUSY) is raised before anything is recorded, so it is
- *    always safe to repeat, up to MAX_RETRIES times.
- *  - Any other transient failure (dropped network, gateway error) is AMBIGUOUS: the tap
- *    may have been recorded and only the response lost. Repeating it is safe only if the
- *    server will read it as a double-tap, i.e. it lands inside its 5 s debounce window of
- *    the first attempt (which was recorded no earlier than it was sent). So ambiguous
- *    failures are retried only within AMBIGUOUS_RETRY_WINDOW_MS of the first attempt;
- *    after that the employee is told to check and tap again themselves.
+ * Retry rules, chosen so that a retry is very unlikely to record a second punch:
+ *  - HTTP 429 (rate limit, busy) is raised before anything is recorded. While NO earlier
+ *    attempt failed ambiguously, it is safe to repeat up to MAX_RETRIES times.
+ *  - Any other transient failure (dropped network, gateway error) is AMBIGUOUS: the tap may
+ *    have been recorded and only the response lost. From then on EVERY retry, 429s included,
+ *    must be sent within AMBIGUOUS_RETRY_WINDOW_MS of the first attempt, so the server sees it
+ *    inside its 5 s debounce window and answers with an echo instead of a second punch.
+ *    The bound counts the delay before the retry is sent, not just the time already elapsed.
+ *  - If it still cannot be confirmed, the employee is told so ("couldn't confirm your tap")
+ *    instead of "busy, tap again", which could invite a deliberate second tap.
+ *
+ * This is a heuristic, not a guarantee: it assumes the retry is processed within a couple of
+ * seconds of being sent. A server-side idempotency key (one id per page load, stored on the
+ * event) would make retries unconditionally safe and is the proposed follow-up.
  */
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1200;
@@ -53,20 +58,24 @@ export default function TapPage({ retryDelayMs = RETRY_DELAY_MS }: { retryDelayM
         }
         void (async () => {
             const startedAt = Date.now();
+            let maybeRecorded = false; // an earlier attempt failed in a way that may have still recorded the tap
             for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
                 try {
                     const result = await phoneClient.attendance.tap.mutate({ cardId });
                     setView({ kind: 'result', view: toTapView(result) });
                     return;
                 } catch (e) {
-                    const overloaded = isOverloadError(e);
-                    const safeToRepeat = overloaded || (isTransientError(e) && Date.now() - startedAt < AMBIGUOUS_RETRY_WINDOW_MS);
-                    if (safeToRepeat && attempt < MAX_RETRIES) {
+                    if (!isOverloadError(e)) maybeRecorded = true;
+                    const retryable = isTransientError(e);
+                    const withinWindow = Date.now() + retryDelayMs - startedAt < AMBIGUOUS_RETRY_WINDOW_MS;
+                    if (retryable && (!maybeRecorded || withinWindow) && attempt < MAX_RETRIES) {
                         setView({ kind: 'waking' });
                         await sleep(retryDelayMs);
                         continue;
                     }
-                    const code = appCodeOf(e) ?? (isTransientError(e) && !overloaded ? 'UNCONFIRMED' : '');
+                    // A definitive answer (not registered, card inactive, ...) is shown as such. Otherwise,
+                    // if the tap might have been recorded, say we cannot confirm rather than "try again".
+                    const code = !retryable ? (appCodeOf(e) ?? '') : maybeRecorded ? 'UNCONFIRMED' : (appCodeOf(e) ?? '');
                     const known = TAP_ERRORS[code];
                     setView({
                         kind: 'error',
