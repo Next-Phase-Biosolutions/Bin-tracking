@@ -127,8 +127,44 @@ interface FakeFormSubmission {
     createdAt: Date;
 }
 
+interface FakeNfcCard {
+    id: string;
+    organizationId: string;
+    label: string;
+    direction: 'IN' | 'OUT' | 'BOTH';
+    chipUid: string;
+    active: boolean;
+}
+interface FakeDeviceSession {
+    id: string;
+    organizationId: string;
+    employeeId: string;
+    sessionTokenHash: string;
+    deviceLabel: string | null;
+    createdAt: Date;
+    lastUsedAt: Date | null;
+    revokedAt: Date | null;
+}
+interface FakeWorkSession {
+    id: string;
+    employeeId: string;
+    checkInAt: Date;
+    checkOutAt: Date | null;
+    durationMin: number | null;
+    autoClosed: boolean;
+    approvedAt: Date | null;
+}
+interface FakeRegistrationToken {
+    employeeId: string;
+    organizationId: string;
+}
+
 const store = vi.hoisted(() => {
     return {
+        nfcCards: [] as FakeNfcCard[],
+        deviceSessions: [] as FakeDeviceSession[],
+        workSessions: [] as FakeWorkSession[],
+        registrationTokens: [] as FakeRegistrationToken[],
         employees: [] as FakeEmployee[],
         payrollRuns: [] as FakePayrollRun[],
         binTypes: [] as FakeBinType[],
@@ -177,10 +213,78 @@ vi.mock('@bin-tracker/db', () => {
     const employee = {
         findMany: ({ where }: { where: { organizationId: string; status?: string } }) =>
             Promise.resolve(
-                store.employees.filter(
-                    (e) => e.organizationId === where.organizationId && (!where.status || e.status === where.status),
-                ),
+                store.employees
+                    .filter((e) => e.organizationId === where.organizationId && (!where.status || e.status === where.status))
+                    // nested relations facilityStatus selects; harmless extras for employeeService.list
+                    .map((e) => ({
+                        ...e,
+                        sessions: store.workSessions.filter((w) => w.employeeId === e.id && w.checkOutAt === null).slice(0, 1),
+                        deviceSessions: store.deviceSessions.filter((d) => d.employeeId === e.id && d.revokedAt === null).slice(0, 1),
+                    })),
             ),
+        findFirst: ({ where }: { where: { id: string; organizationId: string } }) =>
+            Promise.resolve(store.employees.find((e) => e.id === where.id && e.organizationId === where.organizationId) ?? null),
+    };
+
+    // ─── NFC attendance models ────────────────────────────────
+    const nfcCard = {
+        findMany: ({ where }: { where: { organizationId: string } }) =>
+            Promise.resolve(store.nfcCards.filter((c) => c.organizationId === where.organizationId)),
+        findUnique: ({ where }: { where: { id: string } }) => Promise.resolve(store.nfcCards.find((c) => c.id === where.id) ?? null),
+        findFirstOrThrow: ({ where }: { where: { id: string; organizationId: string } }) => {
+            const card = store.nfcCards.find((c) => c.id === where.id && c.organizationId === where.organizationId);
+            return card ? Promise.resolve(card) : Promise.reject(new Error('No NfcCard found'));
+        },
+        updateMany: ({ where, data }: { where: { id: string; organizationId: string }; data: Partial<FakeNfcCard> }) => {
+            const hit = store.nfcCards.filter((c) => c.id === where.id && c.organizationId === where.organizationId);
+            hit.forEach((c) => Object.assign(c, data));
+            return Promise.resolve({ count: hit.length });
+        },
+        deleteMany: ({ where }: { where: { id: string; organizationId: string } }) => {
+            const before = store.nfcCards.length;
+            store.nfcCards = store.nfcCards.filter((c) => !(c.id === where.id && c.organizationId === where.organizationId));
+            return Promise.resolve({ count: before - store.nfcCards.length });
+        },
+    };
+    const deviceSession = {
+        findMany: ({ where }: { where: { organizationId: string; revokedAt: null } }) =>
+            Promise.resolve(store.deviceSessions.filter((d) => d.organizationId === where.organizationId && d.revokedAt === null)),
+        findFirst: ({ where }: { where: { id: string; organizationId: string } }) =>
+            Promise.resolve(store.deviceSessions.find((d) => d.id === where.id && d.organizationId === where.organizationId) ?? null),
+        updateMany: ({ where, data }: { where: { id: string; organizationId: string; revokedAt?: null }; data: Partial<FakeDeviceSession> }) => {
+            const hit = store.deviceSessions.filter(
+                (d) => d.id === where.id && d.organizationId === where.organizationId && (where.revokedAt === undefined || d.revokedAt === null),
+            );
+            hit.forEach((d) => Object.assign(d, data));
+            return Promise.resolve({ count: hit.length });
+        },
+        findUnique: ({ where }: { where: { sessionTokenHash: string } }) => {
+            const session = store.deviceSessions.find((d) => d.sessionTokenHash === where.sessionTokenHash);
+            const employee = session && store.employees.find((e) => e.id === session.employeeId);
+            return Promise.resolve(session && employee ? { ...session, employee } : null);
+        },
+    };
+    const registrationToken = {
+        updateMany: () => Promise.resolve({ count: 0 }),
+        create: ({ data }: { data: FakeRegistrationToken }) => {
+            store.registrationTokens.push(data);
+            return Promise.resolve(data);
+        },
+    };
+    const workSession = {
+        findMany: ({ where }: { where: { autoClosed: boolean; approvedAt: null; employee: { organizationId: string } } }) =>
+            Promise.resolve(
+                store.workSessions
+                    .filter((w) => w.autoClosed === where.autoClosed && w.approvedAt === null)
+                    .map((w) => ({ ...w, employee: store.employees.find((e) => e.id === w.employeeId)! }))
+                    .filter((w) => w.employee.organizationId === where.employee.organizationId),
+            ),
+        findFirst: ({ where }: { where: { id: string; employee: { organizationId: string } } }) => {
+            const w = store.workSessions.find((x) => x.id === where.id);
+            const owner = w && store.employees.find((e) => e.id === w.employeeId);
+            return Promise.resolve(w && owner?.organizationId === where.employee.organizationId ? w : null);
+        },
+        groupBy: () => Promise.resolve([]),
     };
 
     const payrollRun = {
@@ -368,6 +472,10 @@ vi.mock('@bin-tracker/db', () => {
     Object.assign(fakePrisma, {
         formSubmission,
         employee,
+        nfcCard,
+        deviceSession,
+        registrationToken,
+        workSession,
         payrollRun,
         // Rate visibility checks the org's PAYROLL module; enabled here so the
         // ADMIN-viewer list test exercises the org filter, not the module gate.
@@ -385,7 +493,8 @@ vi.mock('@bin-tracker/db', () => {
         formTemplate,
         eventLog,
         $queryRaw: () => Promise.resolve([]),
-        $transaction: (cb: (tx: unknown) => unknown) => Promise.resolve(cb(fakePrisma)),
+        $transaction: (arg: unknown) =>
+            Array.isArray(arg) ? Promise.all(arg) : Promise.resolve((arg as (tx: unknown) => unknown)(fakePrisma)),
     });
 
     return { prisma: fakePrisma };
@@ -401,6 +510,11 @@ const { facilityService } = await import('./facility.service.js');
 const { shipmentService } = await import('./shipment.service.js');
 const { sensorService } = await import('./sensor.service.js');
 const { formService } = await import('./form.service.js');
+const { attendanceService } = await import('./attendance.service.js');
+const { nfcCardService } = await import('./nfc-card.service.js');
+const { deviceRegistrationService } = await import('./device-registration.service.js');
+const { tap } = await import('./nfc-tap.service.js');
+const { hashToken } = await import('../lib/token.js');
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -578,6 +692,10 @@ beforeEach(() => {
     store.sensorDevices.length = 0;
     store.formTemplates.length = 0;
     store.formSubmissions.length = 0;
+    store.nfcCards = [];
+    store.deviceSessions.length = 0;
+    store.workSessions.length = 0;
+    store.registrationTokens.length = 0;
     store.seq = 0;
 });
 
@@ -820,6 +938,153 @@ describe('cross-organization tenancy isolation', () => {
             const result = await formService.getSubmission(fakePrisma as unknown as PrismaClient, ORG_A, submission.id);
 
             expect(result?.submission.id).toBe(submission.id);
+        });
+    });
+
+    // ─── NFC tag attendance ───────────────────────────────────
+    // Every case below plants an org-B row and asserts org A cannot see or touch it. The
+    // real-Postgres suites (*.db.test.ts) prove the same against actual queries.
+    describe('nfcCardService', () => {
+        function seedCard(overrides: Partial<FakeNfcCard> = {}): FakeNfcCard {
+            const card: FakeNfcCard = { id: nextId('card'), organizationId: ORG_A, label: 'Door', direction: 'IN', chipUid: nextId('uid'), active: true, ...overrides };
+            store.nfcCards.push(card);
+            return card;
+        }
+
+        it('list never includes a card from a different org', async () => {
+            const mine = seedCard();
+            seedCard({ organizationId: ORG_B });
+
+            expect((await nfcCardService.list(ORG_A)).map((c) => c.id)).toEqual([mine.id]);
+        });
+
+        it("update, setActive and remove treat another org's card as not found and leave it untouched", async () => {
+            const foreign = seedCard({ organizationId: ORG_B, label: 'Theirs' });
+
+            await expect(nfcCardService.update(ORG_A, { id: foreign.id, label: 'hijacked' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+            await expect(nfcCardService.setActive(ORG_A, { id: foreign.id, active: false })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+            await expect(nfcCardService.remove(ORG_A, foreign.id)).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+
+            expect(store.nfcCards).toEqual([expect.objectContaining({ id: foreign.id, label: 'Theirs', active: true })]);
+        });
+    });
+
+    describe('deviceRegistrationService', () => {
+        function seedDevice(overrides: Partial<FakeDeviceSession> = {}): FakeDeviceSession {
+            const device: FakeDeviceSession = {
+                id: nextId('dev'),
+                organizationId: ORG_A,
+                employeeId: 'emp-x',
+                sessionTokenHash: nextId('hash'),
+                deviceLabel: null,
+                createdAt: new Date(),
+                lastUsedAt: null,
+                revokedAt: null,
+                ...overrides,
+            };
+            store.deviceSessions.push(device);
+            return device;
+        }
+
+        it('sendLink refuses an employee of a different org and creates no token', async () => {
+            const foreign = seedEmployee({ id: 'emp-b', organizationId: ORG_B });
+
+            await expect(deviceRegistrationService.sendLink(ORG_A, foreign.id)).rejects.toMatchObject({ appCode: 'EMPLOYEE_NOT_FOUND' });
+
+            expect(store.registrationTokens).toHaveLength(0);
+        });
+
+        it('sendLink for an own-org employee stamps the token with that organization', async () => {
+            const own = seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+
+            await deviceRegistrationService.sendLink(ORG_A, own.id);
+
+            expect(store.registrationTokens).toEqual([{ employeeId: own.id, organizationId: ORG_A, tokenHash: expect.any(String), expiresAt: expect.any(Date) }]);
+        });
+
+        it('listDevices never includes a phone registered in a different org', async () => {
+            const mine = seedDevice();
+            seedDevice({ organizationId: ORG_B });
+
+            expect((await deviceRegistrationService.listDevices(ORG_A)).map((d) => d.id)).toEqual([mine.id]);
+        });
+
+        it("revokeDevice treats another org's phone as not found and does not revoke it", async () => {
+            const foreign = seedDevice({ organizationId: ORG_B });
+
+            await expect(deviceRegistrationService.revokeDevice(ORG_A, foreign.id)).rejects.toMatchObject({ appCode: 'DEVICE_SESSION_NOT_FOUND' });
+
+            expect(foreign.revokedAt).toBeNull();
+        });
+    });
+
+    describe('attendanceService (NFC management)', () => {
+        function seedSession(employeeId: string, overrides: Partial<FakeWorkSession> = {}): FakeWorkSession {
+            const session: FakeWorkSession = {
+                id: nextId('sess'),
+                employeeId,
+                checkInAt: new Date('2031-01-01T08:00:00Z'),
+                checkOutAt: new Date('2031-01-02T00:00:00Z'),
+                durationMin: 960,
+                autoClosed: true,
+                approvedAt: null,
+                ...overrides,
+            };
+            store.workSessions.push(session);
+            return session;
+        }
+
+        it('facilityStatus never lists an employee from a different org', async () => {
+            seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+            seedEmployee({ id: 'emp-b', organizationId: ORG_B });
+
+            const status = await attendanceService.facilityStatus(ORG_A);
+
+            expect(status.checkedOut.map((e) => e.employeeId)).toEqual(['emp-a']);
+            expect(status.totals.employees).toBe(1);
+        });
+
+        it('listPendingApprovals never includes a different org\'s auto-closed session', async () => {
+            const own = seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+            const foreign = seedEmployee({ id: 'emp-b', organizationId: ORG_B });
+            const mine = seedSession(own.id);
+            seedSession(foreign.id);
+
+            expect((await attendanceService.listPendingApprovals(ORG_A)).map((s) => s.id)).toEqual([mine.id]);
+        });
+
+        it("approveWorkSession treats another org's session as not found and does not approve it", async () => {
+            const foreign = seedEmployee({ id: 'emp-b', organizationId: ORG_B });
+            const session = seedSession(foreign.id);
+
+            await expect(attendanceService.approveWorkSession(ORG_A, null, { id: session.id })).rejects.toMatchObject({ appCode: 'WORK_SESSION_NOT_FOUND' });
+
+            expect(session.approvedAt).toBeNull();
+        });
+    });
+
+    describe('nfc tap (organization comes from the card, never the client)', () => {
+        it("a phone registered in org A cannot act on org B's card", async () => {
+            const employee = seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+            store.deviceSessions.push({
+                id: 'dev-a', organizationId: ORG_A, employeeId: employee.id, sessionTokenHash: hashToken('phone-secret'),
+                deviceLabel: null, createdAt: new Date(), lastUsedAt: new Date(), revokedAt: null,
+            });
+            store.nfcCards.push({ id: 'card-b', organizationId: ORG_B, label: 'B door', direction: 'BOTH', chipUid: 'uid-b', active: true });
+
+            await expect(tap({ cardId: 'card-b', deviceToken: 'phone-secret' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
+        });
+
+        it('a device session row whose organization disagrees with its employee is refused', async () => {
+            // A corrupted or hand-edited row must fail closed, not pick one org over the other.
+            const employee = seedEmployee({ id: 'emp-a', organizationId: ORG_A });
+            store.deviceSessions.push({
+                id: 'dev-x', organizationId: ORG_B, employeeId: employee.id, sessionTokenHash: hashToken('odd-secret'),
+                deviceLabel: null, createdAt: new Date(), lastUsedAt: new Date(), revokedAt: null,
+            });
+            store.nfcCards.push({ id: 'card-b', organizationId: ORG_B, label: 'B door', direction: 'BOTH', chipUid: 'uid-b', active: true });
+
+            await expect(tap({ cardId: 'card-b', deviceToken: 'odd-secret' })).rejects.toMatchObject({ appCode: 'CARD_NOT_FOUND' });
         });
     });
 });
