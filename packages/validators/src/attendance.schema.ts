@@ -30,3 +30,15 @@ export const attendanceRecentSchema = z.object({
 });
 
 export type AttendanceRecentInput = z.infer<typeof attendanceRecentSchema>;
+
+/**
+ * Manager review of an auto-closed (forgotten check-out) session. Without
+ * `checkOutAt` the capped shift is approved as-is; with one, that real
+ * check-out time is used instead.
+ */
+export const attendanceApproveSessionSchema = z.object({
+    id: z.string().min(1).max(200),
+    checkOutAt: z.string().datetime({ offset: true }).optional(),
+});
+
+export type AttendanceApproveSessionInput = z.infer<typeof attendanceApproveSessionSchema>;

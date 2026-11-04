@@ -1,6 +1,10 @@
 // ─── Attendance Types ─────────────────────────────────────────
 
-export type AttendanceEventType = 'CHECK_IN' | 'CHECK_OUT';
+/** What an AttendanceEvent row records. The last three are NFC bookkeeping only. */
+export type AttendanceEventType = 'CHECK_IN' | 'CHECK_OUT' | 'DEBOUNCED' | 'REJECTED' | 'REGISTERED';
+
+/** The two outcomes that actually open or close a shift. */
+export type AttendancePunchAction = 'CHECK_IN' | 'CHECK_OUT';
 
 export interface WorkSession {
     id: string;
@@ -9,6 +13,8 @@ export interface WorkSession {
     checkOutAt: Date | null;
     durationMin: number | null;
     autoClosed: boolean;
+    /** Set when a manager approves an auto-closed session; payroll pays it only then. */
+    approvedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -16,7 +22,7 @@ export interface WorkSession {
 export interface AttendanceEvent {
     id: string;
     employeeId: string;
-    sessionId: string;
+    sessionId: string | null;
     eventType: AttendanceEventType;
     scannedAt: Date;
     source: string | null;
@@ -25,7 +31,7 @@ export interface AttendanceEvent {
 
 /** Result returned to the guard scanner after a scan resolves. */
 export interface AttendanceScanResult {
-    action: AttendanceEventType;
+    action: AttendancePunchAction;
     employeeName: string;
     employeeCode: string;
     sessionId: string;

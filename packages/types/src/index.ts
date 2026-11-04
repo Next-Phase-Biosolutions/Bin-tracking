@@ -14,6 +14,7 @@ export type { User, UserRole, UserInfo } from './user.js';
 export type { Employee, EmployeeStatus } from './employee.js';
 export type {
     AttendanceEventType,
+    AttendancePunchAction,
     WorkSession,
     AttendanceEvent,
     AttendanceScanResult,
