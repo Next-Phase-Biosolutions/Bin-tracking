@@ -2,7 +2,14 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 function createPrismaClient() {
-    const adapter = new PrismaPg({ connectionString: process.env['DATABASE_URL'] });
+    // DB_POOL_MAX caps the pg pool. Unset keeps the pg default (10). A tap rush
+    // (many employees at shift start) is the case worth raising it for, but the
+    // production URL goes through Supabase's pooler, so raise it only to match.
+    const poolMax = Number(process.env['DB_POOL_MAX']);
+    const adapter = new PrismaPg({
+        connectionString: process.env['DATABASE_URL'],
+        ...(Number.isInteger(poolMax) && poolMax > 0 ? { max: poolMax } : {}),
+    });
     return new PrismaClient({
         adapter,
         /**

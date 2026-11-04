@@ -14,6 +14,7 @@ interface FakeRun {
 }
 interface FakeSession {
     id: string;
+    employeeId: string;
     checkInAt: Date;
     checkOutAt: Date | null;
     durationMin: number | null;
@@ -52,6 +53,13 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
     const workSession = {
+        // The overlap guard: the employee's earliest session starting after a given check-in.
+        findFirst: ({ where }: { where: { employeeId: string; checkInAt: { gt: Date } } }) =>
+            Promise.resolve(
+                store.sessions
+                    .filter((s) => s.employeeId === where.employeeId && s.checkInAt.getTime() > where.checkInAt.gt.getTime())
+                    .sort((a, b) => a.checkInAt.getTime() - b.checkInAt.getTime())[0] ?? null,
+            ),
         update: ({ where, data }: { where: { id: string }; data: Partial<FakeSession> }) => {
             const s = store.sessions.find((x) => x.id === where.id)!;
             Object.assign(s, data);
@@ -73,7 +81,7 @@ const CHECK_IN = new Date('2026-07-10T14:00:00Z');
 
 function seed(runStatus = 'DRAFT'): void {
     store.runs.push({ id: 'run-1', organizationId: ORG_A, period: '2026-07', status: runStatus });
-    store.sessions.push({ id: 'sess-1', checkInAt: CHECK_IN, checkOutAt: null, durationMin: null, autoClosed: false });
+    store.sessions.push({ id: 'sess-1', employeeId: 'emp-1', checkInAt: CHECK_IN, checkOutAt: null, durationMin: null, autoClosed: false });
     store.exceptions.push({ id: 'ex-1', runId: 'run-1', sessionId: 'sess-1', resolved: false, resolvedAt: null, note: null });
 }
 
@@ -153,5 +161,56 @@ describe('payrollService.resolveException', () => {
         await expect(
             payrollService.resolveException(ORG_A, { exceptionId: 'ex-1', action: 'DISMISS' }),
         ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+});
+
+describe('payrollService.resolveException — FIX_CHECKOUT overlap guard', () => {
+    const NEXT_SHIFT = new Date('2026-07-10T20:00:00Z'); // 6h after CHECK_IN
+
+    function seedNextShift(): void {
+        store.sessions.push({ id: 'sess-2', employeeId: 'emp-1', checkInAt: NEXT_SHIFT, checkOutAt: null, durationMin: null, autoClosed: false });
+    }
+
+    it('rejects a check-out that runs into the employee\'s next shift, and changes nothing', async () => {
+        seed();
+        seedNextShift();
+
+        await expect(
+            payrollService.resolveException(ORG_A, {
+                exceptionId: 'ex-1',
+                action: 'FIX_CHECKOUT',
+                checkOutAt: '2026-07-10T21:00:00.000Z', // 1h into the next shift
+            }),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('next shift') });
+
+        expect(store.sessions[0]?.checkOutAt).toBeNull();
+        expect(store.exceptions[0]?.resolved).toBe(false);
+    });
+
+    it('allows a check-out that ends exactly when the next shift begins', async () => {
+        seed();
+        seedNextShift();
+
+        const result = await payrollService.resolveException(ORG_A, {
+            exceptionId: 'ex-1',
+            action: 'FIX_CHECKOUT',
+            checkOutAt: NEXT_SHIFT.toISOString(),
+        });
+
+        expect(result.requiresRecompute).toBe(true);
+        expect(store.sessions[0]?.durationMin).toBe(360);
+    });
+
+    it('does not mistake another employee\'s shift for the next shift', async () => {
+        seed();
+        store.sessions.push({ id: 'sess-x', employeeId: 'emp-OTHER', checkInAt: NEXT_SHIFT, checkOutAt: null, durationMin: null, autoClosed: false });
+
+        await expect(
+            payrollService.resolveException(ORG_A, {
+                exceptionId: 'ex-1',
+                action: 'FIX_CHECKOUT',
+                checkOutAt: '2026-07-10T21:00:00.000Z',
+            }),
+        ).resolves.toMatchObject({ resolved: true });
     });
 });

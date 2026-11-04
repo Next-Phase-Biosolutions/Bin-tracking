@@ -28,8 +28,8 @@ interface FakeSession {
 interface FakeEvent {
     id: string;
     employeeId: string;
-    sessionId: string;
-    eventType: 'CHECK_IN' | 'CHECK_OUT';
+    sessionId: string | null;
+    eventType: 'CHECK_IN' | 'CHECK_OUT' | 'DEBOUNCED' | 'REJECTED' | 'REGISTERED';
     scannedAt: Date;
     source: string | null;
 }
@@ -98,9 +98,10 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
     const attendanceEvent = {
-        findFirst: ({ where, orderBy }: { where: { employeeId: string }; orderBy?: { scannedAt?: 'asc' | 'desc' } }) => {
+        findFirst: ({ where, orderBy }: { where: { employeeId: string; eventType?: { in: string[] } }; orderBy?: { scannedAt?: 'asc' | 'desc' } }) => {
             const rows = store.events
                 .filter((e) => e.employeeId === where.employeeId)
+                .filter((e) => !where.eventType || where.eventType.in.includes(e.eventType))
                 .sort((a, b) =>
                     orderBy?.scannedAt === 'desc'
                         ? b.scannedAt.getTime() - a.scannedAt.getTime()
@@ -111,12 +112,13 @@ vi.mock('@bin-tracker/db', () => {
             const session = store.sessions.find((s) => s.id === event.sessionId);
             return Promise.resolve({ ...event, session });
         },
-        findMany: ({ where }: { where: { employee: { organizationId: string } } }) => {
+        findMany: ({ where }: { where: { employee: { organizationId: string }; eventType?: { in: string[] } } }) => {
             const orgEmployeeIds = new Set(
                 store.employees.filter((e) => e.organizationId === where.employee.organizationId).map((e) => e.id),
             );
             const rows = store.events
                 .filter((e) => orgEmployeeIds.has(e.employeeId))
+                .filter((e) => !where.eventType || where.eventType.in.includes(e.eventType))
                 .sort((a, b) => b.scannedAt.getTime() - a.scannedAt.getTime())
                 .map((e) => ({ ...e, employee: store.employees.find((emp) => emp.id === e.employeeId)! }));
             return Promise.resolve(rows);
@@ -132,6 +134,8 @@ vi.mock('@bin-tracker/db', () => {
         employee,
         workSession,
         attendanceEvent,
+        // The per-employee advisory lock is a no-op in-memory (the DB-backed suite proves it).
+        $executeRaw: () => Promise.resolve(0),
         $transaction: (cb: (tx: unknown) => unknown) => Promise.resolve(cb(fakePrisma)),
     });
 
@@ -213,9 +217,48 @@ describe('attendanceService.scan', () => {
 
         expect(second.debounced).toBe(true);
         expect(second.action).toBe('CHECK_IN');
-        // Still exactly one session and one event — no phantom toggle.
+        // Still exactly one session — no phantom toggle. The echo is audited as a
+        // DEBOUNCED row; it is bookkeeping, never a second check-in.
         expect(store.sessions).toHaveLength(1);
-        expect(store.events).toHaveLength(1);
+        expect(store.events.map((e) => e.eventType)).toEqual(['CHECK_IN', 'DEBOUNCED']);
+    });
+
+    it('auto-closes a forgotten 17 h shift at the 16 h cap, holds it for approval, then opens a fresh shift', async () => {
+        const emp = seedEmployee();
+        store.sessions.push({
+            id: 's-old',
+            employeeId: emp.id,
+            checkInAt: new Date(Date.now() - 17 * 3_600_000),
+            checkOutAt: null,
+            durationMin: null,
+            autoClosed: false,
+        });
+
+        const result = await attendanceService.scan(ORG_A, { qrCode: emp.qrCode });
+
+        const old = store.sessions.find((s) => s.id === 's-old')!;
+        expect(old).toMatchObject({ autoClosed: true, durationMin: 960 });
+        expect(old.checkOutAt?.getTime()).toBe(old.checkInAt.getTime() + 16 * 3_600_000);
+        // The scan did NOT pay the stale shift as a 17 h check-out; it started a new one.
+        expect(result.action).toBe('CHECK_IN');
+        expect(store.sessions.filter((s) => s.checkOutAt === null)).toHaveLength(1);
+    });
+
+    it('leaves a 15 h shift alone and checks it out normally', async () => {
+        const emp = seedEmployee();
+        store.sessions.push({
+            id: 's-15h',
+            employeeId: emp.id,
+            checkInAt: new Date(Date.now() - 15 * 3_600_000),
+            checkOutAt: null,
+            durationMin: null,
+            autoClosed: false,
+        });
+
+        const result = await attendanceService.scan(ORG_A, { qrCode: emp.qrCode });
+
+        expect(result.action).toBe('CHECK_OUT');
+        expect(store.sessions[0]?.autoClosed).toBe(false);
     });
 
     it('rejects an unknown QR code', async () => {
@@ -256,5 +299,20 @@ describe('attendanceService.recent', () => {
         const result = await attendanceService.recent(ORG_A, { limit: 10 });
 
         expect(result.map((r) => r.id)).toEqual(['ev-a']);
+    });
+
+    it('lists check-ins and check-outs only, not NFC bookkeeping rows', async () => {
+        const emp = seedEmployee({ id: 'emp-a', organizationId: ORG_A, qrCode: 'ATT-a' });
+        const at = new Date();
+        store.events.push(
+            { id: 'ev-in', employeeId: emp.id, sessionId: 's-1', eventType: 'CHECK_IN', scannedAt: at, source: 'nfc' },
+            { id: 'ev-deb', employeeId: emp.id, sessionId: 's-1', eventType: 'DEBOUNCED', scannedAt: at, source: 'nfc' },
+            { id: 'ev-rej', employeeId: emp.id, sessionId: null, eventType: 'REJECTED', scannedAt: at, source: 'nfc' },
+            { id: 'ev-reg', employeeId: emp.id, sessionId: null, eventType: 'REGISTERED', scannedAt: at, source: 'nfc' },
+        );
+
+        const result = await attendanceService.recent(ORG_A, { limit: 10 });
+
+        expect(result.map((r) => r.id)).toEqual(['ev-in']);
     });
 });

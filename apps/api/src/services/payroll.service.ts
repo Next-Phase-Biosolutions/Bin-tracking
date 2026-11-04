@@ -8,6 +8,7 @@ import type {
 } from '@bin-tracker/validators';
 import type { PayrollRunView, PayrollRunSummary } from '@bin-tracker/types';
 import { verifyApprovalCode } from '../lib/approvalCode.js';
+import { attendanceService } from './attendance.service.js';
 
 const MINUTES_PER_HOUR = 60;
 
@@ -163,6 +164,11 @@ export const payrollService = {
             });
         }
 
+        // Forgotten check-outs (open 16 h or more) are closed at the cap and flagged
+        // auto-closed BEFORE the sums run, so they land as AUTO_CLOSED exceptions
+        // held for approval. Lazy and org-scoped: no background job, no other tenant.
+        await attendanceService.closeStaleSessions(orgId);
+
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Atomic create-or-update on the compound key — avoids the
             // find-then-create race where two concurrent calls for the same
@@ -186,7 +192,8 @@ export const payrollService = {
             const resolvedSessionIds = new Set(resolvedExceptions.map((e) => e.sessionId));
             await tx.payrollException.deleteMany({ where: { runId: run.id, resolved: false } });
 
-            // Payable sessions: checked out and not auto-closed, bucketed by
+            // Payable sessions: checked out and either never auto-closed or approved by a
+            // manager (approvedAt), bucketed by
             // local check-in month. WorkSession has no organizationId column of
             // its own, so the org boundary is enforced by joining employees.
             // hourlyRateCents is per-employee (functionally dependent on
@@ -203,7 +210,7 @@ export const payrollService = {
                     JOIN "employees" e ON e."id" = ws."employeeId"
                     WHERE e."organizationId" = ${orgId}
                       AND ws."checkOutAt" IS NOT NULL
-                      AND ws."autoClosed" = false
+                      AND (ws."autoClosed" = false OR ws."approvedAt" IS NOT NULL)
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
                     GROUP BY ws."employeeId", e."hourlyRateCents"
@@ -234,7 +241,7 @@ export const payrollService = {
                 });
             }
 
-            // Dirty sessions: no check-out, or auto-closed. Held back from pay.
+            // Dirty sessions: no check-out, or auto-closed and not yet approved. Held back from pay.
             const exceptionRows = await tx.$queryRaw<
                 Array<{ id: string; employeeId: string; checkOutAt: Date | null }>
             >(
@@ -243,7 +250,7 @@ export const payrollService = {
                     FROM "work_sessions" ws
                     JOIN "employees" e ON e."id" = ws."employeeId"
                     WHERE e."organizationId" = ${orgId}
-                      AND (ws."checkOutAt" IS NULL OR ws."autoClosed" = true)
+                      AND (ws."checkOutAt" IS NULL OR (ws."autoClosed" = true AND ws."approvedAt" IS NULL))
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
                 `,
@@ -336,6 +343,20 @@ export const payrollService = {
             throw new TRPCError({
                 code: 'BAD_REQUEST',
                 message: 'Shifts longer than 16 hours cannot be entered — split the session instead.',
+            });
+        }
+
+        // The fixed check-out must not run into the employee's NEXT shift, or those
+        // minutes would be paid twice. Ending exactly when the next shift begins is fine.
+        const nextSession = await prisma.workSession.findFirst({
+            where: { employeeId: exception.session.employeeId, checkInAt: { gt: checkInAt } },
+            orderBy: { checkInAt: 'asc' },
+            select: { checkInAt: true },
+        });
+        if (nextSession && checkOutAt.getTime() > nextSession.checkInAt.getTime()) {
+            throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: "Checkout overlaps the employee's next shift — choose a time before it starts.",
             });
         }
 

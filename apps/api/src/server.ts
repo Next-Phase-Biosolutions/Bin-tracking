@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyRawBody from 'fastify-raw-body';
@@ -47,9 +48,16 @@ async function buildServer() {
         credentials: true,
     });
 
+    // ─── Cookies (NFC phone pages only — see lib/nfc-cookies.ts) ─
+    // Unsigned: the device cookie is a random secret whose SHA-256 is looked up
+    // server-side, so there is nothing to sign.
+    await server.register(cookie);
+
     // ─── Rate Limiting ───────────────────────────────────────
     await server.register(rateLimit, {
-        max: 100,
+        // RATE_LIMIT_MAX raises the per-IP ceiling when the API sits behind a
+        // proxy that collapses many clients onto few IPs (see docs/nfc-attendance).
+        max: Number(process.env['RATE_LIMIT_MAX'] ?? 100),
         timeWindow: '1 minute',
     });
 
@@ -78,7 +86,7 @@ async function buildServer() {
         prefix: '/trpc',
         trpcOptions: {
             router: appRouter,
-            createContext: ({ req }) => createContext(req),
+            createContext: ({ req, res }) => createContext(req, res),
             // Side-effect hook for error reporting — kept separate from
             // trpc.ts's errorFormatter (which only shapes the client-facing
             // response). `ctx` is available here (v11 HTTPErrorHandlerOptions),

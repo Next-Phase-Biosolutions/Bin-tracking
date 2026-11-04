@@ -1,5 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { middleware } from './trpc.js';
+import { DEVICE_COOKIE, PENDING_COOKIE, readCookie } from '../lib/nfc-cookies.js';
+import { hashToken } from '../lib/token.js';
 
 /**
  * In-memory sliding-window limiter. Single-process only — the existing
@@ -143,6 +145,35 @@ export function bankTokenRateLimit(limiter: SlidingWindowLimiter = bankTokenLimi
                 code: 'TOO_MANY_REQUESTS',
                 message: 'Too many attempts. Try again later.',
             });
+        }
+        return next();
+    });
+}
+
+/**
+ * Registration links: the token is the sole credential, so the same per-IP rule
+ * as the bank-link endpoints, in its own bucket.
+ */
+const registrationStartLimiter = new SlidingWindowLimiter(BANK_TOKEN_ATTEMPTS_PER_HOUR, BANK_TOKEN_WINDOW_MS);
+export const registrationStartRateLimit = () => bankTokenRateLimit(registrationStartLimiter);
+
+/**
+ * NFC taps: keyed on the phone's own cookie (hashed, so no raw secret is held
+ * as a map key), falling back to IP for a cookie-less caller. Deliberately NOT
+ * IP-first: behind Netlify and Caddy many phones can share one IP, and per-IP
+ * limiting would throttle a whole shift change. A rotating cookie value would
+ * dodge this limiter, but such a caller carries no valid session and is stopped
+ * by the global per-IP limit and the NO_SESSION check.
+ */
+const TAPS_PER_MINUTE = 30;
+const tapLimiter = new SlidingWindowLimiter(TAPS_PER_MINUTE, 60 * 1000);
+
+export function tapRateLimit(limiter: SlidingWindowLimiter = tapLimiter) {
+    return middleware(async ({ ctx, next }) => {
+        const cookie = readCookie(ctx.req, DEVICE_COOKIE) ?? readCookie(ctx.req, PENDING_COOKIE);
+        const key = cookie ? `cookie:${hashToken(cookie)}` : `ip:${ctx.req.ip}`;
+        if (!limiter.tryConsume(key)) {
+            throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Too many taps. Wait a moment and try again.' });
         }
         return next();
     });
