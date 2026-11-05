@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { apiClient, type RouterOutputs } from '../../lib/trpc';
+import { apiClient, trpc, type RouterOutputs } from '../../lib/trpc';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { UpgradePrompt } from '../../components/UpgradePrompt';
 import { Icon } from '../../components/ui/Icon';
@@ -70,7 +70,8 @@ export default function GuardScannerPage() {
     }, [scanMode, showScanPanel, scanMutation.isPending]);
 
     const { hasModule, isLoading } = useSubscription();
-    if (isLoading) {
+    const method = trpc.attendance.method.useQuery(undefined, { staleTime: 30_000 });
+    if (isLoading || method.isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-canvas">
                 <FacilityLoader variant="inline" label="access log" />
@@ -81,6 +82,28 @@ export default function GuardScannerPage() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
                 <UpgradePrompt module="WORKFORCE" />
+            </div>
+        );
+    }
+
+    // QR scanning is the original clock-in method: kept, but only usable while the org is on QR.
+    if (method.data?.method !== 'QR') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
+                <Card className="max-w-md p-8 text-center">
+                    <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-olive-deep text-bone-light">
+                        <Icon name="badge" width={22} height={22} />
+                    </span>
+                    <h1 className="mt-4 font-display text-lg font-extrabold text-olive-deep">QR scanning is turned off</h1>
+                    <p role="status" className="mt-2 text-sm text-muted">
+                        Your organisation clocks employees in with NFC cards, so the badge scanner is disabled. An admin can switch back under Settings.
+                    </p>
+                    <Link to="/app/timesheet" className="mt-5 inline-block">
+                        <Button variant="secondary">
+                            <Icon name="clock" width={15} height={15} /> Timesheet
+                        </Button>
+                    </Link>
+                </Card>
             </div>
         );
     }

@@ -10,6 +10,8 @@ import { farmerRouter } from './farmer.router.js';
 import { formRouter } from './form.router.js';
 import { employeeRouter } from './employee.router.js';
 import { attendanceRouter } from './attendance.router.js';
+import { nfcCardRouter } from './nfc-card.router.js';
+import { deviceRegistrationRouter } from './device-registration.router.js';
 import { shipmentRouter } from './shipment.router.js';
 import { payrollRouter } from './payroll.router.js';
 import { billingRouter } from './billing.router.js';
@@ -31,6 +33,8 @@ export const appRouter = router({
     form: formRouter,
     employee: employeeRouter,
     attendance: attendanceRouter,
+    nfcCard: nfcCardRouter,
+    deviceRegistration: deviceRegistrationRouter,
     shipment: shipmentRouter,
     payroll: payrollRouter,
     billing: billingRouter,

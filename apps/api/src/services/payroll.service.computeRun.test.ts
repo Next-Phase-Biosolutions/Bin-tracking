@@ -73,7 +73,13 @@ interface ExceptionRow {
     checkOutAt: Date | null;
 }
 
+// attendanceService.closeStaleSessions has its own tests (attendance.service.test.ts and the
+// DB-backed suite); here it is only observed, so a run is computed from the canned rows below.
+const closeStaleSessions = vi.hoisted(() => vi.fn().mockResolvedValue({ closed: 0 }));
+vi.mock('./attendance.service.js', () => ({ attendanceService: { closeStaleSessions } }));
+
 const store = vi.hoisted(() => ({
+    sqlSeen: [] as string[],
     settings: [] as FakeSettings[],
     runs: [] as FakeRun[],
     lineItems: [] as FakeLineItem[],
@@ -198,7 +204,7 @@ vi.mock('@bin-tracker/db', () => {
         payrollRun: typeof payrollRun;
         payrollLineItem: typeof payrollLineItem;
         payrollException: typeof payrollException;
-        $queryRaw: () => Promise<unknown[]>;
+        $queryRaw: (query?: { strings?: readonly string[] }) => Promise<unknown[]>;
         $transaction: (cb: (tx: FakePrisma) => Promise<void>) => Promise<void>;
     };
 
@@ -207,7 +213,8 @@ vi.mock('@bin-tracker/db', () => {
         payrollRun,
         payrollLineItem,
         payrollException,
-        $queryRaw: () => {
+        $queryRaw: (query) => {
+            store.sqlSeen.push((query?.strings ?? []).join('?'));
             if (store.queryRawQueue.length === 0) {
                 throw new Error('queryRawQueue exhausted — did the test call queueRows() enough times?');
             }
@@ -245,7 +252,9 @@ beforeEach(() => {
     store.employees.clear();
     store.sessions.clear();
     store.queryRawQueue.length = 0;
+    store.sqlSeen.length = 0;
     store.idCounter = 0;
+    closeStaleSessions.mockClear();
 });
 
 describe('payrollService.computeRun', () => {
@@ -418,5 +427,29 @@ describe('payrollService.computeRun', () => {
         expect(result.lineItems).toHaveLength(1);
         expect(result.lineItems[0]).toMatchObject({ employeeId: 'emp-fresh', grossCents: 2500 });
         expect(result.exceptions).toHaveLength(0); // stale unresolved exception was cleared, not resurrected
+    });
+});
+
+describe('payrollService.computeRun — NFC approval and lazy auto-close', () => {
+    it('closes the organization\'s forgotten check-outs before summing, scoped to that org only', async () => {
+        seedSettings();
+        queueRows([]);
+
+        await payrollService.computeRun(ORG_A, { period: '2026-07' });
+
+        expect(closeStaleSessions).toHaveBeenCalledTimes(1);
+        expect(closeStaleSessions).toHaveBeenCalledWith(ORG_A);
+    });
+
+    it('pays an auto-closed session only once approved: clean query accepts approvedAt, exception query holds the rest', async () => {
+        seedSettings();
+        queueRows([]);
+
+        await payrollService.computeRun(ORG_A, { period: '2026-07' });
+
+        const [cleanSql, exceptionSql] = store.sqlSeen.map((q) => q.replace(/\s+/g, ' '));
+        expect(cleanSql).toContain('ws."checkOutAt" IS NOT NULL');
+        expect(cleanSql).toContain('(ws."autoClosed" = false OR ws."approvedAt" IS NOT NULL)');
+        expect(exceptionSql).toContain('(ws."checkOutAt" IS NULL OR (ws."autoClosed" = true AND ws."approvedAt" IS NULL))');
     });
 });

@@ -61,6 +61,21 @@ enum EmployeeStatus {
 enum AttendanceEventType {
   CHECK_IN
   CHECK_OUT
+  // NFC tap bookkeeping. These rows are written for audit only and never open
+  // or close a session: DEBOUNCED = a second tap inside the debounce window,
+  // REJECTED = a tap the card's direction did not allow (e.g. an OUT card
+  // while checked out), REGISTERED = a phone was bound to an employee.
+  DEBOUNCED
+  REJECTED
+  REGISTERED
+}
+
+// What a wall-mounted NFC card does when tapped. BOTH is a single card that
+// toggles: it checks in when the employee is out and checks out when in.
+enum NfcDirection {
+  IN
+  OUT
+  BOTH
 }
 
 enum ShipmentCondition {
@@ -137,6 +152,9 @@ model Organization {
   modules             OrganizationModule[]
   sensorDevices       SensorDevice[]
   sensorReadings      SensorReading[]
+  nfcCards            NfcCard[]
+  registrationTokens  RegistrationToken[]
+  deviceSessions      DeviceSession[]
 
   @@map("organizations")
 }
@@ -641,6 +659,8 @@ model Employee {
   payrollLineItems    PayrollLineItem[]
   payrollExceptions   PayrollException[]
   animalRegistrations AnimalRegistration[]
+  registrationTokens  RegistrationToken[]
+  deviceSessions      DeviceSession[]
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, qrCode])
@@ -656,6 +676,10 @@ model WorkSession {
   checkOutAt  DateTime?
   durationMin Int?
   autoClosed  Boolean   @default(false)
+  // Set when a manager approves an auto-closed session (forgotten check-out).
+  // Payroll pays an auto-closed session only once this is set; until then it
+  // stays a payroll exception. NULL on every session that was never auto-closed.
+  approvedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -665,6 +689,11 @@ model WorkSession {
   payrollExceptions PayrollException[]
 
   // Used to find an employee's currently-open session quickly.
+  //
+  // NOT MODELED HERE: a partial unique index "work_sessions_one_open_per_employee"
+  // ON (employeeId) WHERE checkOutAt IS NULL (migration 20261104120100_nfc_attendance).
+  // Prisma cannot express partial indexes, so `prisma migrate dev` will propose
+  // DROPPING it. Delete that line from any generated migration; never apply it.
   @@index([employeeId, checkOutAt])
   @@index([checkInAt])
   @@map("work_sessions")
@@ -674,18 +703,96 @@ model WorkSession {
 model AttendanceEvent {
   id         String              @id @default(cuid())
   employeeId String
-  sessionId  String
+  // Null for events that belong to no shift (REGISTERED, and a REJECTED tap
+  // made while checked out).
+  sessionId  String?
   eventType  AttendanceEventType
   scannedAt  DateTime            @default(now())
   source     String?
   createdAt  DateTime            @default(now())
 
-  employee Employee    @relation(fields: [employeeId], references: [id])
-  session  WorkSession @relation(fields: [sessionId], references: [id])
+  employee Employee     @relation(fields: [employeeId], references: [id])
+  session  WorkSession? @relation(fields: [sessionId], references: [id])
 
   @@index([employeeId])
   @@index([scannedAt])
   @@map("attendance_events")
+}
+
+// ─── NFC tag attendance ───────────────────────────────────────────
+// A wall-mounted NFC tag carries a URL with its card id. A tap identifies the
+// EMPLOYEE by the phone's device cookie (a hashed DeviceSession) and the DOOR
+// by the card. The card id is just a string in a URL, so a tap is not proof of
+// physical presence — see docs/nfc-attendance.
+
+// One row per physical card/tag. The id (not chipUid) is what is written into
+// the tag's URL, so editing chipUid or direction never invalidates a written tag.
+model NfcCard {
+  id             String       @id @default(cuid())
+  organizationId String
+  label          String
+  direction      NfcDirection
+  // The chip's hardware id, kept for the admin's own records only.
+  chipUid        String
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, chipUid])
+  @@index([organizationId])
+  @@map("nfc_cards")
+}
+
+// Single-use, expiring registration credential. Stored HASHED (lib/token.ts):
+// the raw token only ever exists in the link the manager hands to the employee.
+model RegistrationToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  employeeId     String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  // Set when the token completes a registration.
+  usedAt         DateTime?
+  // Set when a newer link is issued for the same employee before this was used.
+  supersededAt   DateTime?
+  // The 10-minute "mid-registration" cookie. When the employee opens the link the
+  // server mints a fresh RANDOM secret for that browser and stores only its hash
+  // here, so the cookie is never a value derived from (or equal to) anything in
+  // this table. A database read therefore yields no usable credential.
+  pendingHash      String?   @unique
+  pendingExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([organizationId])
+  @@map("registration_tokens")
+}
+
+// One row per registered phone. The device cookie holds a random secret; only
+// its SHA-256 lives here. This (not any client input) is what tells a tap which
+// employee and which organization it belongs to.
+model DeviceSession {
+  id               String    @id @default(cuid())
+  organizationId   String
+  employeeId       String
+  sessionTokenHash String    @unique
+  // Coarse "iPhone · Safari" label from the user agent, shown to admins.
+  deviceLabel      String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([organizationId])
+  @@map("device_sessions")
 }
 
 // ─── Supplier Shipments ───────────────────────────────────────────
@@ -816,6 +923,14 @@ enum PayrollExceptionType {
   AUTO_CLOSED
 }
 
+// How employees clock in and out. Exactly one method is active per organization.
+// NFC = tap a phone on a wall-mounted tag (the default). QR = a guard scans a
+// badge (the original method, kept in the code but off unless chosen here).
+enum AttendanceMethod {
+  NFC
+  QR
+}
+
 // Company-wide config. Single row per org enforced by the unique `organizationId`.
 model Settings {
   id                  String   @id @default(cuid())
@@ -823,6 +938,7 @@ model Settings {
   currency            String   @default("CAD")
   companyTimezone     String   @default("America/Toronto")
   managerEmail        String?
+  attendanceMethod    AttendanceMethod @default(NFC)
   organizationId      String   @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -921,7 +1037,7 @@ model PayrollAuditLog {
   id        String   @id @default(cuid())
   orgId     String
   actorId   String // user id of the admin who made the change
-  action    String // 'settings.update' | 'employee.setHourlyRate' | 'module.toggle'
+  action    String // 'settings.update' | 'employee.setHourlyRate' | 'module.toggle' | 'attendance.approveSession'
   targetId  String? // employeeId for rate changes, ModuleKey for toggles
   oldValue  Json?
   newValue  Json?

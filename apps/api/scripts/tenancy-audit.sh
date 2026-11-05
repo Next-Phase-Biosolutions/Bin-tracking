@@ -69,7 +69,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 
 SERVICES_DIR="apps/api/src/services"
 
-RAW_HITS=$(grep -rn "prisma\.\(facility\|binType\|bin\|binCycle\|employee\|shipment\|formTemplate\|animalRegistration\|settings\|payrollRun\)\." "$SERVICES_DIR" | grep -v organizationId || true)
+RAW_HITS=$(grep -rn "prisma\.\(facility\|binType\|bin\|binCycle\|employee\|shipment\|formTemplate\|animalRegistration\|settings\|payrollRun\|nfcCard\|registrationToken\|deviceSession\)\." "$SERVICES_DIR" | grep -v organizationId || true)
 
 # NOTE: sort (not sort -u) — duplicates are kept so occurrence counts are
 # preserved. See "COUNTING, NOT SET MEMBERSHIP" above.
@@ -169,11 +169,24 @@ CURRENT=$(echo "$RAW_HITS" | sed -E 's/^([^:]+):[0-9]+:[[:space:]]*/\1\t/' | sor
 #            verifyApprovalCode checks the one-time hashed code; a non-DRAFT run
 #            reveals period and status only (no amounts), keyed by an
 #            unguessable cuid runId. See the [TOKEN] category above.
+#
+# NFC attendance (nfc-tap.service.ts, attendance.service.ts) entries:
+#   [FILTER] const employees = await prisma.employee.findMany({ in
+#            attendanceService.facilityStatus — a second occurrence of the line
+#            already listed for summary(); `where: { organizationId: orgId }` is
+#            on the line below, orgId is ctx.orgId, never client input.
+#   [TOKEN]  const session = await prisma.deviceSession.findUnique({ in
+#            nfc-tap.service.ts — the PUBLIC phone tap. The hashed device cookie is
+#            the credential; the org is READ FROM the resolved session row (and must
+#            equal its employee's org), and the card is then looked up SCOPED to that
+#            org, so a missing card and another org's card are the same answer.
+#            Nothing the client sends can choose the org. See [TOKEN] above.
 ALLOWLIST_FILE=$(mktemp)
 trap 'rm -f "$ALLOWLIST_FILE"' EXIT
 cat > "$ALLOWLIST_FILE" <<'EOF'
 apps/api/src/services/admin.service.ts	const run = await prisma.payrollRun.findUnique({
 apps/api/src/services/attendance.service.ts	const employee = await prisma.employee.findUnique({
+apps/api/src/services/attendance.service.ts	const employees = await prisma.employee.findMany({
 apps/api/src/services/attendance.service.ts	const employees = await prisma.employee.findMany({
 apps/api/src/services/bin.service.ts	const activeBins = await prisma.bin.findMany({
 apps/api/src/services/bin.service.ts	const activeBins = await prisma.bin.findMany({
@@ -223,6 +236,7 @@ apps/api/src/services/form.service.ts	const maxSort = await prisma.formTemplate.
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.create({
 apps/api/src/services/form.service.ts	const row = await prisma.formTemplate.findUnique({ where: { id } });
 apps/api/src/services/form.service.ts	const rows = await prisma.formTemplate.findMany({
+apps/api/src/services/nfc-tap.service.ts	const session = await prisma.deviceSession.findUnique({
 apps/api/src/services/payroll.service.ts	const existing = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({
 apps/api/src/services/payroll.service.ts	const run = await prisma.payrollRun.findUnique({ where: { id: runId } });

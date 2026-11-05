@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
-import { SlidingWindowLimiter, aiRateLimit } from './rate-limit.js';
+import { SlidingWindowLimiter, aiRateLimit, consumeTapBudget } from './rate-limit.js';
 
 describe('SlidingWindowLimiter', () => {
     beforeEach(() => {
@@ -43,6 +43,50 @@ describe('SlidingWindowLimiter', () => {
         expect(limiter.tryConsume('org-a')).toBe(true);
         expect(limiter.tryConsume('org-a')).toBe(false);
         expect(limiter.tryConsume('org-b')).toBe(true);
+    });
+
+    it('does not grow forever under a flood of distinct keys: expired keys are swept', () => {
+        const limiter = new SlidingWindowLimiter(5, 60_000);
+        const tracked = () => (limiter as unknown as { hits: Map<string, number[]> }).hits.size;
+
+        for (let i = 0; i < 10_001; i++) limiter.tryConsume(`key-${i}`);
+        expect(tracked()).toBe(10_001);
+
+        vi.advanceTimersByTime(61_000); // every key above has left its window
+        limiter.tryConsume('fresh'); // the sweep runs on the next hit
+        expect(tracked()).toBe(1);
+    });
+
+    it('has a hard ceiling on tracked keys, so a flood of distinct live keys cannot grow it without bound', () => {
+        const limiter = new SlidingWindowLimiter(5, 60_000);
+        const hits = () => (limiter as unknown as { hits: Map<string, number[]> }).hits;
+
+        for (let i = 0; i < 50_005; i++) limiter.tryConsume(`flood-${i}`); // all still inside the window
+
+        expect(hits().size).toBeLessThanOrEqual(50_000);
+        expect(hits().has('flood-0')).toBe(false); // the oldest were dropped
+        expect(hits().has('flood-50004')).toBe(true); // the newest are kept
+    });
+
+    it('sweeping never forgets a key that is still inside its window', () => {
+        const limiter = new SlidingWindowLimiter(1, 60_000);
+        for (let i = 0; i < 10_001; i++) limiter.tryConsume(`old-${i}`);
+        vi.advanceTimersByTime(30_000);
+        limiter.tryConsume('recent'); // still counts after a sweep that removes nothing yet
+        vi.advanceTimersByTime(31_000); // 'old-*' expired, 'recent' not
+        limiter.tryConsume('trigger'); // triggers the sweep
+
+        expect(limiter.tryConsume('recent')).toBe(false);
+    });
+});
+
+describe('consumeTapBudget', () => {
+    it('allows 30 taps a minute per registered phone, then answers with a retryable 429', () => {
+        const limiter = new SlidingWindowLimiter(30, 60_000);
+        for (let i = 0; i < 30; i++) expect(() => consumeTapBudget('session-1', limiter)).not.toThrow();
+
+        expect(() => consumeTapBudget('session-1', limiter)).toThrowError(expect.objectContaining({ appCode: 'TOO_MANY_TAPS', code: 'TOO_MANY_REQUESTS' }));
+        expect(() => consumeTapBudget('session-2', limiter)).not.toThrow(); // another phone is unaffected
     });
 });
 
