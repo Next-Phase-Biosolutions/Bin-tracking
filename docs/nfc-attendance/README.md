@@ -11,6 +11,15 @@ Design background and every deviation from the prototype it was ported from: [RE
 3. The page identifies the employee from a cookie in that browser, records the punch, and shows the result: *Checked in at 9:02 AM*, or *Checked out, worked 8h 9m*.
 4. The punch writes the same `work_sessions` rows the QR guard scanner writes, so Timesheet and Payroll need no separate path.
 
+## Clock-in method: NFC or QR (exactly one is active)
+
+Each organization has one active clock-in method, **Settings → Clock-in method** (ADMIN only; every change is written to the payroll audit log):
+
+- **NFC (the default):** phones tap tags. The QR badge scan (`attendance.scan`, the Employee Scanner page and its menu entry) is **switched off**: it answers `QR_DISABLED` and records nothing.
+- **QR:** the original badge scanner works as before. NFC taps and phone registration are switched off: they answer `NFC_DISABLED` and record nothing. You can still prepare cards and phones.
+
+Nothing was deleted: `Employee.qrCode`, the scanner page and the scan procedure all remain, so flipping the setting is also the **rollback**. The migration sets every existing organization to NFC, so **deploy only after tags are written and phones are registered**, or employees will be unable to clock in until an admin flips the setting back.
+
 ## Tag URL
 
 ```
@@ -70,7 +79,9 @@ Everything is behind the **WORKFORCE** module.
 | `CORS_ORIGIN` | (required in prod) | Also accepted as a trusted origin for those calls. |
 | `COOKIE_SECURE` | on | `false` allows the phone cookies over plain http for local LAN testing. Ignored in production. |
 | `DB_POOL_MAX` | `10` | Postgres pool size. Raise to match the pooler. |
-| `RATE_LIMIT_MAX` | `100` | Global per-IP requests/minute. See "Rate limits". |
+| `RATE_LIMIT_MAX` | `100` | Per-IP requests/minute for the API (not the phone routes). See "Rate limits". |
+| `NFC_RATE_LIMIT_MAX` | `3000` | Per-IP requests/minute for the two phone routes, in a bucket of their own. |
+| `REGISTRATION_STARTS_PER_HOUR` | `1000` | Registration-link opens per address per hour. |
 | `CLIENT_IP_HEADER` | unset | Header holding the real client IP (Netlify: `x-nf-client-connection-ip`). Makes every limiter key on it. **Read "Rate limits" before setting.** |
 
 ## Security notes
@@ -93,19 +104,16 @@ What is protected:
 ### Rate limits
 
 - **Per registered phone:** 30 taps/minute, counted after the cookie is validated (a garbage cookie cannot create counters).
-- **Registration links:** 200 opens/hour per address. The link token itself is 256-bit and unguessable, so this only bounds cheap lookups.
-- **Global:** 100 requests/minute per address across the whole API (`RATE_LIMIT_MAX`).
+- **Registration links:** 1,000 opens/hour per address (`REGISTRATION_STARTS_PER_HOUR`). The link token itself is 256-bit and unguessable, so this only bounds cheap lookups, and it must be roomy because a whole company enrolls behind one proxy address.
+- **Phone routes (`attendance.tap`, `deviceRegistration.start`):** their own bucket of 3,000 requests/minute per address (`NFC_RATE_LIMIT_MAX`), separate from the rest of the API, so a shift-start burst behind the proxy is not refused and phone traffic never spends the API's budget. A request that mixes in any other procedure does not qualify.
+- **Everything else:** 100 requests/minute per address (`RATE_LIMIT_MAX`).
 
-**Known limitation (also true of the rest of the API before NFC): behind Netlify and Caddy the API sees the proxy's address for everyone**, so "per address" becomes one bucket shared by the whole company, and any anonymous caller who sends more than the global limit locks everyone out for a minute. The phone pages make this more visible because every tap goes through the Netlify rewrite.
+Behind Netlify and Caddy the API still sees the proxy's address for everyone, so "per address" is shared by the whole company. That is why the phone routes have a large ceiling of their own. If the API itself ever answers HTTP 429 to a phone, the tap page shows "The system is busy, wait a moment and tap again" and repeats safely (nothing was recorded).
 
-To fix it properly, once and on the real deployment:
+To key limits on the real client address instead (optional, for the non-phone routes):
 
-1. On staging, send a request through `https://<site>/trpc/…` and look at which headers reach the API (log them, or use a tiny echo route) to confirm Netlify's `x-nf-client-connection-ip` arrives intact.
-2. Confirm the API cannot be reached by a spoofer who sets that header, or accept that it can (a caller who spoofs the header only chooses their own bucket; they can already reach the API directly).
-3. Set `CLIENT_IP_HEADER=x-nf-client-connection-ip` on the API. Every limiter then keys on the real client address. **Only do this once the API origin cannot be reached around the edge, or Caddy overwrites that header**: while the API is directly reachable, a caller can send any value and choose their own bucket. The limiter's memory is bounded either way (expired keys are swept, and a hard ceiling of 50,000 keys drops the oldest), so the worst a spoofer gets is a weaker limit for themselves.
-4. Until then, raise `RATE_LIMIT_MAX` (e.g. 600) so a shift start does not hit the shared bucket, and treat it as a stopgap.
-
-I could not verify any of this from outside the deployment, which is why `CLIENT_IP_HEADER` is off by default.
+1. On staging, send a request through `https://<site>/trpc/…` and look at which headers reach the API to confirm Netlify's `x-nf-client-connection-ip` arrives intact.
+2. Set `CLIENT_IP_HEADER=x-nf-client-connection-ip` on the API. **Only do this once the API origin cannot be reached around the edge, or Caddy overwrites that header**: while the API is directly reachable, a caller can send any value and choose their own bucket. The limiter's memory is bounded either way (expired keys are swept, and a hard ceiling of 50,000 keys drops the oldest).
 
 ## Deployment notes
 
@@ -114,7 +122,7 @@ I could not verify any of this from outside the deployment, which is why `CLIENT
   ```sql
   SELECT "employeeId", count(*) FROM work_sessions WHERE "checkOutAt" IS NULL GROUP BY 1 HAVING count(*) > 1;
   ```
-- **Approving into a frozen month is refused.** Approving a forgotten check-out adds hours to the payroll period it falls in; if that month's run is already APPROVED, PAID or CANCELLED it can never be recomputed, so the approval is refused with a clear message rather than silently never paying. An approved shift is also capped at 24 hours.
+- **Approving into a frozen month is refused.** Approving a forgotten check-out adds hours to the payroll period it falls in; if that month's run is already APPROVED, PAID or CANCELLED it can never be recomputed, so the approval is refused with a clear message rather than silently never paying. An approved shift is capped at 16 hours, the same cap as the auto-close and Payroll's "Fix checkout": one policy for both ways of resolving a forgotten check-out. (A forgotten shift is closed at exactly 16 h, so the real check-out a manager enters can only be earlier; a longer genuine shift cannot be paid through either path.)
 - `prisma migrate dev` will propose **dropping** the `work_sessions_one_open_per_employee` index (Prisma cannot model partial indexes). Delete that line from any generated migration.
 
 ## Physical test checklist
@@ -137,7 +145,7 @@ Daily use
 - [ ] Tap again within 5 s: the same message, no second check-in.
 - [ ] Wait, tap again: *Checked out, worked …*.
 - [ ] Close the browser completely, reopen, tap: it still works (the cookie persisted). On iPhone, also try after the phone has been locked and unlocked.
-- [ ] Tap with the phone's NFC disabled / a non-NFC phone: nothing opens (expected; use the QR guard scanner).
+- [ ] Tap with the phone's NFC disabled / a non-NFC phone: nothing opens (expected; an admin can switch the organization to the QR method under Settings if needed).
 
 Failure cases
 - [ ] A phone that was never registered: *Phone not registered*.
@@ -147,7 +155,8 @@ Failure cases
 - [ ] Shift start: have 10+ people tap within seconds; watch for HTTP 429 in the browser network tab.
 
 Rate limits (see "Rate limits" above)
-- [ ] With the Netlify rewrite live, check which client-IP header reaches the API, then decide on `CLIENT_IP_HEADER` / `RATE_LIMIT_MAX`.
+- [ ] With the Netlify rewrite live, send a burst of taps through it (see "Rate limits") and confirm none are refused; optionally check which client-IP header reaches the API and decide on `CLIENT_IP_HEADER`.
+- [ ] Before the deploy: tags written, phones registered, then confirm Settings → Clock-in method shows NFC (the migration default). Flipping it to QR is the rollback.
 
 Things to record, because they could not be verified from here: whether the cookie survives a week on iPhone Safari through the Netlify rewrite, and what client IP the API sees.
 
@@ -162,7 +171,8 @@ Things to record, because they could not be verified from here: whether the cook
 - **Retries are a heuristic, not a guarantee.** The tap page repeats a failed request only when that is very unlikely to record a second punch (a 429 before any ambiguous failure, or anything within 3 s of the first attempt) and otherwise says "couldn't confirm your tap". A server-side idempotency key (one id per page load, stored on the event) would make retries unconditionally safe and is the proposed follow-up.
 - **Approving races with payroll finalization.** The approval reads the month's run status under the employee lock, but moving a run out of DRAFT (done by the payment agent) takes no such lock, so a finalize landing in the same few milliseconds could leave an approved shift unpaid. An approval made after `computeRun` while the run is still DRAFT leaves the run stale until it is recomputed (the UI says so).
 - **Opening the registration link twice** (two tabs, two phones) lets the last one win; the earlier browser then sees "link not valid" and the employee just opens the link again.
-- **Pay caps differ on purpose:** approving a forgotten check-out may enter real overtime up to 24 h; the older payroll "Fix checkout" action keeps its 16 h cap.
+- **One 16 h cap everywhere:** auto-close, NFC approval and Payroll's "Fix checkout" all use `MAX_SHIFT_MS` (`attendance-punch.ts`). Change it in that one place if genuine longer shifts need to be payable.
+- **Auto-close is audited:** closing a forgotten shift writes a `CHECK_OUT` event with source `auto-close` at the 16 h mark, so the event log and the recent-scans feed never show a check-in with no check-out. That event is not a punch and is never echoed as a double-tap.
 - **Netlify deploy previews** have a different origin, so cookie-authenticated calls from them fail with `BAD_ORIGIN`. Production is unaffected.
 
 ## Running the tests

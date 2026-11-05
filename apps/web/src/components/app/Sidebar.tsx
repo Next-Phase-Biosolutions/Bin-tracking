@@ -43,6 +43,7 @@ function NavGroup({
     subscriptionLoading,
     orgRole,
     roleLoading,
+    attendanceMethod,
     collapsed,
 }: {
     title: string;
@@ -52,11 +53,14 @@ function NavGroup({
     subscriptionLoading: boolean;
     orgRole: string | null | undefined;
     roleLoading: boolean;
+    /** The org's active clock-in method; undefined while loading (method-specific links stay hidden). */
+    attendanceMethod?: 'NFC' | 'QR';
     collapsed: boolean;
 }) {
     const visibleItems = items.filter((item) => {
         if (item.module && (subscriptionLoading || !hasModule(item.module))) return false;
         if (item.roles && (roleLoading || !orgRole || !(item.roles as string[]).includes(orgRole))) return false;
+        if (item.attendanceMethod && item.attendanceMethod !== attendanceMethod) return false;
         return true;
     });
     if (visibleItems.length === 0) return null;
@@ -100,6 +104,8 @@ export function Sidebar({
     // served by admin.whoAmI. Server-side platformAdminProcedure is the real
     // gate; this only decides whether to show the nav entry.
     const whoAmI = trpc.admin.whoAmI.useQuery(undefined, { staleTime: 300_000 });
+    // Which clock-in method the org uses: only that method's links are shown (QR scanner vs NFC cards).
+    const attendanceMethod = trpc.attendance.method.useQuery(undefined, { staleTime: 60_000 }).data?.method;
     // Show the active organization's name under the logo (falls back to the
     // brand name while loading / for a not-yet-onboarded user).
     const myOrgs = trpc.auth.myOrgs.useQuery(undefined, { staleTime: 300_000 });
@@ -149,7 +155,7 @@ export function Sidebar({
 
             <nav className="scroll-thin flex-1 overflow-y-auto pb-4">
                 <NavGroup title="Facility Zones" items={facilityZonesNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
-                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
+                <NavGroup title="Operations" items={operationsNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={!modulesReady} orgRole={me.data?.orgRole} roleLoading={me.isLoading} attendanceMethod={attendanceMethod} collapsed={collapsed} />
                 {platformNav.length > 0 ? (
                     <NavGroup title="Platform" items={platformNav} pathname={pathname} hasModule={hasModule} subscriptionLoading={false} orgRole={me.data?.orgRole} roleLoading={me.isLoading} collapsed={collapsed} />
                 ) : null}

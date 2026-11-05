@@ -16,8 +16,8 @@ export function EmployeePhoneCell({ employee, devices }: { employee: Employee; d
     const [open, setOpen] = useState(false);
     return (
         <>
-            <div className="flex items-center gap-2">
-                {devices.length > 0 ? <Badge tone="good">{devices.length === 1 ? '1 phone' : `${devices.length} phones`}</Badge> : <Badge tone="idle">Not set up</Badge>}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+                {devices.length > 0 ? <Badge tone="good" className="whitespace-nowrap">{devices.length === 1 ? '1 phone' : `${devices.length} phones`}</Badge> : <Badge tone="idle" className="whitespace-nowrap">Not set up</Badge>}
                 <button
                     type="button"
                     onClick={() => setOpen(true)}

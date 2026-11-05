@@ -1,5 +1,5 @@
 import { router, orgAdminProcedure } from '../trpc/trpc.js';
-import { updatePayrollSettingsSchema } from '@bin-tracker/validators';
+import { updatePayrollSettingsSchema, setAttendanceMethodSchema } from '@bin-tracker/validators';
 import { settingsService } from '../services/settings.service.js';
 
 /**
@@ -14,4 +14,9 @@ export const settingsRouter = router({
     update: orgAdminProcedure
         .input(updatePayrollSettingsSchema)
         .mutation(({ ctx, input }) => settingsService.update(ctx.orgId, input, ctx.user!.id)),
+
+    /** Switch between NFC tap attendance and the original QR badge scan (admin only, audited). */
+    setAttendanceMethod: orgAdminProcedure
+        .input(setAttendanceMethodSchema)
+        .mutation(({ ctx, input }) => settingsService.setAttendanceMethod(ctx.orgId, input.method, ctx.user!.id)),
 });

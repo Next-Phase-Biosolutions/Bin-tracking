@@ -923,6 +923,14 @@ enum PayrollExceptionType {
   AUTO_CLOSED
 }
 
+// How employees clock in and out. Exactly one method is active per organization.
+// NFC = tap a phone on a wall-mounted tag (the default). QR = a guard scans a
+// badge (the original method, kept in the code but off unless chosen here).
+enum AttendanceMethod {
+  NFC
+  QR
+}
+
 // Company-wide config. Single row per org enforced by the unique `organizationId`.
 model Settings {
   id                  String   @id @default(cuid())
@@ -930,6 +938,7 @@ model Settings {
   currency            String   @default("CAD")
   companyTimezone     String   @default("America/Toronto")
   managerEmail        String?
+  attendanceMethod    AttendanceMethod @default(NFC)
   organizationId      String   @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

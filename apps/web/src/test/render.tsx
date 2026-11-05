@@ -23,3 +23,11 @@ export function apiError(appCode: string, httpStatus = 409) {
 export function gatewayError() {
     return new TRPCClientError('Unexpected token < in JSON');
 }
+
+/**
+ * What the tRPC client throws when the API's global rate limiter answers HTTP 429 with its own
+ * non-tRPC JSON body: no data or shape at all, only the raw response status on `meta`.
+ */
+export function rateLimiterError() {
+    return new TRPCClientError('Unable to transform response from server', { meta: { response: { status: 429 } as Response } });
+}

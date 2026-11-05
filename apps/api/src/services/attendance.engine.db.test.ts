@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bin-tracker/db';
 import { cleanupOrg, dbTestsEnabled, seedCard, seedCrowd, seedDevice, seedEmployee, seedOrg } from '../test-support/db.js';
-import { withLock } from '../lib/with-lock.js';
+import { withAdvisoryLock, withLock } from '../lib/with-lock.js';
 import { periodOf } from '../lib/period.js';
 import { attendanceService } from './attendance.service.js';
 import { tap } from './nfc-tap.service.js';
@@ -219,6 +219,46 @@ suite('attendance engine (real Postgres)', () => {
             expect((await sessions(b.employee.id))[0]).toMatchObject({ autoClosed: false });
         });
 
+        it('auto-close leaves an audit trail: a CHECK_OUT event stamped at the 16 h mark with source "auto-close"', async () => {
+            const { employee, token } = await person();
+            const both = await seedCard(orgId, 'BOTH');
+            const old = await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: new Date(T0.getTime() - hours(17)) } });
+            await prisma.attendanceEvent.create({ data: { employeeId: employee.id, sessionId: old.id, eventType: 'CHECK_IN', scannedAt: old.checkInAt, source: 'nfc' } });
+
+            await punch(both.id, token, T0);
+
+            const autoClose = (await events(employee.id)).filter((e) => e.source === 'auto-close');
+            expect(autoClose).toHaveLength(1);
+            expect(autoClose[0]).toMatchObject({ eventType: 'CHECK_OUT', sessionId: old.id });
+            expect(autoClose[0]!.scannedAt.getTime()).toBe(old.checkInAt.getTime() + hours(16));
+            // the recent-scans feed now shows the in AND the out, not a lone check-in
+            const feed = await attendanceService.recent(orgId, { limit: 50 });
+            expect(feed.filter((e) => e.employeeCode === employee.employeeCode).map((e) => `${e.eventType}:${e.source}`)).toEqual(expect.arrayContaining(['CHECK_OUT:auto-close']));
+        });
+
+        it('a tap only seconds after the 16 h mark is a real check-in, not an echo of the system\'s auto-close event', async () => {
+            const { employee, token } = await person();
+            const both = await seedCard(orgId, 'BOTH');
+            await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: new Date(T0.getTime() - hours(16) - 2000) } }); // capped 2 s ago
+
+            const result = await punch(both.id, token, T0);
+
+            expect(result.result).toMatchObject({ status: 'CHECK_IN', debounced: false });
+            expect((await sessions(employee.id)).filter((x) => x.checkOutAt === null)).toHaveLength(1);
+        });
+
+        it('closeStaleSessions (payroll) writes the same audit event, once per shift', async () => {
+            const employee = await seedEmployee(orgId);
+            const old = await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: new Date(Date.now() - hours(20)) } });
+
+            await attendanceService.closeStaleSessions(orgId);
+            await attendanceService.closeStaleSessions(orgId); // idempotent: nothing left open
+
+            const autoClose = (await events(employee.id)).filter((e) => e.source === 'auto-close');
+            expect(autoClose).toHaveLength(1);
+            expect(autoClose[0]).toMatchObject({ eventType: 'CHECK_OUT', sessionId: old.id });
+        });
+
         it('closeStaleSessions closes only THIS organization\'s forgotten shifts', async () => {
             const mine = await seedEmployee(orgId);
             const theirs = await seedEmployee(otherOrgId);
@@ -303,7 +343,95 @@ suite('attendance engine (real Postgres)', () => {
         }, 120_000);
     });
 
+    describe('the database advisory lock on its own (no in-process queue in front)', () => {
+        const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+        /** Runs `n` holders and reports the most that were ever inside their critical section at once. */
+        async function maxConcurrent(keys: string[]) {
+            let inside = 0;
+            let max = 0;
+            await Promise.all(
+                keys.map((key) =>
+                    withAdvisoryLock(key, async () => {
+                        inside++;
+                        max = Math.max(max, inside);
+                        await sleep(150);
+                        inside--;
+                    }),
+                ),
+            );
+            return max;
+        }
+
+        it('serializes two holders of the SAME key even without the in-process mutex (what protects several API instances)', async () => {
+            const key = `employee:lock-same-${Date.now()}`;
+            const started = Date.now();
+
+            expect(await maxConcurrent([key, key, key])).toBe(1);
+            expect(Date.now() - started).toBeGreaterThanOrEqual(430); // three 150 ms sections, one after another
+        });
+
+        it('lets holders of DIFFERENT keys run together', async () => {
+            const stamp = Date.now();
+
+            expect(await maxConcurrent([`employee:lock-a-${stamp}`, `employee:lock-b-${stamp}`, `employee:lock-c-${stamp}`])).toBe(3);
+        });
+    });
+
+    describe('retry on the unique-index backstop (P2002)', () => {
+        const p2002 = () => Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+
+        it('retries a P2002 when the caller asks for it, and the second attempt wins', async () => {
+            let attempts = 0;
+
+            const out = await withLock(
+                `employee:p2002-yes-${Date.now()}`,
+                async () => {
+                    attempts++;
+                    if (attempts === 1) throw p2002();
+                    return 'recorded';
+                },
+                { retryOn: ['P2002'] },
+            );
+
+            expect(out).toBe('recorded');
+            expect(attempts).toBe(2);
+        });
+
+        it('does NOT retry a P2002 the caller did not ask about', async () => {
+            let attempts = 0;
+
+            await expect(
+                withLock(`employee:p2002-no-${Date.now()}`, async () => {
+                    attempts++;
+                    throw p2002();
+                }),
+            ).rejects.toMatchObject({ code: 'P2002' });
+            expect(attempts).toBe(1);
+        });
+
+        it('gives up after five attempts instead of looping forever', async () => {
+            let attempts = 0;
+
+            await expect(
+                withLock(
+                    `employee:p2002-loop-${Date.now()}`,
+                    async () => {
+                        attempts++;
+                        throw p2002();
+                    },
+                    { retryOn: ['P2002'] },
+                ),
+            ).rejects.toMatchObject({ code: 'P2002' });
+            expect(attempts).toBe(5);
+        });
+    });
+
     describe('QR scan shares the same engine', () => {
+        // QR scanning only works while the organization is on QR (NFC is the default).
+        beforeAll(() => prisma.settings.updateMany({ where: { organizationId: { in: [orgId, otherOrgId] } }, data: { attendanceMethod: 'QR' } }));
+        afterAll(() => prisma.settings.updateMany({ where: { organizationId: { in: [orgId, otherOrgId] } }, data: { attendanceMethod: 'NFC' } }));
+
         it('scan checks in, debounces, and checks out through the lock', async () => {
             const employee = await seedEmployee(orgId);
 
@@ -363,13 +491,13 @@ suite('attendance engine (real Postgres)', () => {
             expect((await attendanceService.listPendingApprovals(orgId)).map((p) => p.id)).not.toContain(session.id);
         });
 
-        it('approving with a real, later check-out uses that time (genuine overtime)', async () => {
+        it('approving with a real, earlier check-out uses that time (the employee left long before the 16 h cap)', async () => {
             const { session, checkInAt } = await autoClosed();
-            const realCheckOut = new Date(checkInAt.getTime() + hours(19));
+            const realCheckOut = new Date(checkInAt.getTime() + hours(11));
 
             const approved = await attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: realCheckOut.toISOString() }, T0);
 
-            expect(approved.durationMin).toBe(19 * 60);
+            expect(approved.durationMin).toBe(11 * 60);
         });
 
         it('writes an audit row when an actor is known', async () => {
@@ -403,7 +531,7 @@ suite('attendance engine (real Postgres)', () => {
 
         it('refuses an approval whose check-out overlaps the next shift, allows ending exactly when it starts', async () => {
             const { employee, session, checkInAt } = await autoClosed();
-            const nextStart = new Date(checkInAt.getTime() + hours(18));
+            const nextStart = new Date(checkInAt.getTime() + hours(12));
             await prisma.workSession.create({ data: { employeeId: employee.id, checkInAt: nextStart } }); // still open
 
             await expect(
@@ -412,7 +540,7 @@ suite('attendance engine (real Postgres)', () => {
             expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
 
             const ok = await attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: nextStart.toISOString() }, T0);
-            expect(ok.durationMin).toBe(18 * 60);
+            expect(ok.durationMin).toBe(12 * 60);
         });
 
         it('also checks overlap when approving as-is (the closed time itself may run into the next shift)', async () => {
@@ -423,19 +551,19 @@ suite('attendance engine (real Postgres)', () => {
             expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
         });
 
-        it('refuses to approve a shift longer than 24 hours, and accepts exactly 24', async () => {
+        it('refuses to approve a shift longer than 16 hours (the same cap as Payroll\'s Fix checkout), and accepts exactly 16', async () => {
             const { session, checkInAt } = await autoClosed(); // checked in 20 h before T0
             const later = new Date(T0.getTime() + hours(30)); // "now": late enough that both times below are in the past
-            const tooLong = new Date(checkInAt.getTime() + hours(25));
-            const exactly24 = new Date(checkInAt.getTime() + hours(24));
+            const tooLong = new Date(checkInAt.getTime() + hours(17));
+            const exactly16 = new Date(checkInAt.getTime() + hours(16));
 
             await expect(
                 attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: tooLong.toISOString() }, later),
             ).rejects.toMatchObject({ appCode: 'SHIFT_TOO_LONG' });
             expect((await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).approvedAt).toBeNull();
             await expect(
-                attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: exactly24.toISOString() }, later),
-            ).resolves.toMatchObject({ durationMin: 24 * 60 });
+                attendanceService.approveWorkSession(orgId, null, { id: session.id, checkOutAt: exactly16.toISOString() }, later),
+            ).resolves.toMatchObject({ durationMin: 16 * 60 });
         });
 
         describe('payroll runs that are no longer drafts', () => {

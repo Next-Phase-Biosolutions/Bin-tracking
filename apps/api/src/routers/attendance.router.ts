@@ -8,6 +8,7 @@ import {
 } from '@bin-tracker/validators';
 import { attendanceService } from '../services/attendance.service.js';
 import { tap } from '../services/nfc-tap.service.js';
+import { getAttendanceMethod } from '../lib/attendance-method.js';
 import { TERMINAL_TOKEN_ERRORS } from '../services/device-registration.service.js';
 import { AppError } from '../lib/app-error.js';
 import {
@@ -24,6 +25,12 @@ import {
 const manager = orgOpsProcedure.use(requireModule('WORKFORCE'));
 
 export const attendanceRouter = router({
+    /**
+     * Which clock-in method the caller's organization uses (NFC or QR). Any org member may
+     * read it: the sidebar and the guard page need it to show only the active method.
+     */
+    method: orgProcedure.query(async ({ ctx }) => ({ method: await getAttendanceMethod(ctx.orgId) })),
+
     /** Guard scan — toggles check-in / check-out for the scanned badge */
     scan: orgProcedure
         .use(requireModule('WORKFORCE'))

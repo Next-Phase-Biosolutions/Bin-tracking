@@ -14,7 +14,7 @@ import { registerStripeWebhook } from './routes/stripe-webhook.js';
 import { registerSensorIngest } from './routes/sensor-ingest.js';
 import { initSentry, captureError } from './lib/sentry.js';
 import { validateEnv } from './lib/env.js';
-import { clientIp } from './lib/client-ip.js';
+import { rateLimitOptions } from './lib/rate-limit-config.js';
 
 // Fail fast on a misconfigured production environment — before Sentry init,
 // before the server binds. No-op outside production (lib/env.ts).
@@ -55,14 +55,9 @@ async function buildServer() {
     await server.register(cookie);
 
     // ─── Rate Limiting ───────────────────────────────────────
-    await server.register(rateLimit, {
-        // RATE_LIMIT_MAX raises the per-IP ceiling when the API sits behind a
-        // proxy that collapses many clients onto few IPs (see docs/nfc-attendance).
-        max: Number(process.env['RATE_LIMIT_MAX'] ?? 100),
-        // req.ip is the proxy for everyone unless CLIENT_IP_HEADER is set (lib/client-ip.ts).
-        keyGenerator: (request) => clientIp(request),
-        timeWindow: '1 minute',
-    });
+    // Per-IP limits (lib/rate-limit-config.ts): the API's strict default, plus a separate, larger
+    // bucket for the two phone procedures so a shift-start burst behind the proxy is not refused.
+    await server.register(rateLimit, rateLimitOptions());
 
     // ─── Health Check (raw Fastify — no tRPC, no auth) ──────
     server.get('/health', async (_request, reply) => {

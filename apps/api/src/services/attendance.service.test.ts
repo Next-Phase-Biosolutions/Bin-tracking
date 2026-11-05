@@ -40,6 +40,8 @@ const store = vi.hoisted(() => {
         sessions: [] as FakeSession[],
         events: [] as FakeEvent[],
         seq: 0,
+        // The org's clock-in method. QR scans only work while it is 'QR'; the suite below runs the QR path.
+        method: 'QR' as 'NFC' | 'QR',
     };
 });
 
@@ -130,7 +132,12 @@ vi.mock('@bin-tracker/db', () => {
         },
     };
 
+    const settings = {
+        findUnique: () => Promise.resolve({ attendanceMethod: store.method }),
+    };
+
     Object.assign(fakePrisma, {
+        settings,
         employee,
         workSession,
         attendanceEvent,
@@ -167,6 +174,31 @@ beforeEach(() => {
     store.sessions.length = 0;
     store.events.length = 0;
     store.seq = 0;
+    store.method = 'QR';
+});
+
+describe('attendanceService.scan: method switch', () => {
+    it('refuses a QR scan while the organization is on NFC, and records nothing', async () => {
+        store.method = 'NFC';
+        const emp = seedEmployee();
+
+        await expect(attendanceService.scan(ORG_A, { qrCode: emp.qrCode })).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            appCode: 'QR_DISABLED',
+        });
+        expect(store.sessions).toHaveLength(0);
+        expect(store.events).toHaveLength(0);
+    });
+
+    it('works again as soon as the organization is switched back to QR (the rollback)', async () => {
+        store.method = 'NFC';
+        const emp = seedEmployee();
+        await expect(attendanceService.scan(ORG_A, { qrCode: emp.qrCode })).rejects.toMatchObject({ appCode: 'QR_DISABLED' });
+
+        store.method = 'QR';
+
+        await expect(attendanceService.scan(ORG_A, { qrCode: emp.qrCode })).resolves.toMatchObject({ action: 'CHECK_IN' });
+    });
 });
 
 describe('attendanceService.scan', () => {

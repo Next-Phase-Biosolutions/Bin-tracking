@@ -29,7 +29,7 @@ export function dbTestsEnabled(url: string | undefined = process.env['DATABASE_U
 
 const unique = () => randomUUID().replace(/-/g, '').slice(0, 12);
 
-export async function seedOrg(tag: string, options: { workforce?: boolean } = {}) {
+export async function seedOrg(tag: string, options: { workforce?: boolean; attendanceMethod?: 'NFC' | 'QR' } = {}) {
     const id = unique();
     const org = await prisma.organization.create({ data: { name: `NFC test ${tag}`, slug: `nfc-test-${tag}-${id}` } });
     await prisma.organizationModule.createMany({
@@ -38,7 +38,9 @@ export async function seedOrg(tag: string, options: { workforce?: boolean } = {}
             { orgId: org.id, module: 'PAYROLL', enabled: true },
         ],
     });
-    await prisma.settings.create({ data: { organizationId: org.id, flatHourlyRateCents: 2000, companyTimezone: 'America/Toronto' } });
+    await prisma.settings.create({
+        data: { organizationId: org.id, flatHourlyRateCents: 2000, companyTimezone: 'America/Toronto', ...(options.attendanceMethod ? { attendanceMethod: options.attendanceMethod } : {}) },
+    });
     return org;
 }
 

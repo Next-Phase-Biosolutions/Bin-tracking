@@ -1,5 +1,6 @@
 import { prisma } from '@bin-tracker/db';
-import type { UpdatePayrollSettingsInput } from '@bin-tracker/validators';
+import { TRPCError } from '@trpc/server';
+import type { AttendanceMethodInput, UpdatePayrollSettingsInput } from '@bin-tracker/validators';
 import { sendManagerEmailChangedNotice } from '../lib/email.js';
 import { captureError } from '../lib/sentry.js';
 
@@ -61,5 +62,32 @@ export const settingsService = {
         }
 
         return updated;
+    },
+
+    /**
+     * Switch the organization between NFC tap attendance and the original QR badge scan.
+     * Exactly one is active. Recorded in PayrollAuditLog (who/old/new): it decides which
+     * clock-in records feed payroll. A no-op write (same value) is not logged.
+     */
+    async setAttendanceMethod(orgId: string, method: AttendanceMethodInput, actorId: string) {
+        const existing = await prisma.settings.findUnique({ where: { organizationId: orgId } });
+        if (!existing) {
+            throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Payroll settings are not configured yet. Set the hourly rate first.' });
+        }
+        if (existing.attendanceMethod === method) return { attendanceMethod: method };
+
+        await prisma.$transaction([
+            prisma.settings.update({ where: { organizationId: orgId }, data: { attendanceMethod: method } }),
+            prisma.payrollAuditLog.create({
+                data: {
+                    orgId,
+                    actorId,
+                    action: 'settings.attendanceMethod',
+                    oldValue: { attendanceMethod: existing.attendanceMethod },
+                    newValue: { attendanceMethod: method },
+                },
+            }),
+        ]);
+        return { attendanceMethod: method };
     },
 };

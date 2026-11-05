@@ -69,7 +69,9 @@ vi.mock('@bin-tracker/db', () => {
     const prisma = {
         payrollException,
         workSession,
-        $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+        // withLock runs its callback inside a transaction and takes an advisory lock (a no-op in memory).
+        $executeRaw: () => Promise.resolve(0),
+        $transaction: (arg: unknown) => (typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(prisma) : Promise.all(arg as Promise<unknown>[])),
     };
     return { prisma };
 });

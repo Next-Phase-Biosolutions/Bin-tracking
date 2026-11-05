@@ -2,6 +2,7 @@ import { prisma } from '@bin-tracker/db';
 import { AppError } from '../lib/app-error.js';
 import { hashToken } from '../lib/token.js';
 import { withLock } from '../lib/with-lock.js';
+import { assertAttendanceMethod } from '../lib/attendance-method.js';
 import { consumeTapBudget } from '../trpc/rate-limit.js';
 import { punchInTx, type PunchResult } from './attendance-punch.js';
 import { deviceRegistrationService } from './device-registration.service.js';
@@ -42,6 +43,8 @@ async function resolveCard(orgId: string, cardId: string) {
     const module = await prisma.organizationModule.findUnique({ where: { orgId_module: { orgId, module: 'WORKFORCE' } } });
     // No row = never provisioned: deny, never default to enabled (same rule as requireModule).
     if (!module?.enabled) throw new AppError('MODULE_DISABLED', 'FORBIDDEN');
+    // Only while the organization is on NFC (the QR badge scan is the alternative method).
+    await assertAttendanceMethod(orgId, 'NFC');
     return card;
 }
 

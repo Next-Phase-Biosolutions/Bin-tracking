@@ -5,6 +5,7 @@ import { AppError } from '../lib/app-error.js';
 import { deviceLabelFromUserAgent } from '../lib/device-label.js';
 import { hashToken } from '../lib/token.js';
 import { withLock } from '../lib/with-lock.js';
+import { assertAttendanceMethod } from '../lib/attendance-method.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -106,6 +107,7 @@ export const deviceRegistrationService = {
      */
     async start(rawToken: string, now: Date = new Date()) {
         const token = await validateLink(prisma, rawToken, now);
+        await assertAttendanceMethod(token.organizationId, 'NFC');
         const pendingSecret = newSecret();
         const pendingExpiresAt = new Date(now.getTime() + PENDING_TTL_MS);
         await prisma.registrationToken.updateMany({ where: { id: token.id, organizationId: token.organizationId, usedAt: null }, data: { pendingHash: hashToken(pendingSecret), pendingExpiresAt } });

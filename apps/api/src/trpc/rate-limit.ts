@@ -181,7 +181,7 @@ export function bankTokenRateLimit(limiter: SlidingWindowLimiter = bankTokenLimi
  * links in a burst on the first day, often behind one proxy address (see
  * lib/client-ip.ts), and a tight shared cap would lock a whole company out.
  */
-const REGISTRATION_STARTS_PER_HOUR = 200;
+const REGISTRATION_STARTS_PER_HOUR = Number.isInteger(Number(process.env['REGISTRATION_STARTS_PER_HOUR'])) && Number(process.env['REGISTRATION_STARTS_PER_HOUR']) > 0 ? Number(process.env['REGISTRATION_STARTS_PER_HOUR']) : 1000;
 const registrationStartLimiter = new SlidingWindowLimiter(REGISTRATION_STARTS_PER_HOUR, BANK_TOKEN_WINDOW_MS);
 export const registrationStartRateLimit = () => bankTokenRateLimit(registrationStartLimiter);
 

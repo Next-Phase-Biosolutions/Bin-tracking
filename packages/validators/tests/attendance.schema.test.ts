@@ -3,6 +3,7 @@ import {
     attendanceScanSchema,
     attendanceSummarySchema,
     attendanceRecentSchema,
+    setAttendanceMethodSchema,
 } from '../src/attendance.schema.js';
 
 describe('attendanceScanSchema', () => {
@@ -47,5 +48,19 @@ describe('attendanceRecentSchema', () => {
     it('rejects an out-of-range limit', () => {
         expect(attendanceRecentSchema.safeParse({ limit: 0 }).success).toBe(false);
         expect(attendanceRecentSchema.safeParse({ limit: 1000 }).success).toBe(false);
+    });
+});
+
+describe('setAttendanceMethodSchema', () => {
+    it.each(['NFC', 'QR'])('accepts %s', (method) => {
+        expect(setAttendanceMethodSchema.safeParse({ method }).success).toBe(true);
+    });
+
+    it.each([[undefined], [''], ['nfc'], ['BADGE'], [null], [1]])('rejects %j', (method) => {
+        expect(setAttendanceMethodSchema.safeParse({ method }).success).toBe(false);
+    });
+
+    it('rejects a missing body field', () => {
+        expect(setAttendanceMethodSchema.safeParse({}).success).toBe(false);
     });
 });

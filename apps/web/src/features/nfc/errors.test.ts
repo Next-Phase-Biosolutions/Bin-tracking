@@ -5,6 +5,34 @@ import { TAP_ERRORS, appCodeOf, describeAdminError, isOverloadError, isTransient
 const apiError = (appCode: string, httpStatus: number) =>
     TRPCClientError.from({ error: { message: appCode, code: -32000, data: { appCode, httpStatus } } } as never);
 
+// The API's global rate limiter answers 429 with a body that is not tRPC JSON: the client error has no
+// data at all, only the raw response status.
+const rateLimiter429 = () => new TRPCClientError('Unable to transform response from server', { meta: { response: { status: 429 } as Response } });
+const proxyPage = (status: number) => new TRPCClientError('Unexpected token <', { meta: { response: { status } as Response } });
+
+describe('a 429 that did not come from tRPC (the API\'s global rate limiter)', () => {
+    it('is overload: busy, nothing was recorded, safe to repeat', () => {
+        expect(isOverloadError(rateLimiter429())).toBe(true);
+        expect(isTransientError(rateLimiter429())).toBe(true);
+    });
+
+    it('maps to SERVER_BUSY so the employee sees "the system is busy", not "connection dropped"', () => {
+        expect(appCodeOf(rateLimiter429())).toBe('SERVER_BUSY');
+        expect(TAP_ERRORS[appCodeOf(rateLimiter429())!]!.title).toBe('The system is busy');
+    });
+
+    it('a gateway failure with another status is still NOT overload (the tap may have been recorded)', () => {
+        expect(isOverloadError(proxyPage(502))).toBe(false);
+        expect(isTransientError(proxyPage(502))).toBe(true);
+        expect(appCodeOf(proxyPage(502))).toBeUndefined();
+    });
+
+    it('a failure with no response at all (network drop) is neither overload nor given a code', () => {
+        expect(isOverloadError(new TRPCClientError('Failed to fetch'))).toBe(false);
+        expect(appCodeOf(new TRPCClientError('Failed to fetch'))).toBeUndefined();
+    });
+});
+
 describe('appCodeOf', () => {
     it('reads the API machine code, and is undefined for anything else', () => {
         expect(appCodeOf(apiError('NO_SESSION', 401))).toBe('NO_SESSION');
@@ -58,7 +86,7 @@ describe('describeAdminError', () => {
         expect(describeAdminError(apiError('DUPLICATE_CHIP_UID', 409))).toBe('A card with this chip UID already exists.');
         expect(describeAdminError(apiError('OVERLAPS_NEXT_SESSION', 400))).toContain('next shift');
         expect(describeAdminError(apiError('PAYROLL_RUN_FROZEN', 409))).toContain('already approved or paid');
-        expect(describeAdminError(apiError('SHIFT_TOO_LONG', 400))).toContain('24 hours');
+        expect(describeAdminError(apiError('SHIFT_TOO_LONG', 400))).toContain('16 hours');
     });
 
     it('explains a validation failure, and falls back to the message', () => {

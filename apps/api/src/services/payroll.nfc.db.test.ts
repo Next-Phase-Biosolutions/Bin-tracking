@@ -5,6 +5,7 @@ import { periodOf } from '../lib/period.js';
 import { attendanceService } from './attendance.service.js';
 import { payrollService } from './payroll.service.js';
 import { tap } from './nfc-tap.service.js';
+import { withLock } from '../lib/with-lock.js';
 
 // NFC punches -> the EXISTING payroll, through its real SQL (the fakes in the other payroll
 // tests cannot exercise the WHERE clauses). Skipped unless DATABASE_URL is a localhost
@@ -113,7 +114,7 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         expect(exceptions).toHaveLength(0);
     });
 
-    it('approving with a real, longer check-out pays exactly that time', async () => {
+    it('approving with a real, earlier check-out pays exactly that time', async () => {
         const { employee, token } = await person();
         const card = await seedCard(orgId, 'BOTH');
         const checkIn = new Date(Date.now() - hours(28));
@@ -122,10 +123,85 @@ suite('NFC attendance feeding payroll (real Postgres)', () => {
         await payrollService.computeRun(orgId, { period }); // lazily auto-closes it
 
         const [pending] = (await attendanceService.listPendingApprovals(orgId)).filter((p) => p.employee.id === employee.id);
-        await attendanceService.approveWorkSession(orgId, null, { id: pending!.id, checkOutAt: new Date(checkIn.getTime() + hours(19)).toISOString() });
+        await attendanceService.approveWorkSession(orgId, null, { id: pending!.id, checkOutAt: new Date(checkIn.getTime() + hours(11)).toISOString() });
         await payrollService.computeRun(orgId, { period });
 
-        expect((await lineFor(period, employee.id)).line).toMatchObject({ minutes: 19 * 60 });
+        expect((await lineFor(period, employee.id)).line).toMatchObject({ minutes: 11 * 60 });
+    });
+
+    /** An auto-closed (forgotten) shift 30 h ago, already flagged as a payroll exception in a DRAFT run. */
+    async function heldBack() {
+        const { employee } = await person();
+        const checkIn = new Date(Date.now() - hours(30));
+        const session = await prisma.workSession.create({
+            data: { employeeId: employee.id, checkInAt: checkIn, checkOutAt: new Date(checkIn.getTime() + hours(16)), durationMin: 960, autoClosed: true },
+        });
+        const period = periodOf_(checkIn);
+        await payrollService.computeRun(orgId, { period });
+        const exception = await prisma.payrollException.findFirstOrThrow({ where: { sessionId: session.id } });
+        return { employee, session, checkIn, period, exception };
+    }
+
+    it('both ways to resolve a forgotten shift share ONE cap: 16 h is accepted, 16 h 1 min is refused by each', async () => {
+        const a = await heldBack(); // resolved through Payroll\'s "Fix checkout"
+        const b = await heldBack(); // resolved through the NFC approval
+        // The second compute rebuilt the run's open exceptions, so read the first one's id fresh.
+        const exceptionA = await prisma.payrollException.findFirstOrThrow({ where: { sessionId: a.session.id } });
+
+        const tooLong = (c: Date) => new Date(c.getTime() + hours(16) + 60_000).toISOString();
+        await expect(
+            payrollService.resolveException(orgId, { exceptionId: exceptionA.id, action: 'FIX_CHECKOUT', checkOutAt: tooLong(a.checkIn) }),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('16 hours') });
+        await expect(
+            attendanceService.approveWorkSession(orgId, null, { id: b.session.id, checkOutAt: tooLong(b.checkIn) }),
+        ).rejects.toMatchObject({ appCode: 'SHIFT_TOO_LONG' });
+
+        const exactly = (c: Date) => new Date(c.getTime() + hours(16)).toISOString();
+        await expect(payrollService.resolveException(orgId, { exceptionId: exceptionA.id, action: 'FIX_CHECKOUT', checkOutAt: exactly(a.checkIn) })).resolves.toMatchObject({ requiresRecompute: true });
+        await expect(attendanceService.approveWorkSession(orgId, null, { id: b.session.id, checkOutAt: exactly(b.checkIn) })).resolves.toMatchObject({ durationMin: 960 });
+    });
+
+    it('Fix checkout takes the employee\'s lock: it waits for a tap in flight instead of racing it', async () => {
+        const { employee, session, checkIn, exception } = await heldBack();
+        let holderReleased = 0;
+        let lockHeld!: () => void;
+        const held = new Promise<void>((resolve) => (lockHeld = resolve));
+
+        // A tap is "in flight" for this employee: it holds their lock for 400 ms.
+        const holder = withLock(`employee:${employee.id}`, async () => {
+            lockHeld();
+            await new Promise((r) => setTimeout(r, 400));
+            holderReleased = Date.now();
+        });
+        await held;
+
+        const fixed = await payrollService.resolveException(orgId, { exceptionId: exception.id, action: 'FIX_CHECKOUT', checkOutAt: new Date(checkIn.getTime() + hours(10)).toISOString() });
+        const fixedAt = Date.now();
+        await holder;
+
+        expect(fixed.requiresRecompute).toBe(true);
+        expect(fixedAt).toBeGreaterThanOrEqual(holderReleased); // it could only run after the tap finished
+        expect(await prisma.workSession.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ autoClosed: false, durationMin: 600 });
+    });
+
+    it('Fix checkout sees a next shift opened by a tap that was holding the lock (no overlap slips through)', async () => {
+        const { employee, checkIn, exception } = await heldBack();
+        let lockHeld!: () => void;
+        const held = new Promise<void>((resolve) => (lockHeld = resolve));
+
+        // The tap opens the NEXT shift (1 h after the forgotten one began) while still holding the lock.
+        const tapInFlight = withLock(`employee:${employee.id}`, async (tx) => {
+            lockHeld();
+            await new Promise((r) => setTimeout(r, 300));
+            await tx.workSession.create({ data: { employeeId: employee.id, checkInAt: new Date(checkIn.getTime() + hours(1)) } });
+        });
+        await held;
+
+        // Without the lock this check ran first, saw no next shift, and wrote a check-out that overlaps it.
+        await expect(
+            payrollService.resolveException(orgId, { exceptionId: exception.id, action: 'FIX_CHECKOUT', checkOutAt: new Date(checkIn.getTime() + hours(5)).toISOString() }),
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('overlaps') });
+        await tapInFlight;
     });
 
     it('does not close or pay another organization\'s forgotten shifts when this one runs payroll', async () => {

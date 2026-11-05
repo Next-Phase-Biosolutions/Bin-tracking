@@ -8,6 +8,8 @@ export const DEBOUNCE_MS = 5_000;
 /** An open shift this old is a forgotten check-out: closed at the cap, held for approval. */
 export const MAX_SHIFT_MS = 16 * 60 * 60 * 1000;
 export const MAX_SHIFT_MINUTES = MAX_SHIFT_MS / 60_000;
+/** AttendanceEvent.source of the CHECK_OUT written when a forgotten shift is closed at the cap. */
+export const AUTO_CLOSE_SOURCE = 'auto-close';
 
 /** What a card/scan asks for. BOTH toggles; IN and OUT are strict. */
 export type PunchDirection = 'IN' | 'OUT' | 'BOTH';
@@ -45,16 +47,22 @@ type OpenSession = { id: string; checkInAt: Date };
  * is no background job, so every path that asks "is there an open shift?" runs
  * this first. Returns true when it closed one.
  */
-export async function closeIfStale(tx: Tx, open: OpenSession | null, now: Date): Promise<boolean> {
+export async function closeIfStale(tx: Tx, employeeId: string, open: OpenSession | null, now: Date): Promise<boolean> {
     if (!open || now.getTime() - open.checkInAt.getTime() < MAX_SHIFT_MS) return false;
+    const closeAt = new Date(open.checkInAt.getTime() + MAX_SHIFT_MS);
     await tx.workSession.update({
         where: { id: open.id },
         data: {
-            checkOutAt: new Date(open.checkInAt.getTime() + MAX_SHIFT_MS),
+            checkOutAt: closeAt,
             durationMin: MAX_SHIFT_MINUTES,
             autoClosed: true,
             approvedAt: null,
         },
+    });
+    // Leave the same audit trail a real check-out leaves, so the event log and the recent-scans feed never
+    // show a CHECK_IN with no matching CHECK_OUT. Its source tells it apart from a person's tap.
+    await tx.attendanceEvent.create({
+        data: { employeeId, sessionId: open.id, eventType: 'CHECK_OUT', scannedAt: closeAt, source: AUTO_CLOSE_SOURCE },
     });
     return true;
 }
@@ -74,7 +82,7 @@ export async function punchInTx(tx: Tx, opts: PunchOptions): Promise<PunchResult
         orderBy: { checkInAt: 'desc' },
         select: { id: true, checkInAt: true },
     });
-    if (await closeIfStale(tx, open, now)) open = null;
+    if (await closeIfStale(tx, employeeId, open, now)) open = null;
 
     const rejection = (debounced: boolean): PunchResult =>
         open
@@ -83,8 +91,10 @@ export async function punchInTx(tx: Tx, opts: PunchOptions): Promise<PunchResult
 
     // Debounce is anchored on the last REAL punch: an echo (DEBOUNCED row) never
     // extends the window, so a held-down phone cannot keep itself locked out.
+    // The system's own auto-close CHECK_OUT is not a punch: it is stamped at the 16 h mark, which can be only
+    // seconds before this tap, and echoing it would turn a fresh check-in into a phantom check-out.
     const last = await tx.attendanceEvent.findFirst({
-        where: { employeeId, eventType: { in: [...debounceOn] } },
+        where: { employeeId, eventType: { in: [...debounceOn] }, OR: [{ source: null }, { source: { not: AUTO_CLOSE_SOURCE } }] },
         orderBy: { scannedAt: 'desc' },
         include: { session: true },
     });

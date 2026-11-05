@@ -2,7 +2,7 @@
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import { apiError, gatewayError, renderAt } from '../../test/render';
+import { apiError, gatewayError, rateLimiterError, renderAt } from '../../test/render';
 
 const tapMutate = vi.hoisted(() => vi.fn());
 const startMutate = vi.hoisted(() => vi.fn());
@@ -216,6 +216,25 @@ describe('TapPage', () => {
         tapPage();
 
         expect((await screen.findByRole('alert')).textContent).toContain('The system is busy');
+    });
+
+    it('a global rate-limiter 429 (not tRPC JSON) says "busy", repeats safely, and never claims the tap was unconfirmed', async () => {
+        tapMutate.mockRejectedValue(rateLimiterError());
+
+        tapPage();
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('The system is busy');
+        expect(alert.textContent).not.toContain('connection dropped');
+        expect(tapMutate.mock.calls.length).toBeGreaterThan(1); // 429 is raised before anything is recorded
+    });
+
+    it('a rate-limiter 429 that clears on retry ends in a normal check-in', async () => {
+        tapMutate.mockRejectedValueOnce(rateLimiterError()).mockResolvedValue({ status: 'CHECK_IN', at, employeeName: 'Jane', debounced: false });
+
+        tapPage();
+
+        expect((await screen.findByRole('status')).textContent).toContain('Checked in at');
     });
 
     it('calls the API once even under StrictMode, which double-runs effects in development', async () => {

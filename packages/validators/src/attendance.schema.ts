@@ -42,3 +42,11 @@ export const attendanceApproveSessionSchema = z.object({
 });
 
 export type AttendanceApproveSessionInput = z.infer<typeof attendanceApproveSessionSchema>;
+
+/** How an organization's employees clock in: NFC tag taps (default) or the original QR badge scan. */
+export const attendanceMethodSchema = z.enum(['NFC', 'QR']);
+
+export const setAttendanceMethodSchema = z.object({ method: attendanceMethodSchema });
+
+export type AttendanceMethodInput = z.infer<typeof attendanceMethodSchema>;
+export type SetAttendanceMethodInput = z.infer<typeof setAttendanceMethodSchema>;

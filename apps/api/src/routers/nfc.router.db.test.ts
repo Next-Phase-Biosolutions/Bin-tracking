@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@bin-tracker/db';
 import type { User, UserRole } from '@prisma/client';
 import { appRouter } from './index.js';
@@ -210,12 +210,12 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             await expect(phone().api().deviceRegistration.start({ token: 'ab\u0000cd' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
         });
 
-        it('bounds repeated attempts from one address: the 201st in an hour is TOO_MANY_REQUESTS', async () => {
+        it('bounds repeated attempts from one address: the 1001st in an hour is TOO_MANY_REQUESTS (roomy enough for a company enrolling behind one proxy address)', async () => {
             const browser = phone();
             const codes: string[] = [];
-            for (let i = 0; i < 202; i++) codes.push(await browser.api().deviceRegistration.start({ token: `guess-${i}` }).then(() => 'ok', (e: { code: string }) => e.code));
-            expect(codes.slice(0, 200).every((c) => c === 'NOT_FOUND')).toBe(true);
-            expect(codes.slice(200)).toEqual(['TOO_MANY_REQUESTS', 'TOO_MANY_REQUESTS']);
+            for (let i = 0; i < 1002; i++) codes.push(await browser.api().deviceRegistration.start({ token: `guess-${i}` }).then(() => 'ok', (e: { code: string }) => e.code));
+            expect(codes.slice(0, 1000).every((c) => c === 'NOT_FOUND')).toBe(true);
+            expect(codes.slice(1000)).toEqual(['TOO_MANY_REQUESTS', 'TOO_MANY_REQUESTS']);
         });
     });
 
@@ -608,6 +608,129 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             expect([...status.checkedIn, ...status.overdue, ...status.checkedOut].some((e) => e.employeeId === foreignEmployee.id)).toBe(false);
             expect((await admin.attendance.listPendingApprovals()).some((p) => p.id === foreignSession.id)).toBe(false);
             await expect(admin.attendance.approveWorkSession({ id: foreignSession.id })).rejects.toMatchObject({ appCode: 'WORK_SESSION_NOT_FOUND' });
+        });
+    });
+
+    describe('clock-in method switch (NFC or QR, exactly one)', () => {
+        const setMethod = (org: string, method: 'NFC' | 'QR') => prisma.settings.update({ where: { organizationId: org }, data: { attendanceMethod: method } });
+
+        it('a new organization is on NFC, and any member can read the method', async () => {
+            const org = (await seedOrg('method-default')).id;
+            created.push(org);
+
+            expect(await manager(org, 'WORKER').attendance.method()).toEqual({ method: 'NFC' });
+        });
+
+        it('an organization with no settings row is treated as NFC (the default)', async () => {
+            const org = await prisma.organization.create({ data: { name: 'No settings', slug: `nfc-test-nosettings-${Date.now()}` } });
+            created.push(org.id);
+
+            expect(await manager(org.id, 'WORKER').attendance.method()).toEqual({ method: 'NFC' });
+        });
+
+        it('while on QR, a registered phone is refused with NFC_DISABLED and nothing is recorded', async () => {
+            const org = (await seedOrg('method-qr-tap', { attendanceMethod: 'QR' })).id;
+            created.push(org);
+            const employee = await seedEmployee(org);
+            const card = await seedCard(org, 'BOTH');
+            const { token } = await seedDevice(org, employee.id);
+            const browser = phone();
+            browser.jar.set('bt_device', token);
+
+            await expect(browser.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', appCode: 'NFC_DISABLED' });
+
+            expect(await prisma.workSession.count({ where: { employeeId: employee.id } })).toBe(0);
+            expect(await prisma.attendanceEvent.count({ where: { employeeId: employee.id } })).toBe(0);
+        });
+
+        it('while on QR, opening a registration link is refused and the link stays unused', async () => {
+            const org = (await seedOrg('method-qr-reg')).id;
+            created.push(org);
+            const employee = await seedEmployee(org);
+            const { token, row } = await issueLink(employee.id, org);
+            await setMethod(org, 'QR');
+
+            await expect(phone().api().deviceRegistration.start({ token })).rejects.toMatchObject({ appCode: 'NFC_DISABLED' });
+
+            const after = await prisma.registrationToken.findUniqueOrThrow({ where: { id: row.id } });
+            expect(after.usedAt).toBeNull();
+            expect(after.pendingHash).toBeNull();
+        });
+
+        it('while on NFC, the QR scan procedure is refused with QR_DISABLED and nothing is recorded', async () => {
+            const org = (await seedOrg('method-nfc-scan')).id;
+            created.push(org);
+            const employee = await seedEmployee(org);
+
+            await expect(manager(org, 'WORKER').attendance.scan({ qrCode: employee.qrCode })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', appCode: 'QR_DISABLED' });
+
+            expect(await prisma.workSession.count({ where: { employeeId: employee.id } })).toBe(0);
+        });
+
+        it('an admin switches the method, it takes effect at once in both directions, and each change is audited', async () => {
+            const org = (await seedOrg('method-switch')).id;
+            created.push(org);
+            const employee = await seedEmployee(org);
+            const card = await seedCard(org, 'BOTH');
+            const { token } = await seedDevice(org, employee.id);
+            const admin = manager(org, 'ADMIN');
+            const browser = phone();
+            browser.jar.set('bt_device', token);
+
+            // NFC (default): tap works, QR refused.
+            await expect(browser.api().attendance.tap({ cardId: card.id })).resolves.toMatchObject({ status: 'CHECK_IN' });
+            await expect(admin.attendance.scan({ qrCode: employee.qrCode })).rejects.toMatchObject({ appCode: 'QR_DISABLED' });
+
+            // Switch to QR: scan works, tap refused.
+            await expect(admin.settings.setAttendanceMethod({ method: 'QR' })).resolves.toEqual({ attendanceMethod: 'QR' });
+            expect(await admin.attendance.method()).toEqual({ method: 'QR' });
+            await expect(browser.api().attendance.tap({ cardId: card.id })).rejects.toMatchObject({ appCode: 'NFC_DISABLED' });
+            await expect(admin.attendance.scan({ qrCode: employee.qrCode })).resolves.toMatchObject({ action: expect.stringMatching(/CHECK_(IN|OUT)/) });
+
+            // Switch back (the rollback): tap works again.
+            await admin.settings.setAttendanceMethod({ method: 'NFC' });
+            await expect(admin.attendance.scan({ qrCode: employee.qrCode })).rejects.toMatchObject({ appCode: 'QR_DISABLED' });
+
+            const log = await prisma.payrollAuditLog.findMany({ where: { orgId: org, action: 'settings.attendanceMethod' }, orderBy: { createdAt: 'asc' } });
+            expect(log.map((l) => [l.oldValue, l.newValue])).toEqual([
+                [{ attendanceMethod: 'NFC' }, { attendanceMethod: 'QR' }],
+                [{ attendanceMethod: 'QR' }, { attendanceMethod: 'NFC' }],
+            ]);
+            expect(log.every((l) => l.actorId === `user-${org}`)).toBe(true);
+        });
+
+        it('setting the value it already has is a no-op and is not logged', async () => {
+            const org = (await seedOrg('method-noop')).id;
+            created.push(org);
+
+            await manager(org, 'ADMIN').settings.setAttendanceMethod({ method: 'NFC' });
+
+            expect(await prisma.payrollAuditLog.count({ where: { orgId: org, action: 'settings.attendanceMethod' } })).toBe(0);
+        });
+
+        it('only an ADMIN can change it, and only for their own organization', async () => {
+            const org = (await seedOrg('method-roles')).id;
+            const other = (await seedOrg('method-roles-other')).id;
+            created.push(org, other);
+            vi.stubEnv('DISABLE_AUTH', 'false');
+            try {
+                for (const role of ['OPS_MANAGER', 'DRIVER', 'WORKER'] as const) {
+                    await expect(manager(org, role).settings.setAttendanceMethod({ method: 'QR' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+                }
+                await manager(org, 'ADMIN').settings.setAttendanceMethod({ method: 'QR' });
+            } finally {
+                vi.unstubAllEnvs();
+            }
+
+            expect((await prisma.settings.findUniqueOrThrow({ where: { organizationId: other } })).attendanceMethod).toBe('NFC');
+            expect((await prisma.settings.findUniqueOrThrow({ where: { organizationId: org } })).attendanceMethod).toBe('QR');
+        });
+
+        it('an unknown method value is rejected as a bad request, not a server error', async () => {
+            const org = (await seedOrg('method-bad')).id;
+            created.push(org);
+
+            await expect(manager(org, 'ADMIN').settings.setAttendanceMethod({ method: 'SMOKE' as never })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
         });
     });
 });

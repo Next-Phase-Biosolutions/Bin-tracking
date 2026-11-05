@@ -22,6 +22,7 @@ function NfcCards() {
     const utils = trpc.useUtils();
     const list = trpc.nfcCard.list.useQuery(undefined, { staleTime: 10_000 });
     const tagBase = trpc.nfcCard.tagBaseUrl.useQuery(undefined, { staleTime: Infinity });
+    const method = trpc.attendance.method.useQuery(undefined, { staleTime: 30_000 });
     const [label, setLabel] = useState('');
     const [direction, setDirection] = useState<Direction>('BOTH');
     const [chipUid, setChipUid] = useState('');
@@ -43,6 +44,12 @@ function NfcCards() {
                 subtitle="The tags mounted at your doors. Write each card’s tag URL onto its tag; employees tap it with their registered phone."
                 icon={<Icon name="badge" width={22} height={22} />}
             />
+
+            {method.data?.method === 'QR' && (
+                <p role="status" className="mb-6 rounded-xl border border-edge bg-bone-light/60 px-4 py-3 text-sm text-ink">
+                    NFC taps are switched off: your organisation is set to the QR badge scanner. You can still prepare cards and phones here. Switch the method under Settings when you are ready.
+                </p>
+            )}
 
             <Card className="mb-6 p-5">
                 <h2 className="font-display font-bold text-olive-deep">Add a card</h2>

@@ -10,6 +10,8 @@ export interface NavItem {
     module?: ModuleKey;
     /** When set, the link only renders for these org roles (ctx.orgRole). Omit for no restriction. */
     roles?: Array<'ADMIN' | 'OPS_MANAGER' | 'DRIVER' | 'WORKER'>;
+    /** When set, the link only renders while the org's clock-in method (Settings.attendanceMethod) is this one. */
+    attendanceMethod?: 'NFC' | 'QR';
 }
 
 /** OPERATIONS — people, logistics, records, compliance. Main Dashboard/Driver/Bin are core tracking, never gated. */
@@ -22,10 +24,10 @@ export const operationsNav: NavItem[] = [
     { label: 'Animal Records', href: '/app/animals', icon: 'form', module: 'ANIMAL_INTAKE' },
     { label: 'Employees', href: '/app/employees', icon: 'users', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
     { label: 'Employee Registration', href: '/app/employees/register', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
-    { label: 'Employee Scanner', href: '/app/guard', icon: 'badge', module: 'WORKFORCE' },
+    { label: 'Employee Scanner', href: '/app/guard', icon: 'badge', module: 'WORKFORCE', attendanceMethod: 'QR' },
     { label: 'Timesheet', href: '/app/timesheet', icon: 'clock', module: 'WORKFORCE' },
     { label: 'Live Status', href: '/app/live-status', icon: 'users', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
-    { label: 'NFC Cards', href: '/app/nfc-cards', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
+    { label: 'NFC Cards', href: '/app/nfc-cards', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'], attendanceMethod: 'NFC' },
     { label: 'Payroll', href: '/app/payroll', icon: 'clock', module: 'PAYROLL' },
     { label: 'Forms', href: '/app/forms', icon: 'form', module: 'FORMS' },
 ];

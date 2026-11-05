@@ -9,6 +9,8 @@ import type {
 import type { PayrollRunView, PayrollRunSummary } from '@bin-tracker/types';
 import { verifyApprovalCode } from '../lib/approvalCode.js';
 import { attendanceService } from './attendance.service.js';
+import { MAX_SHIFT_MS } from './attendance-punch.js';
+import { withLock } from '../lib/with-lock.js';
 
 const MINUTES_PER_HOUR = 60;
 
@@ -335,7 +337,6 @@ export const payrollService = {
         // FIX_CHECKOUT — validated present by the schema refine.
         const checkOutAt = new Date(input.checkOutAt!);
         const checkInAt = exception.session.checkInAt;
-        const MAX_SHIFT_MS = 16 * 60 * 60 * 1000; // matches the auto-close policy
         if (checkOutAt.getTime() <= checkInAt.getTime()) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout must be after the check-in time.' });
         }
@@ -351,31 +352,33 @@ export const payrollService = {
             });
         }
 
-        // The fixed check-out must not run into the employee's NEXT shift, or those
-        // minutes would be paid twice. Ending exactly when the next shift begins is fine.
-        const nextSession = await prisma.workSession.findFirst({
-            where: { employeeId: exception.session.employeeId, checkInAt: { gt: checkInAt } },
-            orderBy: { checkInAt: 'asc' },
-            select: { checkInAt: true },
-        });
-        if (nextSession && checkOutAt.getTime() > nextSession.checkInAt.getTime()) {
-            throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: "Checkout overlaps the employee's next shift — choose a time before it starts.",
-            });
-        }
-
+        // The overlap check and the update run together under the employee's lock, the same lock a tap takes.
+        // Checked outside it, a tap landing in between could open a next shift that this check-out then runs into.
         const durationMin = Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60_000);
-        await prisma.$transaction([
-            prisma.workSession.update({
+        await withLock(`employee:${exception.session.employeeId}`, async (tx) => {
+            // The fixed check-out must not run into the employee's NEXT shift, or those
+            // minutes would be paid twice. Ending exactly when the next shift begins is fine.
+            const nextSession = await tx.workSession.findFirst({
+                where: { employeeId: exception.session.employeeId, checkInAt: { gt: checkInAt } },
+                orderBy: { checkInAt: 'asc' },
+                select: { checkInAt: true },
+            });
+            if (nextSession && checkOutAt.getTime() > nextSession.checkInAt.getTime()) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: "Checkout overlaps the employee's next shift — choose a time before it starts.",
+                });
+            }
+
+            await tx.workSession.update({
                 where: { id: exception.sessionId },
                 data: { checkOutAt, durationMin, autoClosed: false },
-            }),
-            prisma.payrollException.update({
+            });
+            await tx.payrollException.update({
                 where: { id: exception.id },
                 data: { resolved: true, resolvedAt: new Date(), note: input.note ?? null },
-            }),
-        ]);
+            });
+        });
         return { resolved: true, requiresRecompute: true };
     },
 

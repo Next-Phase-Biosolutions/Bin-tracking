@@ -121,9 +121,11 @@ Two independent reviews (security, correctness) of the finished branch led to th
 | Retry on the tap page | 3 retries on any transient error | HTTP 429 always safe to repeat; any other transient failure only within 3 s of the first attempt (otherwise "couldn't confirm your tap"). The earlier claim that every retry stays inside the 5 s debounce window was wrong. |
 | Debounce | also echoed a refused tap | refused taps are not debounced, so the correct card tapped just after a wrong one works. |
 | In-flight revoke | checked before the lock only | re-checked inside the employee lock. |
-| Approval | no overlap check as-is, no cap, no payroll-run check | overlap checked always; shift capped at 24 h; refused if the month's run is not a DRAFT. |
+| Approval | no overlap check as-is, no cap, no payroll-run check | overlap checked always; shift capped at 16 h (the one cap shared with auto-close and Payroll's Fix checkout); refused if the month's run is not a DRAFT. |
 | `FIX_CHECKOUT` | no future-time check | rejects a check-out in the future. |
-| Registration rate limit | 20/hour per address | 200/hour per address, and every limiter uses `CLIENT_IP_HEADER` when configured. |
+| Registration rate limit | 20/hour per address | 1,000/hour per address, configurable, and every limiter uses `CLIENT_IP_HEADER` when configured. |
+| Phone-route rate limit | none (prototype ran without a proxy) | own bucket of 3,000/min per address for `attendance.tap` and `deviceRegistration.start`, separate from the API's 100/min. |
+| Clock-in method | QR only | `Settings.attendanceMethod` NFC (default) or QR; the other method is switched off, not deleted. |
 | Tag URL origin | admin's browser origin | server `APP_URL` (`nfcCard.tagBaseUrl`). |
 | Card ids | cuid | random UUID. |
 | Limiter memory | unbounded | expired keys swept above 10,000. |

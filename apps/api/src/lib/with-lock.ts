@@ -84,23 +84,35 @@ export async function withLock<T>(
     fn: (tx: Tx) => Promise<T>,
     options: { retryOn?: readonly string[] } = {},
 ): Promise<T> {
-    return withKeyMutex(key, async () => {
-        for (let attempt = 1; ; attempt++) {
-            try {
-                return await prisma.$transaction(
-                    async (tx: Tx) => {
-                        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
-                        return fn(tx);
-                    },
-                    { maxWait: TX_MAX_WAIT_MS, timeout: TX_TIMEOUT_MS },
-                );
-            } catch (e) {
-                if (isPoolTimeout(e)) throw new AppError('SERVER_BUSY', 'TOO_MANY_REQUESTS');
-                const code = (e as DriverErrorShape | null)?.code;
-                const retryable = isSerializationFailure(e) || (code !== undefined && options.retryOn?.includes(code));
-                if (!retryable || attempt >= MAX_ATTEMPTS) throw e;
-                await sleep(25 + Math.random() * 75);
-            }
+    return withKeyMutex(key, () => withAdvisoryLock(key, fn, options));
+}
+
+/**
+ * The database half of withLock: `pg_advisory_xact_lock` inside the transaction, plus the retry rules
+ * above, with NO in-process queue in front. That queue only exists to keep duplicate taps off the
+ * connection pool; correctness across API instances rests on this lock (and the unique index behind
+ * it). Exported so tests can prove it serializes holders on its own.
+ */
+export async function withAdvisoryLock<T>(
+    key: string,
+    fn: (tx: Tx) => Promise<T>,
+    options: { retryOn?: readonly string[] } = {},
+): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await prisma.$transaction(
+                async (tx: Tx) => {
+                    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+                    return fn(tx);
+                },
+                { maxWait: TX_MAX_WAIT_MS, timeout: TX_TIMEOUT_MS },
+            );
+        } catch (e) {
+            if (isPoolTimeout(e)) throw new AppError('SERVER_BUSY', 'TOO_MANY_REQUESTS');
+            const code = (e as DriverErrorShape | null)?.code;
+            const retryable = isSerializationFailure(e) || (code !== undefined && options.retryOn?.includes(code));
+            if (!retryable || attempt >= MAX_ATTEMPTS) throw e;
+            await sleep(25 + Math.random() * 75);
         }
-    });
+    }
 }

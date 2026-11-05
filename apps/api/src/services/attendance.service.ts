@@ -14,10 +14,8 @@ import { TRPCError } from '@trpc/server';
 import { AppError } from '../lib/app-error.js';
 import { periodOf } from '../lib/period.js';
 import { withLock } from '../lib/with-lock.js';
+import { assertAttendanceMethod } from '../lib/attendance-method.js';
 import { MAX_SHIFT_MS, closeIfStale, punchInTx, type PunchResult } from './attendance-punch.js';
-
-/** An approved shift longer than this is almost certainly a typo, not a real shift. */
-const MAX_APPROVED_SHIFT_MS = 24 * 60 * 60 * 1000;
 
 function diffMinutes(start: Date, end: Date): number {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60_000));
@@ -57,6 +55,8 @@ export const attendanceService = {
      * a rush cannot open two sessions.
      */
     async scan(orgId: string, input: AttendanceScanInput): Promise<AttendanceScanResult> {
+        // QR scanning is the original method: kept, but only usable while the organization is on QR.
+        await assertAttendanceMethod(orgId, 'QR');
         // qrCode is unique per-organization — look up via the compound key so a
         // badge from another org's namespace can never resolve here.
         const employee = await prisma.employee.findUnique({
@@ -182,7 +182,7 @@ export const attendanceService = {
                     orderBy: { checkInAt: 'desc' },
                     select: { id: true, checkInAt: true },
                 });
-                return closeIfStale(tx, open, now);
+                return closeIfStale(tx, employeeId, open, now);
             });
             if (didClose) closed++;
         }
@@ -303,8 +303,9 @@ export const attendanceService = {
                 if (checkOutAt.getTime() <= session.checkInAt.getTime() || checkOutAt.getTime() > now.getTime()) {
                     throw new AppError('INVALID_CHECK_OUT', 'BAD_REQUEST', 'Check-out must be after check-in and not in the future');
                 }
-                if (checkOutAt.getTime() - session.checkInAt.getTime() > MAX_APPROVED_SHIFT_MS) {
-                    throw new AppError('SHIFT_TOO_LONG', 'BAD_REQUEST', 'A shift longer than 24 hours cannot be approved');
+                // The same 16 h cap as the auto-close and as Payroll's "Fix checkout": one policy, two doors.
+                if (checkOutAt.getTime() - session.checkInAt.getTime() > MAX_SHIFT_MS) {
+                    throw new AppError('SHIFT_TOO_LONG', 'BAD_REQUEST', 'A shift longer than 16 hours cannot be approved. Split it instead.');
                 }
                 data.checkOutAt = checkOutAt;
                 data.durationMin = diffMinutes(session.checkInAt, checkOutAt);

@@ -7,9 +7,23 @@ interface ErrorData {
 
 const dataOf = (e: unknown): ErrorData | undefined => (e instanceof TRPCClientError ? (e.data as ErrorData | undefined) : undefined);
 
-/** The API's stable machine code (data.appCode), e.g. NO_SESSION or TOKEN_EXPIRED. */
+/**
+ * The HTTP status of the failed call. A tRPC error carries it in data.httpStatus, but a response
+ * that is not tRPC-shaped (the API's global rate limiter, a proxy's error page) has no data at
+ * all; the status is then only on the raw response, so read it from there.
+ */
+function httpStatusOf(e: unknown): number | undefined {
+    if (!(e instanceof TRPCClientError)) return undefined;
+    const meta = e.meta as { response?: { status?: number } } | undefined;
+    return dataOf(e)?.httpStatus ?? meta?.response?.status;
+}
+
+/**
+ * The API's stable machine code (data.appCode), e.g. NO_SESSION or TOKEN_EXPIRED. A bare HTTP 429
+ * (rate limited before the request reached tRPC) means "busy, nothing was recorded".
+ */
 export function appCodeOf(e: unknown): string | undefined {
-    return dataOf(e)?.appCode;
+    return dataOf(e)?.appCode ?? (httpStatusOf(e) === 429 ? 'SERVER_BUSY' : undefined);
 }
 
 /**
@@ -19,7 +33,7 @@ export function appCodeOf(e: unknown): string | undefined {
  */
 export function isTransientError(e: unknown): boolean {
     if (!(e instanceof TRPCClientError)) return true;
-    const status = dataOf(e)?.httpStatus;
+    const status = httpStatusOf(e);
     if (status === undefined) return true;
     return [408, 429, 502, 503, 504].includes(status);
 }
@@ -34,7 +48,7 @@ export function isTransientError(e: unknown): boolean {
  * the tap may have been recorded and only the response lost.
  */
 export function isOverloadError(e: unknown): boolean {
-    return dataOf(e)?.httpStatus === 429;
+    return httpStatusOf(e) === 429;
 }
 
 /** What a phone shows when a tap fails for a final reason. */
@@ -49,6 +63,7 @@ export const TAP_ERRORS: Record<string, { title: string; detail: string }> = {
     CARD_INACTIVE: { title: 'Card not active', detail: 'This card isn’t active. Tell your manager.' },
     CARD_NOT_FOUND: { title: 'Card not recognised', detail: 'This card isn’t recognised for your account. Tell your manager.' },
     MODULE_DISABLED: { title: 'Attendance is off', detail: 'Attendance isn’t switched on for your organisation. Tell your manager.' },
+    NFC_DISABLED: { title: 'Tap attendance is off', detail: 'Your organisation isn’t using NFC cards right now. Ask your manager how to clock in.' },
     BAD_ORIGIN: { title: 'Open the link again', detail: 'Please tap the card again and open it in Chrome or Safari.' },
     SERVER_BUSY: { title: 'The system is busy', detail: 'Lots of people are tapping at once. Wait a moment and tap again.' },
     TOO_MANY_TAPS: { title: 'Too many taps', detail: 'You’ve tapped a lot in the last minute. Wait a moment and tap again.' },
@@ -69,6 +84,7 @@ export const REGISTER_ERRORS: Record<string, string> = {
     TOKEN_SUPERSEDED: 'A newer registration link was sent to you. Please use that one.',
     TOKEN_NOT_FOUND: 'This registration link isn’t valid. Ask your manager for a new one.',
     EMPLOYEE_INACTIVE: 'Your account is inactive. Please contact your manager.',
+    NFC_DISABLED: 'Your organisation isn’t using NFC cards right now. Ask your manager how to clock in.',
 };
 
 const ADMIN_ERRORS: Record<string, string> = {
@@ -82,7 +98,7 @@ const ADMIN_ERRORS: Record<string, string> = {
     ALREADY_APPROVED: 'This shift was already approved.',
     INVALID_CHECK_OUT: 'The check-out time must be after check-in and not in the future.',
     OVERLAPS_NEXT_SESSION: 'That check-out overlaps the employee’s next shift. Choose an earlier time.',
-    SHIFT_TOO_LONG: 'A shift longer than 24 hours cannot be approved. Check the check-out time.',
+    SHIFT_TOO_LONG: 'A shift longer than 16 hours cannot be approved. Check the check-out time, or split the shift.',
     PAYROLL_RUN_FROZEN: 'Payroll for that month is already approved or paid, so these hours cannot be added to it.',
 };
 
@@ -90,6 +106,6 @@ const ADMIN_ERRORS: Record<string, string> = {
 export function describeAdminError(e: unknown): string {
     const code = appCodeOf(e);
     if (code && ADMIN_ERRORS[code]) return ADMIN_ERRORS[code];
-    if (e instanceof TRPCClientError && dataOf(e)?.httpStatus === 400) return 'Some of the values entered are not valid. Check them and try again.';
+    if (e instanceof TRPCClientError && httpStatusOf(e) === 400) return 'Some of the values entered are not valid. Check them and try again.';
     return e instanceof Error ? e.message : 'Something went wrong. Please try again.';
 }

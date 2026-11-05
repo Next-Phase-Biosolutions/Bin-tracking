@@ -24,6 +24,20 @@ beforeEach(() => {
 });
 
 describe('NfcCardsPage', () => {
+    it('says NFC taps are switched off while the organization is on the QR method, and still lets the admin prepare cards', async () => {
+        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [], 'attendance.method': () => ({ method: 'QR' }) });
+
+        expect(await screen.findByText(/NFC taps are switched off/i)).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Add card' })).toBeTruthy();
+    });
+
+    it('shows no such notice while the organization is on NFC', async () => {
+        renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [], 'attendance.method': () => ({ method: 'NFC' }) });
+
+        await screen.findByText(/No cards yet/i);
+        expect(screen.queryByText(/NFC taps are switched off/i)).toBeNull();
+    });
+
     it('lists each card with its direction, state and a tag URL built from the CARD id', async () => {
         renderWithTrpc(<NfcCardsPage />, { 'auth.me': () => admin, 'nfcCard.tagBaseUrl': () => ({ url: TAG_BASE }), 'nfcCard.list': () => [card(), card({ id: 'card-2', label: 'Dock', direction: 'OUT', active: false, chipUid: '04B2' })] });
 
