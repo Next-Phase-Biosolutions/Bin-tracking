@@ -140,6 +140,43 @@ describe('sensorIngestService.ingest', () => {
     });
   });
 
+  it('reads temperature and humidity from p_data', async () => {
+    await sensorIngestService.ingest(
+      { p_device_id: 'master-01', p_raw: {}, p_data: { temp_c: 3.4, humidity_pct: 62.1 } },
+      NOW,
+    );
+    expect(store.readings[0]).toMatchObject({ tempC: 3.4, humidityPct: 62.1 });
+    expect(store.readings[0]!.rawPayload).toEqual({});
+  });
+
+  it('prefers p_data over p_temp_c / p_humidity_pct, and falls back to them when p_data lacks a value', async () => {
+    await sensorIngestService.ingest(
+      { p_device_id: 'master-01', p_raw: {}, p_temp_c: 99, p_humidity_pct: 88, p_data: { temp_c: 3.4 } },
+      NOW,
+    );
+    expect(store.readings[0]).toMatchObject({ tempC: 3.4, humidityPct: 88 });
+  });
+
+  it('keeps p_data keys it does not map in the stored raw payload instead of dropping them', async () => {
+    await sensorIngestService.ingest(
+      { p_device_id: 'master-01', p_raw: { fw: '1' }, p_data: { temp_c: 3.4, pm25: 12 } },
+      NOW,
+    );
+    expect(store.readings[0]!.rawPayload).toEqual({ fw: '1', p_data_unmapped: { pm25: 12 } });
+  });
+
+  it('still stores the older flat fields exactly as before when p_data is absent', async () => {
+    await sensorIngestService.ingest({ p_device_id: 'master-01', p_raw: {}, p_temp_c: 5, p_humidity_pct: 70 }, NOW);
+    expect(store.readings[0]).toMatchObject({ tempC: 5, humidityPct: 70, rawPayload: {} });
+  });
+
+  it('logs the p_data temperature for an unknown id, like the flat field', async () => {
+    await expect(
+      sensorIngestService.ingest({ p_device_id: 'ghost-9', p_raw: {}, p_data: { temp_c: 21.5 } }, NOW),
+    ).rejects.toBeInstanceOf(UnknownSensorDeviceError);
+    expect(store.unknown[0]).toMatchObject({ lastTempC: 21.5 });
+  });
+
   it('attributes the reading to the device owner and never to another org', async () => {
     await sensorIngestService.ingest({ p_device_id: 'master-02', p_raw: {} }, NOW);
     expect(store.readings.map((r) => r.deviceId)).toEqual(['dev-b']);

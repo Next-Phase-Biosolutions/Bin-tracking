@@ -120,6 +120,43 @@ describe('ingestSensorReadingSchema', () => {
     });
 });
 
+describe('ingestSensorReadingSchema p_data', () => {
+    const base = { p_device_id: 'MT-0001', p_raw: {} };
+
+    it('accepts p_data with temp_c and humidity_pct', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: 3.4, humidity_pct: 62.1 } });
+        expect(r.success).toBe(true);
+    });
+
+    it('accepts p_data alongside the older p_temp_c / p_humidity_pct, and null or omitted p_data', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: {}, p_temp_c: 3 }).success).toBe(true);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: null }).success).toBe(true);
+        expect(ingestSensorReadingSchema.safeParse(base).success).toBe(true);
+    });
+
+    it('accepts extra keys for future sensors, of any JSON type', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: 3, pm25: 12, note: 'x' } });
+        expect(r.success).toBe(true);
+    });
+
+    it('rejects a non-numeric temp_c or humidity_pct, naming the key', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: '3.4' } });
+        expect(r.success).toBe(false);
+        if (!r.success) expect(r.error.issues[0]?.path).toEqual(['p_data', 'temp_c']);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { humidity_pct: Number.NaN } }).success).toBe(false);
+    });
+
+    it('treats a null temp_c as no value', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: null } }).success).toBe(true);
+    });
+
+    it('rejects a p_data that is an array, or is at or over the size cap, or holds a NUL', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: [1, 2] }).success).toBe(false);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { big: 'a'.repeat(RAW_PAYLOAD_MAX_BYTES) } }).success).toBe(false);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { note: 'a\u0000b' } }).success).toBe(false);
+    });
+});
+
 describe('sensorDeviceIdSchema', () => {
     it('accepts vendor sequential ids', () => {
         for (const id of ['master-01', 'MT_0001', 'de057baa-358c-430c-9f00-ccf7ee7834bc']) {
