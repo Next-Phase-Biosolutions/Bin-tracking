@@ -6,6 +6,8 @@
 //   POST <url>   headers: apikey, Content-Type: application/json
 //   body: p_device_id, p_raw, p_temp_c, p_humidity_pct, p_rssi, p_snr,
 //         p_filtered_rssi, p_error_code, p_error_message        -> 204 on success
+//   Measurements may instead be sent as one object, p_data: { temp_c, humidity_pct }
+//   (--format data); the default (--format flat) sends p_temp_c / p_humidity_pct.
 //
 // Targets:
 //   bintracker  POST http://127.0.0.1:3001/ingest/sensor-reading            (header: apikey)
@@ -15,7 +17,7 @@
 //
 // CLI:
 //   node firmware-stub.mjs --url URL --key KEY [--devices master-01,master-02]
-//        [--rounds 3] [--interval 1000] [--profile-from-id]
+//        [--rounds 3] [--interval 1000] [--profile-from-id] [--format flat|data]
 //   Library: import { send, FLEET, buildPayload } from './firmware-stub.mjs'
 
 export const FLEET = {
@@ -31,7 +33,19 @@ export const FLEET = {
 const rnd = (min, max) => Math.round((min + Math.random() * (max - min)) * 100) / 100;
 const boot = {};
 
-export function buildPayload(deviceId, profile = FLEET[deviceId]?.profile ?? 'cooler') {
+/** Move p_temp_c / p_humidity_pct into p_data { temp_c, humidity_pct } (only the ones present). */
+function toDataFormat(body) {
+  const { p_temp_c, p_humidity_pct, ...rest } = body;
+  const p_data = {};
+  if (p_temp_c !== undefined) p_data.temp_c = p_temp_c;
+  if (p_humidity_pct !== undefined) p_data.humidity_pct = p_humidity_pct;
+  return Object.keys(p_data).length ? { ...rest, p_data } : rest;
+}
+
+/** format 'flat' (default): p_temp_c / p_humidity_pct. format 'data': the same values inside p_data. */
+export function buildPayload(deviceId, profile = FLEET[deviceId]?.profile ?? 'cooler', format = 'flat') {
+  if (format === 'data') return toDataFormat(buildPayload(deviceId, profile, 'flat'));
+  if (format !== 'flat') throw new Error(`unknown format ${format} (use flat or data)`);
   boot[deviceId] = (boot[deviceId] ?? 40) + 0;
   const base = {
     p_device_id: deviceId,
@@ -87,8 +101,8 @@ export async function send({ url, key, body, headers = {}, rawBody }) {
 }
 
 /** Send one reading for a fleet device (or an explicit payload). */
-export async function reading({ url, key, deviceId, payload, profile }) {
-  const body = payload ?? buildPayload(deviceId, profile);
+export async function reading({ url, key, deviceId, payload, profile, format }) {
+  const body = payload ?? buildPayload(deviceId, profile, format);
   const out = await send({ url, key, body });
   return { deviceId: body.p_device_id, request: body, ...out };
 }
@@ -104,9 +118,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const ids = (arg('devices') ?? Object.keys(FLEET).join(',')).split(',');
   const rounds = Number(arg('rounds', '1'));
   const interval = Number(arg('interval', '1000'));
+  const format = arg('format', 'flat');
   for (let r = 1; r <= rounds; r++) {
     for (const id of ids) {
-      const out = await reading({ url, key, deviceId: id, profile: FLEET[id]?.profile });
+      const out = await reading({ url, key, deviceId: id, profile: FLEET[id]?.profile, format });
       console.log(JSON.stringify({ round: r, device: id, status: out.status, body: out.body, ms: out.ms }));
     }
     if (r < rounds) await new Promise((res) => setTimeout(res, interval));

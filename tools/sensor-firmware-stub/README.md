@@ -18,6 +18,16 @@ node tools/sensor-firmware-stub/firmware-stub.mjs --key <key> \
 
 Each line of output is JSON: `{ round, device, status, body, ms }`.
 
+### Body format
+
+By default measurements go in the flat fields `p_temp_c` and `p_humidity_pct`. `--format data` sends the same values inside one object instead, `p_data: { temp_c, humidity_pct }`:
+
+```bash
+node tools/sensor-firmware-stub/firmware-stub.mjs --key <key> --devices master-01 --format data
+```
+
+A fault-only profile (`master-04`) has no measurements, so it sends no `p_data` at all in either format.
+
 ## Simulated devices
 
 | Device id | Profile | What it sends |
@@ -35,6 +45,7 @@ None of these ids exist until an admin registers them (Sensor Fleet, Register de
 ```js
 import { reading, send, buildPayload, FLEET } from './firmware-stub.mjs';
 const out = await reading({ url, key, deviceId: 'master-01' });   // { status, body, request }
+const viaData = buildPayload('master-01', undefined, 'data');     // measurements inside p_data
 const raw = await send({ url, key, body: { p_device_id: 'x', p_raw: {} } }); // any body, any key
 ```
 
