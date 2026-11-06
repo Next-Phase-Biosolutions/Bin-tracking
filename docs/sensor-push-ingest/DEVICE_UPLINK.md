@@ -23,8 +23,9 @@ Content-Type: application/json
 |---|---|---|---|
 | `p_device_id` | string | yes | The device's own id. 1–64 characters: letters, digits, `-` and `_` only. Must be registered first. |
 | `p_raw` | object | yes | Any JSON **object** (not an array or scalar) of extra debug context, e.g. battery voltage. Under 10,000 bytes when serialized; no NUL characters. Shown to platform admins only. |
-| `p_temp_c` | number | no | Temperature, °C. |
-| `p_humidity_pct` | number | no | Relative humidity, %. |
+| `p_data` | object | no | Measurements as one object. `temp_c` (°C) and `humidity_pct` (%) are read from here; any number or null. Any other key is kept with the reading (in the stored raw payload) but is not shown yet, so a new sensor can be added without changing the request format. Under 10,000 bytes; no NUL characters. If a value is also sent as `p_temp_c` / `p_humidity_pct`, the `p_data` value is used. |
+| `p_temp_c` | number | no | Temperature, °C. Still accepted; `p_data.temp_c` wins if both are sent. |
+| `p_humidity_pct` | number | no | Relative humidity, %. Still accepted; `p_data.humidity_pct` wins if both are sent. |
 | `p_rssi` | number | no | Received signal strength, dBm. |
 | `p_snr` | number | no | Signal-to-noise ratio, dB. |
 | `p_filtered_rssi` | number | no | RSSI after the device's own smoothing. |
@@ -52,6 +53,12 @@ curl -X POST https://api.nextphasebiosolutions.com/ingest/sensor-reading \
     "p_snr": 9.5,
     "p_timestamp": "2026-10-30T10:00:00Z"
   }'
+```
+
+The same reading with the measurements in `p_data`:
+
+```json
+{ "p_device_id": "MT-0001", "p_raw": { "battery_mv": 3712 }, "p_data": { "temp_c": 3.4, "humidity_pct": 82.1 }, "p_timestamp": "2026-10-30T10:00:00Z" }
 ```
 
 Fault with no valid temperature or humidity:

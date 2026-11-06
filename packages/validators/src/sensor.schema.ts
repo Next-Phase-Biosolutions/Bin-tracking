@@ -56,6 +56,9 @@ function utf8Bytes(text: string): number {
     return bytes;
 }
 
+/** The `p_data` keys the server maps onto stored columns; any other key is kept in the raw payload. */
+export const SENSOR_DATA_NUMERIC_KEYS = ['temp_c', 'humidity_pct'] as const;
+
 export const ingestSensorReadingSchema = z.object({
     p_device_id: sensorDeviceIdSchema,
     p_raw: z.record(z.string(), z.unknown()).refine(
@@ -66,6 +69,26 @@ export const ingestSensorReadingSchema = z.object({
         },
         { message: `p_raw must be under ${RAW_PAYLOAD_MAX_BYTES} bytes and contain no NUL characters` },
     ),
+    // Measurements as one object, so a new sensor adds a key instead of a new top-level field.
+    // `temp_c` / `humidity_pct` here win over `p_temp_c` / `p_humidity_pct`, which still work.
+    p_data: z
+        .record(z.string(), z.unknown())
+        .refine(
+            (data) => {
+                const json = JSON.stringify(data);
+                return utf8Bytes(json) < RAW_PAYLOAD_MAX_BYTES && !json.includes('\\u0000');
+            },
+            { message: `p_data must be under ${RAW_PAYLOAD_MAX_BYTES} bytes and contain no NUL characters` },
+        )
+        .superRefine((data, ctx) => {
+            for (const key of SENSOR_DATA_NUMERIC_KEYS) {
+                const value = data[key];
+                if (value != null && !(typeof value === 'number' && Number.isFinite(value))) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'must be a number' });
+                }
+            }
+        })
+        .nullish(),
     p_temp_c: optionalMetric,
     p_humidity_pct: optionalMetric,
     p_rssi: optionalMetric,

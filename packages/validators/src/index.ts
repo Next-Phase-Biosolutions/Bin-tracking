@@ -167,6 +167,7 @@ export {
     listDevicesSchema,
     sensorReadingRangeSchema,
     ingestSensorReadingSchema,
+    SENSOR_DATA_NUMERIC_KEYS,
     RAW_PAYLOAD_MAX_BYTES,
     sensorDeviceIdSchema,
     parseDeviceIdList,

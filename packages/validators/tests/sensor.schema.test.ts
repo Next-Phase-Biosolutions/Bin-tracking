@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import {
     addSensorDevicesSchema,
@@ -19,18 +19,25 @@ describe('ingestSensorReadingSchema', () => {
     });
 
     it('accepts every documented optional field', () => {
-        const result = ingestSensorReadingSchema.safeParse({
-            ...minimal,
-            p_temp_c: 24.6,
-            p_humidity_pct: 51.2,
-            p_rssi: -67,
-            p_snr: 9.5,
-            p_filtered_rssi: -66.2,
-            p_error_code: 100,
-            p_error_message: 'sensor read timeout after 3 retries',
-            p_timestamp: '2026-10-29T10:00:00Z',
-        });
-        expect(result.success).toBe(true);
+        // The fixed p_timestamp below ages out of the 7-day window; pin "now" next to it.
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-29T12:00:00Z'));
+        try {
+            const result = ingestSensorReadingSchema.safeParse({
+                ...minimal,
+                p_temp_c: 24.6,
+                p_humidity_pct: 51.2,
+                p_rssi: -67,
+                p_snr: 9.5,
+                p_filtered_rssi: -66.2,
+                p_error_code: 100,
+                p_error_message: 'sensor read timeout after 3 retries',
+                p_timestamp: '2026-10-29T10:00:00Z',
+            });
+            expect(result.success).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('accepts a fault-only reading with no temp or humidity', () => {
@@ -117,6 +124,43 @@ describe('ingestSensorReadingSchema', () => {
         // 4000 three-byte characters = 4000 chars but ~12 KB on the wire.
         const wide = { note: '€'.repeat(4000) };
         expect(ingestSensorReadingSchema.safeParse({ ...minimal, p_raw: wide }).success).toBe(false);
+    });
+});
+
+describe('ingestSensorReadingSchema p_data', () => {
+    const base = { p_device_id: 'MT-0001', p_raw: {} };
+
+    it('accepts p_data with temp_c and humidity_pct', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: 3.4, humidity_pct: 62.1 } });
+        expect(r.success).toBe(true);
+    });
+
+    it('accepts p_data alongside the older p_temp_c / p_humidity_pct, and null or omitted p_data', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: {}, p_temp_c: 3 }).success).toBe(true);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: null }).success).toBe(true);
+        expect(ingestSensorReadingSchema.safeParse(base).success).toBe(true);
+    });
+
+    it('accepts extra keys for future sensors, of any JSON type', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: 3, pm25: 12, note: 'x' } });
+        expect(r.success).toBe(true);
+    });
+
+    it('rejects a non-numeric temp_c or humidity_pct, naming the key', () => {
+        const r = ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: '3.4' } });
+        expect(r.success).toBe(false);
+        if (!r.success) expect(r.error.issues[0]?.path).toEqual(['p_data', 'temp_c']);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { humidity_pct: Number.NaN } }).success).toBe(false);
+    });
+
+    it('treats a null temp_c as no value', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { temp_c: null } }).success).toBe(true);
+    });
+
+    it('rejects a p_data that is an array, or is at or over the size cap, or holds a NUL', () => {
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: [1, 2] }).success).toBe(false);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { big: 'a'.repeat(RAW_PAYLOAD_MAX_BYTES) } }).success).toBe(false);
+        expect(ingestSensorReadingSchema.safeParse({ ...base, p_data: { note: 'a\u0000b' } }).success).toBe(false);
     });
 });
 
