@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { nameIsHardwareId, sensorDeviceIdProblem } from '@bin-tracker/types';
 import {
     addSensorDevicesSchema,
@@ -19,18 +19,25 @@ describe('ingestSensorReadingSchema', () => {
     });
 
     it('accepts every documented optional field', () => {
-        const result = ingestSensorReadingSchema.safeParse({
-            ...minimal,
-            p_temp_c: 24.6,
-            p_humidity_pct: 51.2,
-            p_rssi: -67,
-            p_snr: 9.5,
-            p_filtered_rssi: -66.2,
-            p_error_code: 100,
-            p_error_message: 'sensor read timeout after 3 retries',
-            p_timestamp: '2026-10-29T10:00:00Z',
-        });
-        expect(result.success).toBe(true);
+        // The fixed p_timestamp below ages out of the 7-day window; pin "now" next to it.
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-29T12:00:00Z'));
+        try {
+            const result = ingestSensorReadingSchema.safeParse({
+                ...minimal,
+                p_temp_c: 24.6,
+                p_humidity_pct: 51.2,
+                p_rssi: -67,
+                p_snr: 9.5,
+                p_filtered_rssi: -66.2,
+                p_error_code: 100,
+                p_error_message: 'sensor read timeout after 3 retries',
+                p_timestamp: '2026-10-29T10:00:00Z',
+            });
+            expect(result.success).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('accepts a fault-only reading with no temp or humidity', () => {
