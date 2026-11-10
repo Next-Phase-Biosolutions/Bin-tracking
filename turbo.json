@@ -30,6 +30,9 @@
         "test": {
             "dependsOn": [
                 "^build"
+            ],
+            "env": [
+                "DATABASE_URL"
             ]
         },
         "test:watch": {

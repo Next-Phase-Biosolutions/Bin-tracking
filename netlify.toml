@@ -10,6 +10,17 @@
   base = "/"
 
 [[redirects]]
+  # NFC phone pages (/app/tap, /app/register) call the RELATIVE path /trpc so the httpOnly
+  # device cookie is first-party: set on, and sent back to, this same origin. A rewrite
+  # (status 200), not a redirect, so the browser never leaves the site. MUST stay above the
+  # catch-alls below, which would otherwise answer /trpc/* with an HTML page.
+  # The authenticated app does NOT use this: it talks to the API directly via VITE_API_URL.
+  from = "/trpc/*"
+  to = "https://api.nextphasebiosolutions.com/trpc/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   # apps/web's client-side routes — must come before the marketing catch-all
   # below, since Netlify matches redirects top-to-bottom, first match wins.
   from = "/app/*"

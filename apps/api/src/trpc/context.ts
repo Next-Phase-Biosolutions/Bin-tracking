@@ -1,4 +1,4 @@
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '@bin-tracker/db';
 import type { User, UserRole } from '@prisma/client';
 import { verifySupabaseToken } from '../lib/jwt.js';
@@ -26,13 +26,19 @@ export interface Context {
      */
     jwtPayload: { sub: string; email?: string } | null;
     req: FastifyRequest;
+    /**
+     * The Fastify reply, present on real requests. Only the phone-registration
+     * and tap procedures use it, to set/clear the device cookies; optional so
+     * every other caller (and test) can build a Context without it.
+     */
+    res?: FastifyReply;
 }
 
 /**
  * Create tRPC context from Fastify request.
  * Auth is resolved here — routers get a pre-resolved user.
  */
-export async function createContext(req: FastifyRequest): Promise<Context> {
+export async function createContext(req: FastifyRequest, res?: FastifyReply): Promise<Context> {
     let user: User | null = null;
 
     // ─── AUTH BYPASS (DISABLE_AUTH=true) ─────────────────────────────────────
@@ -54,7 +60,7 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         // (including Fastify's own request-completion log) carries orgId —
         // per-tenant log filtering without threading orgId through every call site.
         if (bypassOrgId) req.log = req.log.child({ orgId: bypassOrgId });
-        return { prisma, user, orgId: bypassOrgId, orgRole: bypassOrgRole, jwtPayload: null, req };
+        return { prisma, user, orgId: bypassOrgId, orgRole: bypassOrgRole, jwtPayload: null, req, res };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -105,5 +111,6 @@ export async function createContext(req: FastifyRequest): Promise<Context> {
         orgRole,
         jwtPayload,
         req,
+        res,
     };
 }

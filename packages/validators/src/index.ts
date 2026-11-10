@@ -96,6 +96,12 @@ export {
     attendanceScanSchema,
     attendanceSummarySchema,
     attendanceRecentSchema,
+    attendanceApproveSessionSchema,
+    attendanceMethodSchema,
+    setAttendanceMethodSchema,
+    type AttendanceApproveSessionInput,
+    type AttendanceMethodInput,
+    type SetAttendanceMethodInput,
     type AttendanceScanInput,
     type AttendanceSummaryInput,
     type AttendanceRecentInput,
@@ -197,3 +203,26 @@ export {
     type CreateZoneInput,
     type ReorderZonesInput,
 } from './sensor.schema.js';
+
+export { text } from './text.js';
+
+export {
+    nfcDirectionSchema,
+    createNfcCardSchema,
+    updateNfcCardSchema,
+    nfcCardRefSchema,
+    setNfcCardActiveSchema,
+    nfcTapSchema,
+    sendRegistrationLinkSchema,
+    registerStartSchema,
+    revokeDeviceSessionSchema,
+    type NfcDirectionInput,
+    type CreateNfcCardInput,
+    type UpdateNfcCardInput,
+    type NfcCardRefInput,
+    type SetNfcCardActiveInput,
+    type NfcTapInput,
+    type SendRegistrationLinkInput,
+    type RegisterStartInput,
+    type RevokeDeviceSessionInput,
+} from './nfc.schema.js';

@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyRawBody from 'fastify-raw-body';
@@ -13,6 +14,7 @@ import { registerStripeWebhook } from './routes/stripe-webhook.js';
 import { registerSensorIngest } from './routes/sensor-ingest.js';
 import { initSentry, captureError } from './lib/sentry.js';
 import { validateEnv } from './lib/env.js';
+import { rateLimitOptions } from './lib/rate-limit-config.js';
 
 // Fail fast on a misconfigured production environment — before Sentry init,
 // before the server binds. No-op outside production (lib/env.ts).
@@ -47,11 +49,15 @@ async function buildServer() {
         credentials: true,
     });
 
+    // ─── Cookies (NFC phone pages only — see lib/nfc-cookies.ts) ─
+    // Unsigned: the device cookie is a random secret whose SHA-256 is looked up
+    // server-side, so there is nothing to sign.
+    await server.register(cookie);
+
     // ─── Rate Limiting ───────────────────────────────────────
-    await server.register(rateLimit, {
-        max: 100,
-        timeWindow: '1 minute',
-    });
+    // Per-IP limits (lib/rate-limit-config.ts): the API's strict default, plus a separate, larger
+    // bucket for the two phone procedures so a shift-start burst behind the proxy is not refused.
+    await server.register(rateLimit, rateLimitOptions());
 
     // ─── Health Check (raw Fastify — no tRPC, no auth) ──────
     server.get('/health', async (_request, reply) => {
@@ -78,7 +84,7 @@ async function buildServer() {
         prefix: '/trpc',
         trpcOptions: {
             router: appRouter,
-            createContext: ({ req }) => createContext(req),
+            createContext: ({ req, res }) => createContext(req, res),
             // Side-effect hook for error reporting — kept separate from
             // trpc.ts's errorFormatter (which only shapes the client-facing
             // response). `ctx` is available here (v11 HTTPErrorHandlerOptions),

@@ -8,6 +8,7 @@ import { Icon } from '../../components/ui/Icon';
 import { Card, Button, Badge, LiveDot } from '../../components/ui/primitives';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { PayrollSettingsCard } from './PayrollSettingsCard';
+import { AttendanceMethodCard } from './AttendanceMethodCard';
 
 const ROLE_OPTIONS = [
     { value: 'ADMIN', label: 'Admin' },
@@ -56,6 +57,7 @@ export default function SettingsPage() {
                     <>
                         <MembersCard myUserId={me.data.id} />
                         <InvitesCard />
+                        {modulesReady && hasModule('WORKFORCE') ? <AttendanceMethodCard /> : null}
                         {modulesReady && hasModule('PAYROLL') ? <PayrollSettingsCard /> : null}
                     </>
                 ) : null}

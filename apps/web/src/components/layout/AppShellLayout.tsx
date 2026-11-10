@@ -60,7 +60,8 @@ export function AppShellLayout() {
                 )}
             </AnimatePresence>
 
-            <div className="flex min-h-screen flex-col">
+            {/* min-w-0: a wide table inside a page must scroll within its own card, not stretch this column and push the whole page past the viewport. */}
+            <div className="flex min-h-screen min-w-0 flex-col">
                 <TopBar onMenu={() => setDrawer(true)} />
                 <main className="flex-1 px-4 py-6 md:px-6 md:py-8">
                     <Outlet />

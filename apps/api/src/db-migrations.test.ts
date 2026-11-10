@@ -51,3 +51,50 @@ describe('sensor fleet management migration', () => {
         expect(sql).not.toContain('FORCE ROW LEVEL SECURITY');
     });
 });
+
+// NFC attendance migrations. Text inspection only (no Prisma client), same as
+// above: the enum values must be applied in complete isolation, and the second
+// migration carries the parts a drift check cannot see — the partial unique
+// index, the duplicate-open-session cleanup that must run BEFORE it, and RLS.
+describe('NFC attendance migrations', () => {
+    const migrationsDir = join(
+        dirname(fileURLToPath(import.meta.url)),
+        '../../../packages/db/prisma/migrations',
+    );
+    const read = (dir: string) => readFileSync(join(migrationsDir, dir, 'migration.sql'), 'utf-8');
+
+    it('adds the AttendanceEventType values in a migration that contains nothing else', () => {
+        const statements = read('20261104120000_attendance_event_nfc_types')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0 && !line.startsWith('--'));
+
+        expect(statements).toEqual([
+            `ALTER TYPE "AttendanceEventType" ADD VALUE 'DEBOUNCED';`,
+            `ALTER TYPE "AttendanceEventType" ADD VALUE 'REJECTED';`,
+            `ALTER TYPE "AttendanceEventType" ADD VALUE 'REGISTERED';`,
+        ]);
+    });
+
+    it('creates the one-open-session partial unique index only after the duplicate cleanup', () => {
+        const sql = read('20261104120100_nfc_attendance');
+        const cleanup = sql.indexOf('WITH open_sessions AS');
+        const index = sql.indexOf('CREATE UNIQUE INDEX "work_sessions_one_open_per_employee"');
+
+        expect(cleanup).toBeGreaterThan(-1);
+        expect(index).toBeGreaterThan(cleanup);
+        expect(sql).toContain('WHERE "checkOutAt" IS NULL');
+        // Cleaned-up duplicates must surface as payroll exceptions, not be paid.
+        expect(sql).toContain('"autoClosed" = true');
+        expect(sql).not.toMatch(/"approvedAt"\s*=/);
+    });
+
+    it('enables RLS (never FORCE) on every new table', () => {
+        const sql = read('20261104120100_nfc_attendance');
+
+        for (const table of ['nfc_cards', 'registration_tokens', 'device_sessions']) {
+            expect(sql).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY;`);
+        }
+        expect(sql).not.toContain('FORCE ROW LEVEL SECURITY');
+    });
+});

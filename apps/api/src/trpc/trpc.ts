@@ -4,6 +4,7 @@ import type { ModuleKey } from '@bin-tracker/types';
 import type { Context } from './context.js';
 import { requireRole, requireOrgRole, requireFacilityAccess, requireAssignedDriver } from './middleware.js';
 import { isAuthDisabled } from '../lib/auth-flags.js';
+import { AppError } from '../lib/app-error.js';
 
 const t = initTRPC.context<Context>().create({
     transformer: superjson,
@@ -12,6 +13,8 @@ const t = initTRPC.context<Context>().create({
             ...shape,
             data: {
                 ...shape.data,
+                // Stable machine code for the phone pages (see lib/app-error.ts).
+                appCode: error instanceof AppError ? error.appCode : undefined,
                 // Strip Prisma/internal details in production
                 stack: process.env['NODE_ENV'] === 'development' ? error.stack : undefined,
             },

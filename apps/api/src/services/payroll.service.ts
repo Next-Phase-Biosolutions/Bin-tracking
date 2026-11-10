@@ -8,6 +8,9 @@ import type {
 } from '@bin-tracker/validators';
 import type { PayrollRunView, PayrollRunSummary } from '@bin-tracker/types';
 import { verifyApprovalCode } from '../lib/approvalCode.js';
+import { attendanceService } from './attendance.service.js';
+import { MAX_SHIFT_MS } from './attendance-punch.js';
+import { withLock } from '../lib/with-lock.js';
 
 const MINUTES_PER_HOUR = 60;
 
@@ -163,6 +166,11 @@ export const payrollService = {
             });
         }
 
+        // Forgotten check-outs (open 16 h or more) are closed at the cap and flagged
+        // auto-closed BEFORE the sums run, so they land as AUTO_CLOSED exceptions
+        // held for approval. Lazy and org-scoped: no background job, no other tenant.
+        await attendanceService.closeStaleSessions(orgId);
+
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Atomic create-or-update on the compound key — avoids the
             // find-then-create race where two concurrent calls for the same
@@ -186,7 +194,8 @@ export const payrollService = {
             const resolvedSessionIds = new Set(resolvedExceptions.map((e) => e.sessionId));
             await tx.payrollException.deleteMany({ where: { runId: run.id, resolved: false } });
 
-            // Payable sessions: checked out and not auto-closed, bucketed by
+            // Payable sessions: checked out and either never auto-closed or approved by a
+            // manager (approvedAt), bucketed by
             // local check-in month. WorkSession has no organizationId column of
             // its own, so the org boundary is enforced by joining employees.
             // hourlyRateCents is per-employee (functionally dependent on
@@ -203,7 +212,7 @@ export const payrollService = {
                     JOIN "employees" e ON e."id" = ws."employeeId"
                     WHERE e."organizationId" = ${orgId}
                       AND ws."checkOutAt" IS NOT NULL
-                      AND ws."autoClosed" = false
+                      AND (ws."autoClosed" = false OR ws."approvedAt" IS NOT NULL)
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
                     GROUP BY ws."employeeId", e."hourlyRateCents"
@@ -234,7 +243,7 @@ export const payrollService = {
                 });
             }
 
-            // Dirty sessions: no check-out, or auto-closed. Held back from pay.
+            // Dirty sessions: no check-out, or auto-closed and not yet approved. Held back from pay.
             const exceptionRows = await tx.$queryRaw<
                 Array<{ id: string; employeeId: string; checkOutAt: Date | null }>
             >(
@@ -243,7 +252,7 @@ export const payrollService = {
                     FROM "work_sessions" ws
                     JOIN "employees" e ON e."id" = ws."employeeId"
                     WHERE e."organizationId" = ${orgId}
-                      AND (ws."checkOutAt" IS NULL OR ws."autoClosed" = true)
+                      AND (ws."checkOutAt" IS NULL OR (ws."autoClosed" = true AND ws."approvedAt" IS NULL))
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) >= ${start}::timestamp
                       AND (ws."checkInAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}) <  ${end}::timestamp
                 `,
@@ -328,9 +337,13 @@ export const payrollService = {
         // FIX_CHECKOUT — validated present by the schema refine.
         const checkOutAt = new Date(input.checkOutAt!);
         const checkInAt = exception.session.checkInAt;
-        const MAX_SHIFT_MS = 16 * 60 * 60 * 1000; // matches the auto-close policy
         if (checkOutAt.getTime() <= checkInAt.getTime()) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout must be after the check-in time.' });
+        }
+        // A future check-out would close a shift that may still be running, and the employee's
+        // next tap would then open a second, overlapping one.
+        if (checkOutAt.getTime() > Date.now()) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout cannot be in the future.' });
         }
         if (checkOutAt.getTime() - checkInAt.getTime() > MAX_SHIFT_MS) {
             throw new TRPCError({
@@ -339,17 +352,33 @@ export const payrollService = {
             });
         }
 
+        // The overlap check and the update run together under the employee's lock, the same lock a tap takes.
+        // Checked outside it, a tap landing in between could open a next shift that this check-out then runs into.
         const durationMin = Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60_000);
-        await prisma.$transaction([
-            prisma.workSession.update({
+        await withLock(`employee:${exception.session.employeeId}`, async (tx) => {
+            // The fixed check-out must not run into the employee's NEXT shift, or those
+            // minutes would be paid twice. Ending exactly when the next shift begins is fine.
+            const nextSession = await tx.workSession.findFirst({
+                where: { employeeId: exception.session.employeeId, checkInAt: { gt: checkInAt } },
+                orderBy: { checkInAt: 'asc' },
+                select: { checkInAt: true },
+            });
+            if (nextSession && checkOutAt.getTime() > nextSession.checkInAt.getTime()) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: "Checkout overlaps the employee's next shift — choose a time before it starts.",
+                });
+            }
+
+            await tx.workSession.update({
                 where: { id: exception.sessionId },
                 data: { checkOutAt, durationMin, autoClosed: false },
-            }),
-            prisma.payrollException.update({
+            });
+            await tx.payrollException.update({
                 where: { id: exception.id },
                 data: { resolved: true, resolvedAt: new Date(), note: input.note ?? null },
-            }),
-        ]);
+            });
+        });
         return { resolved: true, requiresRecompute: true };
     },
 
