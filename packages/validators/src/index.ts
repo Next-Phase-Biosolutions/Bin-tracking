@@ -214,6 +214,7 @@ export {
     setNfcCardActiveSchema,
     nfcTapSchema,
     sendRegistrationLinkSchema,
+    emailRegistrationLinkSchema,
     registerStartSchema,
     revokeDeviceSessionSchema,
     type NfcDirectionInput,
@@ -223,6 +224,7 @@ export {
     type SetNfcCardActiveInput,
     type NfcTapInput,
     type SendRegistrationLinkInput,
+    type EmailRegistrationLinkInput,
     type RegisterStartInput,
     type RevokeDeviceSessionInput,
 } from './nfc.schema.js';

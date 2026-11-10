@@ -27,6 +27,7 @@ const adminProcedures: Record<string, (api: Api) => Promise<unknown>> = {
     'nfcCard.setActive': (api) => api.nfcCard.setActive({ id: 'c1', active: false }),
     'nfcCard.remove': (api) => api.nfcCard.remove({ id: 'c1' }),
     'deviceRegistration.sendLink': (api) => api.deviceRegistration.sendLink({ employeeId: 'e1' }),
+    'deviceRegistration.emailLink': (api) => api.deviceRegistration.emailLink({ employeeId: 'e1', token: 't1' }),
     'deviceRegistration.listDevices': (api) => api.deviceRegistration.listDevices(),
     'deviceRegistration.revokeDevice': (api) => api.deviceRegistration.revokeDevice({ id: 'd1' }),
     'attendance.facilityStatus': (api) => api.attendance.facilityStatus(),
@@ -62,7 +63,7 @@ describe('NFC admin procedures: role enforcement', () => {
         // If a manager procedure is added without a role test, this count changes and flags it.
         const managerProcedures = [
             ...Object.keys(appRouter._def.procedures).filter((p) => p.startsWith('nfcCard.')),
-            ...['deviceRegistration.sendLink', 'deviceRegistration.listDevices', 'deviceRegistration.revokeDevice'],
+            ...['deviceRegistration.sendLink', 'deviceRegistration.emailLink', 'deviceRegistration.listDevices', 'deviceRegistration.revokeDevice'],
             ...['attendance.facilityStatus', 'attendance.listPendingApprovals', 'attendance.approveWorkSession'],
         ];
         expect(managerProcedures.sort()).toEqual(Object.keys(adminProcedures).sort());

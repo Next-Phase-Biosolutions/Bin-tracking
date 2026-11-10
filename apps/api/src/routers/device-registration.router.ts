@@ -1,5 +1,5 @@
 import { router, publicProcedure, orgOpsProcedure, requireModule } from '../trpc/trpc.js';
-import { registerStartSchema, sendRegistrationLinkSchema, revokeDeviceSessionSchema } from '@bin-tracker/validators';
+import { registerStartSchema, sendRegistrationLinkSchema, emailRegistrationLinkSchema, revokeDeviceSessionSchema } from '@bin-tracker/validators';
 import { deviceRegistrationService } from '../services/device-registration.service.js';
 import { registrationStartRateLimit } from '../trpc/rate-limit.js';
 import { PENDING_COOKIE, assertTrustedOrigin, pendingCookieOptions, setCookie } from '../lib/nfc-cookies.js';
@@ -10,6 +10,9 @@ const admin = orgOpsProcedure.use(requireModule('WORKFORCE'));
 export const deviceRegistrationRouter = router({
     /** Manager: mint a single-use registration link for one employee. */
     sendLink: admin.input(sendRegistrationLinkSchema).mutation(({ input, ctx }) => deviceRegistrationService.sendLink(ctx.orgId, input.employeeId)),
+
+    /** Manager: email an issued link to the employee's address on file (the link is rebuilt server-side from the token). */
+    emailLink: admin.input(emailRegistrationLinkSchema).mutation(({ input, ctx }) => deviceRegistrationService.emailLink(ctx.orgId, input.employeeId, input.token)),
 
     /** Manager: every active phone in the org (the web groups them by employee). */
     listDevices: admin.query(({ ctx }) => deviceRegistrationService.listDevices(ctx.orgId)),
