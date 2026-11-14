@@ -43,3 +43,35 @@ describe('Sidebar: only the active clock-in method is shown', () => {
         expect(screen.queryByText('NFC Cards')).toBeNull();
     });
 });
+
+describe('Sidebar: Attendance Logs', () => {
+    const items = () => [...document.querySelectorAll('nav a')].map((a) => a.textContent?.trim());
+
+    it('is listed directly under Timesheet for an admin', async () => {
+        renderWithTrpc(<Sidebar />, { ...base, 'attendance.method': () => ({ method: 'NFC' }) });
+
+        expect(await screen.findByText('Attendance Logs')).toBeTruthy();
+        const list = items();
+        expect(list.indexOf('Attendance Logs')).toBe(list.indexOf('Timesheet') + 1);
+        expect(document.querySelector('a[href="/app/attendance-logs"]')).not.toBeNull();
+    });
+
+    it('is listed for an ops manager', async () => {
+        renderWithTrpc(<Sidebar />, { ...base, 'auth.me': () => ({ orgRole: 'OPS_MANAGER', name: 'Ops', id: 'u2' }), 'attendance.method': () => ({ method: 'NFC' }) });
+
+        expect(await screen.findByText('Attendance Logs')).toBeTruthy();
+    });
+
+    it.each(['DRIVER', 'WORKER'])('is hidden from a %s, who still sees Timesheet', async (orgRole) => {
+        renderWithTrpc(<Sidebar />, { ...base, 'auth.me': () => ({ orgRole, name: 'X', id: 'u3' }), 'attendance.method': () => ({ method: 'NFC' }) });
+
+        expect(await screen.findByText('Timesheet')).toBeTruthy();
+        expect(screen.queryByText('Attendance Logs')).toBeNull();
+    });
+
+    it('shows for both clock-in methods (it reads the same history either way)', async () => {
+        renderWithTrpc(<Sidebar />, { ...base, 'attendance.method': () => ({ method: 'QR' }) });
+
+        expect(await screen.findByText('Attendance Logs')).toBeTruthy();
+    });
+});

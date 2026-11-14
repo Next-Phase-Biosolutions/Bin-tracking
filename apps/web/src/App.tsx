@@ -19,6 +19,7 @@ import LiveStatusPage from './features/nfc/LiveStatusPage';
 import TapPage from './features/nfc/TapPage';
 import RegisterPage from './features/nfc/RegisterPage';
 import TimesheetDashboardPage from './features/timesheet/TimesheetDashboardPage';
+import AttendanceLogsPage from './features/attendance-logs/AttendanceLogsPage';
 import ShipmentRegisterPage from './features/shipments/ShipmentRegisterPage';
 import ShipmentsDashboardPage from './features/shipments/ShipmentsDashboardPage';
 import ShipmentDetailPage from './features/shipments/ShipmentDetailPage';
@@ -89,6 +90,7 @@ export function App() {
                 <Route path="/app/employees" element={<EmployeesPage />} />
                 <Route path="/app/employees/register" element={<EmployeeRegisterPage />} />
                 <Route path="/app/timesheet" element={<TimesheetDashboardPage />} />
+                <Route path="/app/attendance-logs" element={<AttendanceLogsPage />} />
                 <Route path="/app/live-status" element={<LiveStatusPage />} />
                 <Route path="/app/nfc-cards" element={<NfcCardsPage />} />
                 <Route path="/app/payroll" element={<PayrollPage />} />
