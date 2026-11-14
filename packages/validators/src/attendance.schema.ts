@@ -50,3 +50,25 @@ export const setAttendanceMethodSchema = z.object({ method: attendanceMethodSche
 
 export type AttendanceMethodInput = z.infer<typeof attendanceMethodSchema>;
 export type SetAttendanceMethodInput = z.infer<typeof setAttendanceMethodSchema>;
+
+// ─── Attendance Logs (manager view: a calendar month, then one day) ───────────
+
+const isRealDate = (value: string): boolean => {
+    const [y, m, d] = value.split('-').map(Number) as [number, number, number];
+    const date = new Date(Date.UTC(y, m - 1, d));
+    return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+};
+
+/** One calendar month: how many employees clocked in on each day. */
+export const attendanceLogsMonthSchema = z.object({
+    year: z.number().int().min(2000).max(2100),
+    month: z.number().int().min(1).max(12),
+});
+
+/** One day (`YYYY-MM-DD`, in the company's timezone): who clocked in and out. */
+export const attendanceLogsDaySchema = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD').refine(isRealDate, 'Not a real calendar date'),
+});
+
+export type AttendanceLogsMonthInput = z.infer<typeof attendanceLogsMonthSchema>;
+export type AttendanceLogsDayInput = z.infer<typeof attendanceLogsDaySchema>;
