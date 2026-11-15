@@ -244,8 +244,10 @@ suite('Attendance Logs (real Postgres)', () => {
             await attendanceService.scan(org, { qrCode: qrPerson.qrCode });
 
             const past = await attendanceLogsService.day(org, { date: '2026-03-03' }, NOW);
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const live = await attendanceLogsService.day(org, { date: todayStr }, new Date());
+            // "today" is the COMPANY-timezone date, which is not the UTC date for several hours every day
+            const now = new Date();
+            const nowLocal = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto' }).format(now);
+            const live = await attendanceLogsService.day(org, { date: nowLocal }, now);
 
             expect(past.rows.find((r) => r.employeeId === nfcPerson.id)).toMatchObject({ status: 'COMPLETE', totalMinutes: 510 });
             expect(live.rows.some((r) => r.employeeId === qrPerson.id)).toBe(true);
