@@ -99,6 +99,12 @@ const ADMIN_ERRORS: Record<string, string> = {
     INVALID_CHECK_OUT: 'The check-out time must be after check-in and not in the future.',
     OVERLAPS_NEXT_SESSION: 'That check-out overlaps the employee’s next shift. Choose an earlier time.',
     SHIFT_TOO_LONG: 'A shift longer than 16 hours cannot be approved. Check the check-out time, or split the shift.',
+    EMAIL_FAILED: 'The email could not be sent. Please try again.',
+    EMPLOYEE_NO_EMAIL: 'This employee has no email address on file. Add one in Employees, or copy the link and send it yourself.',
+    LINK_NOT_FOUND: 'That link is no longer valid. Create a new one.',
+    TOKEN_EXPIRED: 'That link has expired. Create a new one.',
+    TOKEN_ALREADY_USED: 'That link was already used. Create a new one.',
+    TOKEN_SUPERSEDED: 'A newer link replaced that one. Send the newest link, or create a new one.',
     PAYROLL_RUN_FROZEN: 'Payroll for that month is already approved or paid, so these hours cannot be added to it.',
 };
 

@@ -35,6 +35,12 @@ export const nfcTapSchema = z.object({ cardId: id });
 /** Manager issues a registration link for one employee. */
 export const sendRegistrationLinkSchema = z.object({ employeeId: id });
 
+/**
+ * Manager emails an already-issued registration link to the employee. Only the raw token is sent (never a URL):
+ * the server rebuilds the link from its own APP_URL, so a caller cannot make it email any address of their choosing.
+ */
+export const emailRegistrationLinkSchema = z.object({ employeeId: id, token: text(z.string().trim().min(1).max(512)) });
+
 /** The employee's phone opens the link; marks the browser "pending registration". */
 export const registerStartSchema = z.object({ token: text(z.string().trim().min(1).max(512)) });
 
@@ -48,5 +54,6 @@ export type NfcCardRefInput = z.infer<typeof nfcCardRefSchema>;
 export type SetNfcCardActiveInput = z.infer<typeof setNfcCardActiveSchema>;
 export type NfcTapInput = z.infer<typeof nfcTapSchema>;
 export type SendRegistrationLinkInput = z.infer<typeof sendRegistrationLinkSchema>;
+export type EmailRegistrationLinkInput = z.infer<typeof emailRegistrationLinkSchema>;
 export type RegisterStartInput = z.infer<typeof registerStartSchema>;
 export type RevokeDeviceSessionInput = z.infer<typeof revokeDeviceSessionSchema>;

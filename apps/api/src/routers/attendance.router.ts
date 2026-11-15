@@ -4,9 +4,12 @@ import {
     attendanceSummarySchema,
     attendanceRecentSchema,
     attendanceApproveSessionSchema,
+    attendanceLogsMonthSchema,
+    attendanceLogsDaySchema,
     nfcTapSchema,
 } from '@bin-tracker/validators';
 import { attendanceService } from '../services/attendance.service.js';
+import { attendanceLogsService } from '../services/attendance-logs.service.js';
 import { tap } from '../services/nfc-tap.service.js';
 import { getAttendanceMethod } from '../lib/attendance-method.js';
 import { TERMINAL_TOKEN_ERRORS } from '../services/device-registration.service.js';
@@ -92,6 +95,12 @@ export const attendanceRouter = router({
 
     /** Who is in the building right now (read-only; no pay rates, no QR codes). */
     facilityStatus: manager.query(({ ctx }) => attendanceService.facilityStatus(ctx.orgId)),
+
+    /** Attendance Logs, step 1: per day of a month, how many employees clocked in (company timezone). */
+    logsMonth: manager.input(attendanceLogsMonthSchema).query(({ input, ctx }) => attendanceLogsService.month(ctx.orgId, input)),
+
+    /** Attendance Logs, step 2: one day: who clocked in and out, sessions, totals and statuses. */
+    logsDay: manager.input(attendanceLogsDaySchema).query(({ input, ctx }) => attendanceLogsService.day(ctx.orgId, input)),
 
     /** Auto-closed (forgotten check-out) sessions waiting for approval. */
     listPendingApprovals: manager.query(({ ctx }) => attendanceService.listPendingApprovals(ctx.orgId)),

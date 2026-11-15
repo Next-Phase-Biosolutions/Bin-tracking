@@ -26,6 +26,7 @@ export const operationsNav: NavItem[] = [
     { label: 'Employee Registration', href: '/app/employees/register', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
     { label: 'Employee Scanner', href: '/app/guard', icon: 'badge', module: 'WORKFORCE', attendanceMethod: 'QR' },
     { label: 'Timesheet', href: '/app/timesheet', icon: 'clock', module: 'WORKFORCE' },
+    { label: 'Attendance Logs', href: '/app/attendance-logs', icon: 'clock', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
     { label: 'Live Status', href: '/app/live-status', icon: 'users', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'] },
     { label: 'NFC Cards', href: '/app/nfc-cards', icon: 'badge', module: 'WORKFORCE', roles: ['ADMIN', 'OPS_MANAGER'], attendanceMethod: 'NFC' },
     { label: 'Payroll', href: '/app/payroll', icon: 'clock', module: 'PAYROLL' },

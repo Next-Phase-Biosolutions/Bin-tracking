@@ -5,6 +5,8 @@ import { AppError } from '../lib/app-error.js';
 import { deviceLabelFromUserAgent } from '../lib/device-label.js';
 import { hashToken } from '../lib/token.js';
 import { withLock } from '../lib/with-lock.js';
+import { sendRegistrationLinkEmail } from '../lib/email.js';
+import { captureError } from '../lib/sentry.js';
 import { assertAttendanceMethod } from '../lib/attendance-method.js';
 
 type Tx = Prisma.TransactionClient;
@@ -96,6 +98,35 @@ export const deviceRegistrationService = {
 
         const appUrl = (process.env['APP_URL'] ?? 'http://localhost:3000').replace(/\/$/, '');
         return { link: `${appUrl}/app/register?token=${raw}`, expiresAt, employeeName: employee.fullName };
+    },
+
+    /**
+     * Manager action: email an already-issued link to the employee's address on file.
+     *
+     * The manager's browser sends back the raw token it was given (only its hash is stored). The link is then
+     * rebuilt here from APP_URL, so nothing the caller sends can choose the address or the host in the email.
+     * The token must belong to this organization AND this employee and still be usable, otherwise the answer is
+     * "not found" (a link of another organization is indistinguishable from one that never existed).
+     * A mail failure becomes EMAIL_FAILED (the raw error, which could echo the URL, is reported to Sentry only).
+     */
+    async emailLink(orgId: string, employeeId: string, rawToken: string, now: Date = new Date()) {
+        const employeeSelect = { select: { fullName: true, email: true, status: true } } as const;
+        const token = await prisma.registrationToken.findUnique({ where: { tokenHash: hashToken(rawToken), organizationId: orgId }, include: { employee: employeeSelect } });
+        if (!token || token.employeeId !== employeeId) throw new AppError('LINK_NOT_FOUND', 'NOT_FOUND');
+        assertUsable(token, now);
+        if (token.employee.status !== 'ACTIVE') throw new AppError('EMPLOYEE_INACTIVE', 'FORBIDDEN');
+        const to = token.employee.email?.trim();
+        if (!to) throw new AppError('EMPLOYEE_NO_EMAIL', 'PRECONDITION_FAILED');
+
+        const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
+        const appUrl = (process.env['APP_URL'] ?? 'http://localhost:3000').replace(/\/$/, '');
+        try {
+            await sendRegistrationLinkEmail(to, `${appUrl}/app/register?token=${rawToken}`, org?.name ?? 'Your organization', token.employee.fullName, token.expiresAt);
+        } catch (error: unknown) {
+            captureError(error, orgId);
+            throw new AppError('EMAIL_FAILED', 'BAD_GATEWAY');
+        }
+        return { email: to, sentAt: now };
     },
 
     /**

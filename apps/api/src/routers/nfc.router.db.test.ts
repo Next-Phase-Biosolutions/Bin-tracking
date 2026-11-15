@@ -5,6 +5,13 @@ import { appRouter } from './index.js';
 import { hashToken } from '../lib/token.js';
 import { cleanupOrg, dbTestsEnabled, seedCard, seedDevice, seedEmployee, seedOrg } from '../test-support/db.js';
 
+// The mail provider is replaced by a recorder: tests assert WHAT would be emailed, never send anything.
+const mail = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock('../lib/email.js', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../lib/email.js')>()),
+    sendRegistrationLinkEmail: mail.send,
+}));
+
 // Drives the REAL router (auth middleware, rate limits, cookies, errorFormatter) over a real
 // Postgres, with a fake browser cookie jar. Skipped unless DATABASE_URL is a localhost
 // *_test / *_ci database (see test-support/db.ts).
@@ -731,6 +738,147 @@ suite('NFC registration, tap and card management (real Postgres, real router)', 
             created.push(org);
 
             await expect(manager(org, 'ADMIN').settings.setAttendanceMethod({ method: 'SMOKE' as never })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        });
+    });
+
+    describe('emailing a registration link (deviceRegistration.emailLink)', () => {
+        const setEmail = (employeeId: string, email: string | null) => prisma.employee.update({ where: { id: employeeId }, data: { email } });
+        const reset = () => {
+            mail.send.mockReset();
+            mail.send.mockResolvedValue(undefined);
+        };
+
+        it('emails the link to the address on file: rebuilt from APP_URL, with the name, organisation and expiry', async () => {
+            reset();
+            vi.stubEnv('APP_URL', 'https://app.example.test/');
+            try {
+                const employee = await seedEmployee(orgId);
+                await setEmail(employee.id, 'jane@example.test');
+                const { token, row } = await issueLink(employee.id);
+
+                const out = await manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token });
+
+                expect(out).toMatchObject({ email: 'jane@example.test' });
+                expect(out.sentAt).toBeInstanceOf(Date);
+                expect(mail.send).toHaveBeenCalledTimes(1);
+                const [to, url, orgName, name, expiresAt] = mail.send.mock.calls[0]!;
+                expect(to).toBe('jane@example.test');
+                expect(url).toBe(`https://app.example.test/app/register?token=${token}`);
+                expect(orgName).toContain('NFC test router');
+                expect(name).toBe(employee.fullName);
+                expect((expiresAt as Date).getTime()).toBe(row.expiresAt.getTime());
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it('sending the email does not use up the link: the employee can still open it, and it can be sent again', async () => {
+            reset();
+            const employee = await seedEmployee(orgId);
+            await setEmail(employee.id, 'again@example.test');
+            const { token } = await issueLink(employee.id);
+
+            await manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token });
+            await manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token }); // "Send again"
+
+            expect(mail.send).toHaveBeenCalledTimes(2);
+            await expect(phone().api().deviceRegistration.start({ token })).resolves.toMatchObject({ employeeName: employee.fullName });
+        });
+
+        it('the caller cannot choose the recipient: any extra "to" field is ignored', async () => {
+            reset();
+            const employee = await seedEmployee(orgId);
+            await setEmail(employee.id, 'real@example.test');
+            const { token } = await issueLink(employee.id);
+
+            await manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token, to: 'attacker@evil.test', url: 'https://evil.test/x' } as never);
+
+            expect(mail.send.mock.calls[0]![0]).toBe('real@example.test');
+            expect(String(mail.send.mock.calls[0]![1])).not.toContain('evil.test');
+        });
+
+        it('an employee with no email (or only spaces) is refused with EMPLOYEE_NO_EMAIL and nothing is sent', async () => {
+            reset();
+            const none = await seedEmployee(orgId);
+            const blank = await seedEmployee(orgId);
+            await setEmail(blank.id, '   ');
+            const a = await issueLink(none.id);
+            const b = await issueLink(blank.id);
+
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: none.id, token: a.token })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', appCode: 'EMPLOYEE_NO_EMAIL' });
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: blank.id, token: b.token })).rejects.toMatchObject({ appCode: 'EMPLOYEE_NO_EMAIL' });
+            expect(mail.send).not.toHaveBeenCalled();
+        });
+
+        it('only a link that belongs to this employee in this organisation can be sent', async () => {
+            reset();
+            const mine = await seedEmployee(orgId);
+            const other = await seedEmployee(orgId);
+            const foreign = await seedEmployee(otherOrgId);
+            for (const e of [mine, other, foreign]) await setEmail(e.id, `${e.id}@example.test`);
+            const mineLink = await issueLink(mine.id);
+            const foreignLink = await issueLink(foreign.id, otherOrgId);
+
+            // garbage, another employee's id with this token, another organisation's token, another organisation's manager
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: mine.id, token: 'not-a-real-token' })).rejects.toMatchObject({ appCode: 'LINK_NOT_FOUND' });
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: other.id, token: mineLink.token })).rejects.toMatchObject({ appCode: 'LINK_NOT_FOUND' });
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: foreign.id, token: foreignLink.token })).rejects.toMatchObject({ appCode: 'LINK_NOT_FOUND' });
+            await expect(manager(otherOrgId).deviceRegistration.emailLink({ employeeId: mine.id, token: mineLink.token })).rejects.toMatchObject({ appCode: 'LINK_NOT_FOUND' });
+            expect(mail.send).not.toHaveBeenCalled();
+        });
+
+        it('a link that is used, replaced or expired is refused, and so is an inactive employee', async () => {
+            reset();
+            const used = await seedEmployee(orgId);
+            const replaced = await seedEmployee(orgId);
+            const expired = await seedEmployee(orgId);
+            const inactive = await seedEmployee(orgId);
+            for (const e of [used, replaced, expired, inactive]) await setEmail(e.id, `${e.id}@example.test`);
+            const u = await issueLink(used.id);
+            await prisma.registrationToken.update({ where: { id: u.row.id }, data: { usedAt: new Date() } });
+            const r1 = await issueLink(replaced.id);
+            await issueLink(replaced.id); // supersedes r1
+            const x = await issueLink(expired.id);
+            await prisma.registrationToken.update({ where: { id: x.row.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+            const i = await issueLink(inactive.id);
+            await prisma.employee.update({ where: { id: inactive.id }, data: { status: 'INACTIVE' } });
+            const api = manager(orgId).deviceRegistration;
+
+            await expect(api.emailLink({ employeeId: used.id, token: u.token })).rejects.toMatchObject({ appCode: 'TOKEN_ALREADY_USED' });
+            await expect(api.emailLink({ employeeId: replaced.id, token: r1.token })).rejects.toMatchObject({ appCode: 'TOKEN_SUPERSEDED' });
+            await expect(api.emailLink({ employeeId: expired.id, token: x.token })).rejects.toMatchObject({ appCode: 'TOKEN_EXPIRED' });
+            await expect(api.emailLink({ employeeId: inactive.id, token: i.token })).rejects.toMatchObject({ appCode: 'EMPLOYEE_INACTIVE' });
+            expect(mail.send).not.toHaveBeenCalled();
+        });
+
+        it('a mail failure becomes EMAIL_FAILED without leaking the link, and the link stays usable for a retry', async () => {
+            reset();
+            const employee = await seedEmployee(orgId);
+            await setEmail(employee.id, 'down@example.test');
+            const { token } = await issueLink(employee.id);
+            mail.send.mockRejectedValueOnce(new Error(`provider exploded while sending https://x.test/app/register?token=${token}`));
+
+            const failure = await manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token }).then(
+                () => null,
+                (e: { code: string; appCode: string; message: string }) => e,
+            );
+
+            expect(failure).toMatchObject({ code: 'BAD_GATEWAY', appCode: 'EMAIL_FAILED' });
+            expect(JSON.stringify(failure)).not.toContain(token);
+            expect(failure!.message).not.toContain(token);
+            // the retry works with the very same link
+            await expect(manager(orgId).deviceRegistration.emailLink({ employeeId: employee.id, token })).resolves.toMatchObject({ email: 'down@example.test' });
+            await expect(phone().api().deviceRegistration.start({ token })).resolves.toBeDefined();
+        });
+
+        it('a NUL byte or an empty token is a bad request, not a server error', async () => {
+            reset();
+            const employee = await seedEmployee(orgId);
+            const api = manager(orgId).deviceRegistration;
+
+            await expect(api.emailLink({ employeeId: employee.id, token: 'ab\u0000cd' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+            await expect(api.emailLink({ employeeId: employee.id, token: '' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+            expect(mail.send).not.toHaveBeenCalled();
         });
     });
 });

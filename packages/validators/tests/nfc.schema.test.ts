@@ -6,6 +6,7 @@ import {
     setNfcCardActiveSchema,
     nfcTapSchema,
     sendRegistrationLinkSchema,
+    emailRegistrationLinkSchema,
     registerStartSchema,
     revokeDeviceSessionSchema,
 } from '../src/nfc.schema.js';
@@ -71,5 +72,22 @@ describe('attendanceApproveSessionSchema', () => {
         expect(attendanceApproveSessionSchema.safeParse({ id: 's1', checkOutAt: '2031-05-01T22:00:00+05:30' }).success).toBe(true);
         expect(attendanceApproveSessionSchema.safeParse({ id: 's1', checkOutAt: 'tomorrow' }).success).toBe(false);
         expect(attendanceApproveSessionSchema.safeParse({ id: 's1', checkOutAt: '2031-05-01T22:00:00' }).success).toBe(false);
+    });
+});
+
+describe('emailRegistrationLinkSchema', () => {
+    it('needs an employee id and a token, and nothing else is kept (no recipient or URL can be smuggled in)', () => {
+        const ok = emailRegistrationLinkSchema.safeParse({ employeeId: 'e1', token: 'abc', to: 'evil@x.test', url: 'https://evil.test' });
+        expect(ok.success).toBe(true);
+        expect(ok.success && ok.data).toEqual({ employeeId: 'e1', token: 'abc' });
+    });
+
+    it.each([[{}], [{ employeeId: 'e1' }], [{ token: 't' }], [{ employeeId: '', token: 't' }], [{ employeeId: 'e1', token: '   ' }]])('rejects %j', (input) => {
+        expect(emailRegistrationLinkSchema.safeParse(input).success).toBe(false);
+    });
+
+    it('rejects a NUL byte and an over-long token', () => {
+        expect(emailRegistrationLinkSchema.safeParse({ employeeId: 'e1', token: 'a\u0000b' }).success).toBe(false);
+        expect(emailRegistrationLinkSchema.safeParse({ employeeId: 'e1', token: 'x'.repeat(513) }).success).toBe(false);
     });
 });

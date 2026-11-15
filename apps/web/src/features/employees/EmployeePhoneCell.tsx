@@ -7,7 +7,7 @@ import { CopyField } from '../nfc/CopyField';
 import { describeAdminError } from '../nfc/errors';
 
 type Device = RouterOutputs['deviceRegistration']['listDevices'][number];
-type Employee = { id: string; fullName: string; status: 'ACTIVE' | 'INACTIVE' };
+type Employee = { id: string; fullName: string; status: 'ACTIVE' | 'INACTIVE'; email?: string | null };
 
 const day = (d: Date) => d.toLocaleDateString([], { dateStyle: 'medium' });
 
@@ -34,19 +34,36 @@ export function EmployeePhoneCell({ employee, devices }: { employee: Employee; d
 
 function PhoneModal({ employee, devices, onClose }: { employee: Employee; devices: Device[]; onClose: () => void }) {
     const utils = trpc.useUtils();
-    useEffect(() => {
-        // A dialog you can only dismiss with the mouse is a keyboard trap.
-        const onKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [onClose]);
-
-    const sendLink = trpc.deviceRegistration.sendLink.useMutation();
+    const sendLink = trpc.deviceRegistration.sendLink.useMutation({ onSuccess: () => emailLink.reset() });
+    const emailLink = trpc.deviceRegistration.emailLink.useMutation();
     const revoke = trpc.deviceRegistration.revokeDevice.useMutation({ onSuccess: () => refreshQuery(utils.deviceRegistration.listDevices) });
     const canLink = employee.status === 'ACTIVE';
 
+    const email = employee.email?.trim() || null;
+    const link = sendLink.data?.link;
+    const token = link ? new URL(link).searchParams.get('token') : null;
+    const sentAt = emailLink.data?.sentAt;
+    const sent = emailLink.isSuccess;
+    // A link that exists but has not been emailed must not be lost: Close stays locked until it is sent. The lock
+    // is also held while any request is in flight (a new link replaces the old one, so closing mid-way would strand it).
+    // An employee with no email address can never be sent anything, so locking would trap the manager: no lock then.
+    const unsentLink = Boolean(link) && Boolean(email) && !sent;
+    const locked = unsentLink || sendLink.isPending || emailLink.isPending;
+    const requestClose = () => {
+        if (!locked) onClose();
+    };
+
+    useEffect(() => {
+        // A dialog you can only dismiss with the mouse is a keyboard trap, so Esc closes it, unless it is locked.
+        const onKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && requestClose();
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    });
+
+    const sendButtonLabel = emailLink.isPending ? 'Sending…' : emailLink.isError ? '✉ Try again' : `✉ Send link to ${email}`;
+
     return (
-        <div role="dialog" aria-modal="true" aria-label={`Phone for ${employee.fullName}`} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
+        <div role="dialog" aria-modal="true" aria-label={`Phone for ${employee.fullName}`} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={requestClose}>
             <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-card" onClick={(e) => e.stopPropagation()}>
                 <h2 className="font-display text-lg font-extrabold text-olive-deep">{employee.fullName}’s phone</h2>
 
@@ -76,7 +93,7 @@ function PhoneModal({ employee, devices, onClose }: { employee: Employee; device
                 {!canLink && <p className="mt-1 text-sm text-muted">This employee is inactive. Reactivate them before setting up a phone.</p>}
                 <button
                     type="button"
-                    disabled={!canLink || sendLink.isPending}
+                    disabled={!canLink || sendLink.isPending || emailLink.isPending}
                     onClick={() => sendLink.mutate({ employeeId: employee.id })}
                     className="mt-2 rounded-xl bg-olive-deep px-4 py-2 text-sm font-semibold text-bone-light hover:bg-olive-deep/90 disabled:opacity-40"
                 >
@@ -90,10 +107,68 @@ function PhoneModal({ employee, devices, onClose }: { employee: Employee; device
                             Works once and expires {sendLink.data.expiresAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}. Send it to {employee.fullName}; they open it on
                             their phone, then tap an NFC card. If it opens inside WhatsApp, they should open it in Chrome or Safari instead.
                         </p>
+
+                        <div className="mt-4 border-t border-dashed border-edge pt-4">
+                            {!email ? (
+                                <>
+                                    <button type="button" disabled className="rounded-xl bg-olive-deep px-4 py-2 text-sm font-semibold text-bone-light opacity-40">
+                                        ✉ Send link by email
+                                    </button>
+                                    <p role="status" className="mt-3 rounded-lg bg-warn/15 px-3 py-2 text-sm text-ink">
+                                        {employee.fullName} has no email address on file. Add one in Employees, or copy the link above and send it yourself.
+                                    </p>
+                                </>
+                            ) : sent ? (
+                                <>
+                                    <p role="status" className="rounded-lg bg-live/15 px-3 py-2 text-sm text-olive-deep">
+                                        ✓ Link emailed to {emailLink.data?.email} at {sentAt?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        disabled={emailLink.isPending || !token}
+                                        onClick={() => token && emailLink.mutate({ employeeId: employee.id, token })}
+                                        className="mt-3 rounded-xl border border-edge bg-white px-4 py-2 text-sm font-semibold text-olive-deep hover:border-olive disabled:opacity-40"
+                                    >
+                                        Send again
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        disabled={emailLink.isPending || sendLink.isPending || !token}
+                                        onClick={() => token && emailLink.mutate({ employeeId: employee.id, token })}
+                                        className="rounded-xl bg-olive-deep px-4 py-2 text-sm font-semibold text-bone-light hover:bg-olive-deep/90 disabled:opacity-40"
+                                    >
+                                        {sendButtonLabel}
+                                    </button>
+                                    {emailLink.isError ? (
+                                        <p role="alert" className="mt-3 rounded-lg bg-rust/10 px-3 py-2 text-sm text-rust">{describeAdminError(emailLink.error)}</p>
+                                    ) : (
+                                        <p className="mt-2 text-xs text-muted">The employee receives a one-time link by email. Nothing is sent until you click.</p>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     </div>
                 )}
 
-                <button type="button" onClick={onClose} className="mt-6 text-sm font-medium text-rust hover:underline">Close</button>
+                <div className="mt-6 flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={requestClose}
+                        disabled={locked}
+                        aria-describedby={locked ? 'close-locked-hint' : undefined}
+                        className="text-sm font-medium text-rust hover:underline disabled:cursor-not-allowed disabled:text-muted/60 disabled:no-underline"
+                    >
+                        Close
+                    </button>
+                    {locked && (
+                        <span id="close-locked-hint" className="text-xs text-muted">
+                            {emailLink.isPending ? 'Sending…' : 'Send the link first to close this window.'}
+                        </span>
+                    )}
+                </div>
             </div>
         </div>
     );
